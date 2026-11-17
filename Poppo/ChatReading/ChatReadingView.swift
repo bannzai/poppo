@@ -39,6 +39,21 @@ func chatReadingPhase(
     }
 }
 
+/// 利用者が言語のダウンロードを選んだ時に、システムへダウンロードを頼むための設定を返す。
+/// current が同じ言語の組 (source・target) の設定なら、同じ設定のままでは translationTask が動き直さないため、
+/// 無効にして動かし直せるようにした current を返す。current が無い・違う言語の組の時は、渡した組の新しい設定を返す
+func nextLanguageDownloadConfiguration(
+    current: TranslationSession.Configuration?,
+    source: Locale.Language,
+    target: Locale.Language
+) -> TranslationSession.Configuration {
+    guard var configuration = current, configuration.source == source, configuration.target == target else {
+        return TranslationSession.Configuration(source: source, target: target)
+    }
+    configuration.invalidate()
+    return configuration
+}
+
 /// 選んだスクリーンショットを読み取り、発言ごとの翻訳と返信案を出す画面
 struct ChatReadingView: View {
     /// 読み取るスクリーンショット
@@ -52,12 +67,11 @@ struct ChatReadingView: View {
         ChatReadingPhaseView(
             phase: phase,
             downloadLanguage: { source, target in
-                if languageDownloadConfiguration == nil {
-                    languageDownloadConfiguration = TranslationSession.Configuration(source: source, target: target)
-                } else {
-                    // 同じ設定のままでは translationTask が動き直さないため、2 回目以降は設定を無効にして動かし直す
-                    languageDownloadConfiguration?.invalidate()
-                }
+                languageDownloadConfiguration = nextLanguageDownloadConfiguration(
+                    current: languageDownloadConfiguration,
+                    source: source,
+                    target: target
+                )
             },
             retry: {
                 Task {
