@@ -21,8 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: スクリプトのテスト
+      - name: 実機を決める処理のテスト
         run: bash scripts/test/test-resolve-physical-device.sh
+
+      - name: Makefile の実機向け target のテスト
+        run: bash scripts/test/test-makefile-device-targets.sh
 
   build-and-test:
     # iOS 27 の SDK と simulator が入っている GitHub-hosted runner は xcode-27 だけ

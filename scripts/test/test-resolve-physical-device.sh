@@ -59,5 +59,30 @@ expect "実機が 2 台とも待機中なら決められない" "" 1 "$work/two-
 
 expect "ファイルが無い時は使い方のエラー (exit 2)" "" 2 "$work/missing.json"
 
+echo '{"result":' > "$work/broken.json"
+expect "JSON として読めないファイルは exit 3" "" 3 "$work/broken.json"
+
+echo '{"unexpected":true}' > "$work/other-shape.json"
+expect "devicectl の一覧の形でない JSON は exit 3" "" 3 "$work/other-shape.json"
+
+# 引数の数が違う時は使い方のエラー (exit 2) で、何も出力しない
+expect_argument_error() {
+  local description="$1"
+  shift
+  local output code
+  output="$(bash "$script" "$@" 2>/dev/null)"
+  code=$?
+  if [ -z "$output" ] && [ "$code" -eq 2 ]; then
+    echo "PASS: ${description}"
+    pass=$((pass + 1))
+  else
+    echo "FAIL: ${description} (出力='${output}' exit=${code} / 期待は 出力='' exit=2)"
+    fail=$((fail + 1))
+  fi
+}
+
+expect_argument_error "引数が無い時は使い方のエラー (exit 2)"
+expect_argument_error "引数が 2 つの時は使い方のエラー (exit 2)" "$work/one-disconnected.json" "$work/one-disconnected.json"
+
 echo "passed: $pass, failed: $fail"
 [ "$fail" -eq 0 ]
