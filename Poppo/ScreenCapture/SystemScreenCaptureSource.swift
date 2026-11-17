@@ -14,8 +14,11 @@ final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
     /// 映像を受け取っている stream。取り込みを始めていない間と、止めた後は nil
     private var stream: SCStream?
     /// 本体アプリの操作 (止める操作・対象の選び直し) で stream を止めている途中か。
-    /// 途中の間は、止まったかどうかを stopCapture の結果で決めるため、システムからの「止まった」知らせと対象の選び直しを受けない
+    /// 途中の間は、止まったかどうかを stopCapture の結果で決めるため、システムからの「止まった」知らせを受けない
     private var isStoppingStream = false
+    /// 対象の選び直しで前の stream が止まるのを待っている間の、利用者が最後に選んだ対象。待っていない時は nil。
+    /// 待っている間にもう一度選び直された時は、後から選んだ対象で置き換える
+    private var filterAwaitingReplacement: SCContentFilter?
 
     /// 取り込む対象を選ぶシステムの画面を出す。利用者が対象を選ぶと映像の受け取りを始める。
     /// 何度呼んでも、システムの画面からの知らせを受ける登録は 1 つだけになる
@@ -68,31 +71,37 @@ final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
     /// 既に手放している時は何もしないのと同じ結果になる
     private func releaseStream() {
         stream = nil
+        filterAwaitingReplacement = nil
         SCContentSharingPicker.shared.remove(self)
         SCContentSharingPicker.shared.isActive = false
     }
 
     /// 利用者が選んだ対象 (filter) の映像の受け取りを始める。結果は onEvent に届く。
     /// 既に映像を受け取っている時 (取り込み中に利用者が対象を選び直した時) は、前の対象の stream が止まってから、選び直した対象で始め直す。
-    /// 前の対象の stream を止められなかった時は、始め直さずに stopFailed を知らせる (前の対象の映像を受け取ったままになる)
+    /// 前の対象の stream を止められなかった時は、始め直さずに stopFailed を知らせる (前の対象の映像を受け取ったままになる)。
+    /// 前の対象の stream が止まるのを待っている間にもう一度呼ばれた時は、始め直す対象を後から選んだ対象に置き換える
     private func startStream(filter: SCContentFilter) {
         guard let replacedStream = stream else {
             beginStream(filter: filter)
             return
         }
+        filterAwaitingReplacement = filter
+        guard !isStoppingStream else {
+            return
+        }
         // iOS の SCStream は対象を差し替えられない (updateContentFilter は iOS で使えない) ため、stream を作り直す。
         // Apple のサンプルと同じ扱い: 「When the picker returns a filter, the sample tears down any prior stream and builds a fresh SCStream」
         // ( https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-on-ios )
-        // nonisolated(unsafe): SCContentFilter は Sendable でないが、filter は MainActor の中でだけ使う
-        nonisolated(unsafe) let selectedFilter = filter
         isStoppingStream = true
         stopCapture(stream: replacedStream) { failureDescription in
             self.isStoppingStream = false
             if let failureDescription {
+                self.filterAwaitingReplacement = nil
                 self.onEvent?(.stopFailed(failureDescription))
-            } else if SCContentSharingPicker.shared.isActive {
+            } else if SCContentSharingPicker.shared.isActive, let filterAwaitingReplacement = self.filterAwaitingReplacement {
                 self.stream = nil
-                self.beginStream(filter: selectedFilter)
+                self.filterAwaitingReplacement = nil
+                self.beginStream(filter: filterAwaitingReplacement)
             } else {
                 // 前の対象の stream を止めている途中に止める操作 (stop()) があった。選び直した対象では始めない
                 self.releaseStream()
@@ -147,9 +156,10 @@ extension SystemScreenCaptureSource: SCContentSharingPickerObserver {
         // nonisolated(unsafe): SCContentFilter は Sendable でないが、この関数は filter を MainActor に渡した後は触らないため、同時に使われない
         nonisolated(unsafe) let selectedFilter = filter
         Task { @MainActor in
-            // 止める操作 (stop() が isActive を false にする) の後と、stream を止めている途中に届いた選択では、取り込みを始めない。
-            // 止めた後に取り込みが始まり直ると、利用者が止めたつもりの画面を読み続ける
-            guard SCContentSharingPicker.shared.isActive, !self.isStoppingStream else {
+            // 止める操作 (stop() が isActive を false にする) の後に届いた選択では、取り込みを始めない。
+            // 止めた後に取り込みが始まり直ると、利用者が止めたつもりの画面を読み続ける。
+            // 対象の選び直しで前の stream を止めている途中 (isActive は true のまま) に届いた選択は、startStream が受けて、始め直す対象にする
+            guard SCContentSharingPicker.shared.isActive else {
                 return
             }
             self.startStream(filter: selectedFilter)
