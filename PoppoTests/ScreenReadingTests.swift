@@ -15,6 +15,11 @@ final class FakeScreenReader {
     var onRecognize: (() -> Void)?
     /// 翻訳が投げるエラー。nil の時は、渡された文の頭に「訳: 」を付けて返す
     var translationError: (any Error)?
+    /// translationError を投げる翻訳の呼び出しの番号 (1 が最初の呼び出し)。nil の時は、どの呼び出しでも投げる。
+    /// 発言の翻訳 (1 回目) は成功し、返信の文の意味を作る翻訳 (2 回目) だけが失敗する場面を作るのに使う
+    var translationErrorCallNumber: Int?
+    /// 翻訳が呼ばれた時に、訳文を返す前に実行する処理 (翻訳の途中で起きる出来事をテストが起こすのに使う)
+    var onTranslate: (() -> Void)?
     /// 返信案を作れるか
     var canGenerateReplies = true
     /// 返信の文の生成が返す文
@@ -38,10 +43,11 @@ final class FakeScreenReader {
         return lines
     }
 
-    /// 呼ばれた回数を数え、translationError を投げるか、texts のそれぞれの頭に「訳: 」を付けて返す
+    /// 呼ばれた回数を数え、onTranslate を実行してから、translationError を投げるか、texts のそれぞれの頭に「訳: 」を付けて返す
     func translate(texts: [String]) throws -> [String] {
         translationCallCount += 1
-        if let translationError {
+        onTranslate?()
+        if let translationError, translationErrorCallNumber.map({ $0 == translationCallCount }) ?? true {
             throw translationError
         }
         return texts.map { "訳: " + $0 }
@@ -363,6 +369,64 @@ private let otherChatLines = [
     #expect(controller.diagnostics?.reading == ScreenReadingDiagnostics())
 }
 
+/// 翻訳の途中で取り込みが止まった時は、その読み取りの結果を保存せず、翻訳より後の段を診断の記録に足さないこと
+@Test func screenReadingDoesNotSaveWhenCaptureStopsDuringTranslation() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    reader.onTranslate = { controller.stop() }
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(controller.status == .stopped)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
+    #expect(!FileManager.default.fileExists(atPath: latestReadingFileURL.path))
+    #expect(controller.diagnostics?.reading.recognition.successCount == 1)
+    #expect(controller.diagnostics?.reading.translation == ScreenReadingStageDiagnostics())
+    #expect(controller.diagnostics?.reading.replyGeneration == ScreenReadingStageDiagnostics())
+    #expect(controller.diagnostics?.reading.saving == ScreenReadingStageDiagnostics())
+}
+
+/// 翻訳の途中で取り込みを止めて始め直した時は、前の取り込みの読み取りの結果を、新しい取り込みの読み取り結果として保存せず、
+/// 新しい取り込みの診断の記録にも足さないこと
+@Test func screenReadingDoesNotMixResultIntoRestartedCapture() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    reader.onTranslate = {
+        reader.onTranslate = nil
+        controller.stop()
+        controller.start()
+        source.onEvent?(.started)
+    }
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(controller.status == .capturing)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
+    #expect(controller.diagnostics?.reading == ScreenReadingDiagnostics())
+}
+
 /// 取り込みを止めて始め直した後は、前の取り込みで読んだ画面と同じ画素・同じ発言の画面でも読み直して保存すること
 /// (止めた時に読み取り結果を消しているため)
 @Test func screenReadingReadsSameScreenAgainAfterCaptureRestarts() async throws {
@@ -614,6 +678,92 @@ private let otherChatLines = [
     #expect(controller.diagnostics?.reading.replyGeneration.failureCount == 1)
     #expect(controller.diagnostics?.reading.replyGeneration.lastFailureDescription == "com.example.model 4: model busy")
     #expect(controller.diagnostics?.reading.translation.successCount == 1)
+}
+
+/// 発言の翻訳は成功し、返信の文の意味を作る翻訳だけが失敗した時は、翻訳だけを保存し、
+/// 翻訳の失敗ではなく返信案の生成の失敗として、その翻訳のエラーの内容を記録すること
+@Test func screenReadingRecordsReplyGenerationFailureWhenReplyMeaningTranslationFails() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    reader.translationError = ChatReadingError.incompleteTranslation
+    reader.translationErrorCallNumber = 2
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    let latestReading = try #require(loadLatestReading(fileURL: latestReadingFileURL))
+    #expect(latestReading.messages.map(\.translatedText) == ["訳: Are you free today?", "訳: Yes, after lunch"])
+    #expect(latestReading.replySuggestions.isEmpty)
+    #expect(controller.diagnostics?.reading.translation.successCount == 1)
+    #expect(controller.diagnostics?.reading.translation.failureCount == 0)
+    #expect(controller.diagnostics?.reading.replyGeneration.failureCount == 1)
+    #expect(controller.diagnostics?.reading.replyGeneration.lastFailureDescription == "ChatReadingError.incompleteTranslation")
+}
+
+/// 読み取りの記録 (reading) を足す前の版が保存した診断の記録を、読み取りの記録が空の記録として読めること
+/// (アプリを新しくした後も、前回の取り込みの記録を開発者メニューで見られるようにする)
+@Test func screenCaptureDiagnosticsLoadsRecordSavedWithoutReading() throws {
+    let fileURL = temporaryFileURL()
+    try save(
+        screenCaptureDiagnostics: ScreenCaptureDiagnostics(
+            startedAt: Date(timeIntervalSinceReferenceDate: 500),
+            stoppedAt: nil,
+            stopReason: nil,
+            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 620),
+            receivedFrameCount: 42
+        ),
+        fileURL: fileURL
+    )
+    var savedObject = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: fileURL)) as? [String: Any])
+    #expect(savedObject.removeValue(forKey: "reading") != nil)
+    try JSONSerialization.data(withJSONObject: savedObject).write(to: fileURL)
+
+    #expect(
+        loadScreenCaptureDiagnostics(fileURL: fileURL)
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 500),
+                stoppedAt: nil,
+                stopReason: nil,
+                lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 620),
+                receivedFrameCount: 42
+            )
+    )
+}
+
+/// 読み取りの記録を持つ診断の記録を保存して読み出すと、段ごとの回数・時刻・エラーの内容が同じまま戻ること
+@Test func screenCaptureDiagnosticsRoundTripsReading() throws {
+    let fileURL = temporaryFileURL()
+    let diagnostics = ScreenCaptureDiagnostics(
+        startedAt: Date(timeIntervalSinceReferenceDate: 500),
+        stoppedAt: nil,
+        stopReason: nil,
+        lastFrameReceivedAt: nil,
+        receivedFrameCount: 3,
+        reading: ScreenReadingDiagnostics(
+            translation: ScreenReadingStageDiagnostics(
+                successCount: 2,
+                lastSucceededAt: Date(timeIntervalSinceReferenceDate: 510),
+                failureCount: 1,
+                lastFailedAt: Date(timeIntervalSinceReferenceDate: 520),
+                lastFailureDescription: "ChatReadingError.incompleteTranslation"
+            ),
+            shownLatestReadingCount: 4
+        )
+    )
+
+    try save(screenCaptureDiagnostics: diagnostics, fileURL: fileURL)
+
+    #expect(loadScreenCaptureDiagnostics(fileURL: fileURL) == diagnostics)
 }
 
 /// 返信の文が 1 つも作られなかった時 (エラーは無い) は、返信案の生成の失敗として、その旨を記録すること

@@ -79,6 +79,23 @@ struct ScreenCaptureDiagnostics: Codable, Equatable {
     var reading = ScreenReadingDiagnostics()
 }
 
+extension ScreenCaptureDiagnostics {
+    /// 保存してある記録 (decoder) から作る。読み取りの記録 (reading) が無い記録は、読み取りの記録を空として読む。
+    /// 自動で作られる読み出しは初期値のある項目もキーを必須にし、読み取りの記録を足す前の版が保存した記録を読めなくなるため、手で書いている
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            startedAt: try container.decodeIfPresent(Date.self, forKey: .startedAt),
+            stoppedAt: try container.decodeIfPresent(Date.self, forKey: .stoppedAt),
+            stopReason: try container.decodeIfPresent(ScreenCaptureStopReason.self, forKey: .stopReason),
+            lastFrameReceivedAt: try container.decodeIfPresent(Date.self, forKey: .lastFrameReceivedAt),
+            receivedFrameCount: try container.decode(Int.self, forKey: .receivedFrameCount),
+            // 読み取りの記録を足す前の版の記録は、読み取りを 1 回もしていない取り込みの記録のため、空 (すべて 0 回) として読む
+            reading: try container.decodeIfPresent(ScreenReadingDiagnostics.self, forKey: .reading) ?? ScreenReadingDiagnostics()
+        )
+    }
+}
+
 /// 診断の記録を fileURL に保存する。前に保存した記録は上書きされる。
 /// 置く場所のディレクトリが無ければ作る。書き込めない時はエラーを投げる
 func save(screenCaptureDiagnostics: ScreenCaptureDiagnostics, fileURL: URL) throws {
