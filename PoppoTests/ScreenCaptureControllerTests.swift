@@ -621,6 +621,62 @@ func makeScreenCaptureController(
     #endif
 }
 
+// ScreenCaptureKit が無い環境 (iOS Simulator) でだけコンパイルされる取り込みの実体のテスト。テストは simulator で走る
+#if !canImport(ScreenCaptureKit)
+/// ScreenCaptureKit が無い環境の取り込みの実体は、始める操作のたびに、取り込めないことをエラーとして 1 回知らせること
+@Test func unavailableScreenCaptureSourceReportsFailureOnEachStart() {
+    let source = UnavailableScreenCaptureSource()
+    var events: [ScreenCaptureEvent] = []
+    source.onEvent = { events.append($0) }
+
+    source.start()
+    #expect(events == [.failed("ScreenCaptureKit is not available in this environment (iOS Simulator)")])
+
+    source.start()
+    #expect(
+        events == [
+            .failed("ScreenCaptureKit is not available in this environment (iOS Simulator)"),
+            .failed("ScreenCaptureKit is not available in this environment (iOS Simulator)"),
+        ]
+    )
+}
+
+/// ScreenCaptureKit が無い環境の取り込みの実体は、止める操作で何も知らせないこと
+@Test func unavailableScreenCaptureSourceReportsNothingOnStop() {
+    let source = UnavailableScreenCaptureSource()
+    var events: [ScreenCaptureEvent] = []
+    source.onEvent = { events.append($0) }
+
+    source.stop()
+
+    #expect(events.isEmpty)
+}
+
+/// ScreenCaptureKit が無い環境では、本体アプリが使う取り込みの実体で始める操作をすると「エラーで止まった」になり、
+/// 取り込めない理由が診断の記録に残ること (simulator で「同意して始める」を押した時の動き)
+@Test func screenCaptureFailsOnStartWhenScreenCaptureKitIsUnavailable() {
+    let controller = ScreenCaptureController(
+        makeSource: makeScreenCaptureSource,
+        latestReadingFileURL: nil,
+        diagnosticsFileURL: nil,
+        now: { Date(timeIntervalSinceReferenceDate: 1000) }
+    )
+
+    controller.start()
+
+    #expect(controller.status == .failed)
+    #expect(
+        controller.diagnostics == ScreenCaptureDiagnostics(
+            startedAt: nil,
+            stoppedAt: Date(timeIntervalSinceReferenceDate: 1000),
+            stopReason: .error("ScreenCaptureKit is not available in this environment (iOS Simulator)"),
+            lastFrameReceivedAt: nil,
+            receivedFrameCount: 0
+        )
+    )
+}
+#endif
+
 /// エラーを診断の記録に残す文が、エラーのドメイン・コード・説明を「ドメイン コード: 説明」の形で含むこと
 @Test func screenCaptureFailureDescriptionContainsDomainCodeAndMessage() {
     #expect(

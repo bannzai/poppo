@@ -1,7 +1,7 @@
 import Foundation
 
 /// 取り込みの実体が知らせる出来事
-enum ScreenCaptureEvent {
+enum ScreenCaptureEvent: Equatable {
     /// 利用者がシステムの画面で取り込む対象を選び、映像の受け取りが始まった
     case started
     /// 映像を 1 枚受け取った。値は受け取った時刻
