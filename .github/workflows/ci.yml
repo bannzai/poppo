@@ -11,8 +11,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  # PR は新しい push が来たら前の実行を取り消す。main への push は取り消さず、commit ごとの結果を残す
+  # PR は ref ごとに 1 つの group にまとめ、新しい push が来たら前の実行を取り消す。
+  # push と workflow_dispatch は commit ごとに group を分ける。同じ group だと、cancel-in-progress が false でも
+  # 待機中の実行は次の実行に置き換えられて取り消され、続けて push した時に間の commit の結果が残らないため
+  # (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency )
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
