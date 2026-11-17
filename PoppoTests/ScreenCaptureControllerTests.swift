@@ -9,7 +9,7 @@ final class FakeScreenCaptureSource: ScreenCaptureSource {
     /// 出来事を渡して呼ぶ処理。controller が設定し、テストが呼ぶ
     var onEvent: ((ScreenCaptureEvent) -> Void)?
     /// 映像を受け取った時に呼ぶ処理。controller が設定し、テストが呼ぶ
-    var onFrameImage: ((_ receivedAt: Date, _ makeImage: () throws -> CGImage?) -> Void)?
+    var onFrameImage: ((_ receivedAt: Date, _ makeImage: @escaping () throws -> CGImage) -> Void)?
     /// start が呼ばれた回数
     private(set) var startCallCount = 0
     /// stop が呼ばれた回数
@@ -60,7 +60,8 @@ func makeScreenCaptureController(
         recognizeTextLines: { _ in [] },
         translateTexts: { $0 },
         canGenerateReplies: { false },
-        generateReplyTexts: { _ in [] }
+        generateReplyTexts: { _ in [] },
+        wait: { _ in }
     )
 }
 
@@ -79,7 +80,8 @@ func makeScreenCaptureController(
         recognizeTextLines: { _ in [] },
         translateTexts: { $0 },
         canGenerateReplies: { false },
-        generateReplyTexts: { _ in [] }
+        generateReplyTexts: { _ in [] },
+        wait: { _ in }
     )
 
     #expect(controller.status == .notStarted)
@@ -804,7 +806,8 @@ func makeScreenCaptureController(
         recognizeTextLines: { _ in [] },
         translateTexts: { $0 },
         canGenerateReplies: { false },
-        generateReplyTexts: { _ in [] }
+        generateReplyTexts: { _ in [] },
+        wait: { _ in }
     )
 
     controller.start()

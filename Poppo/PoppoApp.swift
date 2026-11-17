@@ -31,7 +31,8 @@ func makeOnDeviceScreenCaptureController(latestReadingFileURL: URL?, diagnostics
             try await translateOnDevice(texts: $0, targetLanguage: userLanguage(preferredLanguages: Locale.preferredLanguages))
         },
         canGenerateReplies: { SystemLanguageModel.default.isAvailable },
-        generateReplyTexts: { try await generateReplyTexts(messages: $0) }
+        generateReplyTexts: { try await generateReplyTexts(messages: $0) },
+        wait: { try? await Task.sleep(for: .seconds($0)) }
     )
 }
 

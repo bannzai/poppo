@@ -32,6 +32,10 @@ final class FakeScreenReader {
     private(set) var translationCallCount = 0
     /// 返信の文の生成が呼ばれた回数
     private(set) var replyGenerationCallCount = 0
+    /// 待つ処理が呼ばれた時に、待ち終える前に実行する処理 (待っている間に起きる出来事をテストが起こすのに使う)
+    var onWait: (() -> Void)?
+    /// 待つ処理に渡された秒数。呼ばれた順に並ぶ
+    private(set) var waitedSeconds: [TimeInterval] = []
 
     /// 呼ばれた回数を数え、onRecognize を実行してから、recognitionError を投げるか lines を返す
     func recognizeTextLines() throws -> [RecognizedTextLine] {
@@ -61,6 +65,12 @@ final class FakeScreenReader {
         }
         return replyTexts
     }
+
+    /// 渡された秒数を waitedSeconds に足し、onWait を実行する。実際には待たない
+    func wait(seconds: TimeInterval) {
+        waitedSeconds.append(seconds)
+        onWait?()
+    }
 }
 
 /// 偽物の取り込みの実体 (source) と、偽物の読む処理 (reader) をつないだ controller を作って返す。clock は時計、
@@ -80,7 +90,8 @@ private func makeScreenReadingController(
         recognizeTextLines: { _ in try reader.recognizeTextLines() },
         translateTexts: { try reader.translate(texts: $0) },
         canGenerateReplies: { reader.canGenerateReplies },
-        generateReplyTexts: { _ in try reader.generateReplyTexts() }
+        generateReplyTexts: { _ in try reader.generateReplyTexts() },
+        wait: { reader.wait(seconds: $0) }
     )
 }
 
@@ -102,10 +113,19 @@ private func makeScreenImage(gray: CGFloat) throws -> CGImage {
     return try #require(context.makeImage())
 }
 
-/// 取り込み中の controller に、receivedAt (基準の時刻からの秒) に受け取った映像として image を流し、始まった読み取りが終わるまで待つ
+/// controller が進めている読み取りと、見送った映像の扱いが、どちらも終わるまで待つ
+private func waitUntilIdle(controller: ScreenCaptureController) async {
+    while controller.readingTask != nil || controller.skippedFrameTask != nil {
+        await controller.readingTask?.value
+        await controller.skippedFrameTask?.value
+    }
+}
+
+/// 取り込み中の controller に、receivedAt (基準の時刻からの秒) に受け取った映像として image を流し、
+/// 始まった読み取りと、見送った映像の扱いが終わるまで待つ
 private func receiveFrame(source: FakeScreenCaptureSource, controller: ScreenCaptureController, receivedAt: TimeInterval, image: CGImage) async {
     source.onFrameImage?(Date(timeIntervalSinceReferenceDate: receivedAt)) { image }
-    await controller.readingTask?.value
+    await waitUntilIdle(controller: controller)
 }
 
 /// 相手の発言 1 つと利用者の発言 1 つが写った画面の行
@@ -229,8 +249,45 @@ private let otherChatLines = [
     #expect(controller.diagnostics?.reading.saving.successCount == 2)
 }
 
-/// 前に映像を画像にしてから 2 秒経つまでは、次の映像を画像にせず、ちょうど 2 秒経った映像は画像にすること
-@Test func screenReadingMakesImageAtMostOnceEveryTwoSeconds() async throws {
+/// 前に映像を画像にしてから 2 秒経つまでに届いた映像は、届いた時には画像にせず、2 秒経つまでの残りの時間を待ってから画像にして読むこと
+/// (見送った後に画面が変わらなくなると次の映像が届かないため、見送った映像を後で読む)
+@Test func screenReadingReadsFrameSkippedWithinTwoSecondsAfterWaitingForRest() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+    reader.lines = otherChatLines
+    let changedImage = try makeScreenImage(gray: 0.8)
+    var makeImageCallCount = 0
+
+    source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1002.5)) {
+        makeImageCallCount += 1
+        return changedImage
+    }
+    #expect(makeImageCallCount == 0)
+    #expect(reader.recognitionCallCount == 1)
+
+    await waitUntilIdle(controller: controller)
+    #expect(reader.waitedSeconds == [0.5])
+    #expect(makeImageCallCount == 1)
+    #expect(reader.recognitionCallCount == 2)
+    let latestReading = try #require(loadLatestReading(fileURL: latestReadingFileURL))
+    #expect(latestReading.capturedAt == Date(timeIntervalSinceReferenceDate: 1002.5))
+    #expect(latestReading.messages.map(\.originalText) == ["See you tomorrow"])
+}
+
+/// 前に映像を画像にしてからちょうど 2 秒経って届いた映像は、待たずに、届いた時に画像にすること
+@Test func screenReadingMakesImageImmediatelyWhenTwoSecondsHavePassed() async throws {
     let source = FakeScreenCaptureSource()
     let reader = FakeScreenReader()
     reader.lines = chatLines
@@ -247,25 +304,58 @@ private let otherChatLines = [
     let changedImage = try makeScreenImage(gray: 0.8)
     var makeImageCallCount = 0
 
-    source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1002.9)) {
-        makeImageCallCount += 1
-        return changedImage
-    }
-    await controller.readingTask?.value
-    #expect(makeImageCallCount == 0)
-    #expect(reader.recognitionCallCount == 1)
-
     source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1003)) {
         makeImageCallCount += 1
         return changedImage
     }
-    await controller.readingTask?.value
     #expect(makeImageCallCount == 1)
+
+    await waitUntilIdle(controller: controller)
+    #expect(reader.waitedSeconds.isEmpty)
     #expect(reader.recognitionCallCount == 2)
 }
 
-/// 前の読み取りが途中の間に届いた映像は、2 秒経っていても画像にしないこと
-@Test func screenReadingDoesNotMakeImageWhileReadingIsInProgress() async throws {
+/// 見送った映像が続いた時は、最後の 1 枚だけを画像にして読み、その前に見送った映像は画像にしないこと
+@Test func screenReadingReadsOnlyLastOfSkippedFrames() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+    reader.lines = otherChatLines
+    let firstSkippedImage = try makeScreenImage(gray: 0.5)
+    let lastSkippedImage = try makeScreenImage(gray: 0.8)
+    var firstSkippedMakeImageCallCount = 0
+    var lastSkippedMakeImageCallCount = 0
+
+    source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1001.5)) {
+        firstSkippedMakeImageCallCount += 1
+        return firstSkippedImage
+    }
+    source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1002)) {
+        lastSkippedMakeImageCallCount += 1
+        return lastSkippedImage
+    }
+    await waitUntilIdle(controller: controller)
+
+    #expect(firstSkippedMakeImageCallCount == 0)
+    #expect(lastSkippedMakeImageCallCount == 1)
+    #expect(reader.waitedSeconds == [1.5])
+    #expect(reader.recognitionCallCount == 2)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL)?.capturedAt == Date(timeIntervalSinceReferenceDate: 1002))
+}
+
+/// 前の読み取りが途中の間に届いた映像は、届いた時には画像にせず、その読み取りが終わってから、待たずに画像にして読むこと
+@Test func screenReadingReadsFrameSkippedDuringReadingAfterReadingEnds() async throws {
     let source = FakeScreenCaptureSource()
     let reader = FakeScreenReader()
     reader.lines = chatLines
@@ -279,18 +369,58 @@ private let otherChatLines = [
     controller.start()
     source.onEvent?(.started)
     let changedImage = try makeScreenImage(gray: 0.8)
-    var makeImageCallCountDuringReading = 0
+    var makeImageCallCount = 0
+    var makeImageCallCountRightAfterFrameArrived: Int?
     reader.onRecognize = {
+        reader.onRecognize = nil
         source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1010)) {
-            makeImageCallCountDuringReading += 1
+            makeImageCallCount += 1
             return changedImage
         }
+        makeImageCallCountRightAfterFrameArrived = makeImageCallCount
     }
 
     await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
 
-    #expect(makeImageCallCountDuringReading == 0)
+    #expect(makeImageCallCountRightAfterFrameArrived == 0)
+    #expect(makeImageCallCount == 1)
+    #expect(reader.waitedSeconds.isEmpty)
+    #expect(reader.recognitionCallCount == 2)
+    #expect(controller.diagnostics?.reading.saving.successCount == 1)
+    #expect(controller.diagnostics?.reading.unchangedMessagesCount == 1)
+}
+
+/// 見送った映像を読むのを待っている間に取り込みが止まった時は、見送った映像を画像にせず、何も保存しないこと
+@Test func screenReadingDoesNotReadSkippedFrameWhenCaptureStopsWhileWaiting() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+    let changedImage = try makeScreenImage(gray: 0.8)
+    var makeImageCallCount = 0
+    reader.onWait = { controller.stop() }
+
+    source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1002)) {
+        makeImageCallCount += 1
+        return changedImage
+    }
+    await waitUntilIdle(controller: controller)
+
+    #expect(controller.status == .stopped)
+    #expect(reader.waitedSeconds == [1])
+    #expect(makeImageCallCount == 0)
     #expect(reader.recognitionCallCount == 1)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
 }
 
 /// 取り込み中でない時 (始まる前) に届いた映像は、画像にしないこと
@@ -312,7 +442,7 @@ private let otherChatLines = [
         makeImageCallCount += 1
         return image
     }
-    await controller.readingTask?.value
+    await waitUntilIdle(controller: controller)
 
     #expect(makeImageCallCount == 0)
     #expect(reader.recognitionCallCount == 0)
@@ -490,31 +620,8 @@ private let otherChatLines = [
     #expect(controller.diagnostics?.reading.saving.successCount == 1)
 }
 
-/// 映像に画面の絵が入っていない時は、何も記録せず、すぐ後 (2 秒以内) に届いた映像を読むこと
-@Test func screenReadingSkipsFrameWithoutImageAndReadsNextFrame() async throws {
-    let source = FakeScreenCaptureSource()
-    let reader = FakeScreenReader()
-    reader.lines = chatLines
-    let controller = makeScreenReadingController(
-        source: source,
-        reader: reader,
-        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
-        latestReadingFileURL: temporaryFileURL(),
-        diagnosticsFileURL: nil
-    )
-    controller.start()
-    source.onEvent?(.started)
-
-    source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1001)) { nil }
-    await controller.readingTask?.value
-    #expect(controller.diagnostics?.reading == ScreenReadingDiagnostics())
-
-    await receiveFrame(source: source, controller: controller, receivedAt: 1001.1, image: try makeScreenImage(gray: 0.2))
-    #expect(reader.recognitionCallCount == 1)
-}
-
 /// 映像を画像にできなかった時は、文字の読み取りの失敗として、結果のコードと画素の形式つきで時刻とともに記録し、
-/// 2 秒経つまで次の映像を画像にしないこと
+/// 2 秒経つまでに届いた次の映像は、届いた時には画像にしないこと
 @Test func screenReadingRecordsImageConversionFailureAsRecognitionFailure() async throws {
     let source = FakeScreenCaptureSource()
     let reader = FakeScreenReader()
@@ -525,6 +632,7 @@ private let otherChatLines = [
     controller.start()
     source.onEvent?(.started)
     clock.now = Date(timeIntervalSinceReferenceDate: 1002)
+    let nextImage = try makeScreenImage(gray: 0.2)
     var makeImageCallCount = 0
 
     source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1001)) {
@@ -532,9 +640,8 @@ private let otherChatLines = [
     }
     source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1002.5)) {
         makeImageCallCount += 1
-        return nil
+        return nextImage
     }
-    await controller.readingTask?.value
 
     #expect(
         controller.diagnostics?.reading.recognition
@@ -546,6 +653,10 @@ private let otherChatLines = [
     )
     #expect(makeImageCallCount == 0)
     #expect(reader.recognitionCallCount == 0)
+
+    await waitUntilIdle(controller: controller)
+    #expect(reader.waitedSeconds == [0.5])
+    #expect(makeImageCallCount == 1)
 }
 
 /// 文字の読み取りが失敗した時は、読み取りの失敗をエラーの内容と時刻つきで記録し、翻訳へ進まず、何も保存しないこと
@@ -898,7 +1009,7 @@ private let otherChatLines = [
     #expect(controller.diagnostics?.reading.saving.successCount == 0)
 }
 
-/// 画面に、保存してある読み取り結果の訳文 (Poppo のキーボードが出している文) が映っている時は、
+/// 画面に、保存してある読み取り結果の訳文と返信案の意味 (Poppo のキーボードが出している文) が映っている時は、
 /// 発言として読み直さず、保存してある読み取り結果を書き換えないこと
 @Test func screenReadingDoesNotReadScreenShowingLatestReading() async throws {
     let source = FakeScreenCaptureSource()
@@ -915,9 +1026,7 @@ private let otherChatLines = [
     controller.start()
     source.onEvent?(.started)
     await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
-    reader.lines = chatLines + [
-        RecognizedTextLine(text: "訳: Are you free today?", boundingBox: CGRect(x: 0.05, y: 0.7, width: 0.6, height: 0.02)),
-    ]
+    reader.lines = chatLines + screenLines(texts: ["訳: Are you free today?", "訳: Sounds good"])
 
     await receiveFrame(source: source, controller: controller, receivedAt: 1004, image: try makeScreenImage(gray: 0.8))
 
@@ -928,7 +1037,35 @@ private let otherChatLines = [
     #expect(latestReading.messages.count == 2)
 }
 
-/// 画面の行と比べる読み取り結果。原文と違う訳文の発言・原文のままの発言・訳しても変わらない語 (GitHub) を含む発言・返信案を 1 つずつ持つ
+/// チャットに届いた発言が、保存してある訳文の 1 つと同じ文だった時 (訳文が 1 つだけ映っている画面) は、
+/// キーボードの表示とはみなさず、読み直して読み取り結果を新しい内容で上書きすること
+@Test func screenReadingReadsScreenWhereOnlyOneTranslatedTextAppears() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+    reader.lines = chatLines + screenLines(texts: ["訳: Are you free today?"])
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1004, image: try makeScreenImage(gray: 0.8))
+
+    #expect(controller.diagnostics?.reading.shownLatestReadingCount == 0)
+    let latestReading = try #require(loadLatestReading(fileURL: latestReadingFileURL))
+    #expect(latestReading.capturedAt == Date(timeIntervalSinceReferenceDate: 1004))
+    #expect(latestReading.messages.map(\.originalText) == ["Are you free today?", "Yes, after lunch", "訳: Are you free today?"])
+}
+
+/// 画面の行と比べる読み取り結果。原文と違う訳文の発言・原文のままの発言・訳しても変わらない語 (GitHub) を含む発言・返信案を 1 つずつ持つ。
+/// Poppo が作って出す文 (原文と違う訳文と、返信案の意味) は 3 つ
 private let shownLatestReading = LatestReading(
     capturedAt: Date(timeIntervalSinceReferenceDate: 1000),
     messages: [
@@ -939,57 +1076,105 @@ private let shownLatestReading = LatestReading(
     replySuggestions: [ReplySuggestion(text: "Sure, after 3 pm works", meaning: "はい、15 時以降なら大丈夫です")]
 )
 
-/// text の 1 行だけが写った画面の行を返す
-private func singleLine(text: String) -> [RecognizedTextLine] {
-    [RecognizedTextLine(text: text, boundingBox: CGRect(x: 0.05, y: 0.7, width: 0.6, height: 0.02))]
+/// texts のそれぞれが 1 行ずつ、上から順に写った画面の行を返す
+private func screenLines(texts: [String]) -> [RecognizedTextLine] {
+    texts.enumerated().map { index, text in
+        RecognizedTextLine(text: text, boundingBox: CGRect(x: 0.05, y: 0.6 + 0.04 * Double(index), width: 0.6, height: 0.02))
+    }
 }
 
-/// 訳文の行が映っている画面は、読み取り結果が映っていると判定すること
-@Test func showsLatestReadingIsTrueForTranslatedText() {
-    #expect(showsLatestReading(lines: singleLine(text: "今日の午後は空いていますか？"), latestReading: shownLatestReading))
+/// 訳文の行と返信案の意味の行の 2 つが映っている画面は、読み取り結果が映っていると判定すること
+@Test func showsLatestReadingIsTrueWhenTranslatedTextAndReplyMeaningAppear() {
+    #expect(
+        showsLatestReading(lines: screenLines(texts: ["今日の午後は空いていますか？", "はい、15 時以降なら大丈夫です"]), latestReading: shownLatestReading)
+    )
 }
 
-/// 返信案の意味の行が映っている画面は、読み取り結果が映っていると判定すること
-@Test func showsLatestReadingIsTrueForReplyMeaning() {
-    #expect(showsLatestReading(lines: singleLine(text: "はい、15 時以降なら大丈夫です"), latestReading: shownLatestReading))
+/// 訳文が 1 つだけ映っている画面と、返信案の意味が 1 つだけ映っている画面は、読み取り結果が映っているとは判定しないこと
+/// (チャットに届いた発言が、たまたま訳文の 1 つと同じ文だった時に、読み直しを止めない)
+@Test func showsLatestReadingIsFalseWhenOnlyOneShownTextAppears() {
+    #expect(!showsLatestReading(lines: screenLines(texts: ["今日の午後は空いていますか？"]), latestReading: shownLatestReading))
+    #expect(!showsLatestReading(lines: screenLines(texts: ["はい、15 時以降なら大丈夫です"]), latestReading: shownLatestReading))
 }
 
-/// 折り返されて訳文の一部だけになった行と、文字の間に空白が入って読まれた行でも、読み取り結果が映っていると判定すること
-@Test func showsLatestReadingIsTrueForWrappedOrSpacedPartOfTranslatedText() {
-    #expect(showsLatestReading(lines: singleLine(text: "空いていますか？"), latestReading: shownLatestReading))
-    #expect(showsLatestReading(lines: singleLine(text: "今日の 午後は 空いて"), latestReading: shownLatestReading))
+/// 同じ訳文の一部になっている行が 2 つ映っているだけの画面 (1 つの訳文が 2 行に折り返されている) は、映っている文は 1 つと数え、
+/// 読み取り結果が映っているとは判定しないこと
+@Test func showsLatestReadingCountsTwoLinesOfSameShownTextAsOne() {
+    #expect(!showsLatestReading(lines: screenLines(texts: ["今日の午後は", "空いていますか？"]), latestReading: shownLatestReading))
 }
 
-/// 訳文の一部と一致する行は、4 文字なら映っていると判定し、3 文字なら判定しないこと (短い行の偶然の一致で読み直しを止めない)
+/// Poppo が作って出す文が 1 つしか無い読み取り結果では、その 1 つが映っていれば、読み取り結果が映っていると判定すること
+@Test func showsLatestReadingIsTrueForOnlyShownTextOfLatestReading() {
+    let latestReading = LatestReading(
+        capturedAt: Date(timeIntervalSinceReferenceDate: 1000),
+        messages: [TranslatedMessage(originalText: "Are you free this afternoon?", translatedText: "今日の午後は空いていますか？")],
+        replySuggestions: []
+    )
+
+    #expect(showsLatestReading(lines: screenLines(texts: ["今日の午後は空いていますか？"]), latestReading: latestReading))
+    #expect(!showsLatestReading(lines: screenLines(texts: ["Are you free this afternoon?"]), latestReading: latestReading))
+}
+
+/// Poppo が作って出す文が 1 つも無い読み取り結果 (訳さずに原文のまま持っている発言だけ) では、その発言が映っていても、
+/// 読み取り結果が映っているとは判定しないこと
+@Test func showsLatestReadingIsFalseWhenLatestReadingHasNoShownText() {
+    #expect(
+        !showsLatestReading(
+            lines: screenLines(texts: ["了解です、あとで連絡します"]),
+            latestReading: LatestReading(
+                capturedAt: Date(timeIntervalSinceReferenceDate: 1000),
+                messages: [TranslatedMessage(originalText: "了解です、あとで連絡します", translatedText: "了解です、あとで連絡します")],
+                replySuggestions: []
+            )
+        )
+    )
+}
+
+/// 折り返されて訳文の一部だけになった行と、文字の間に空白が入って読まれた行でも、その文が映っていると数えること
+@Test func showsLatestReadingCountsWrappedOrSpacedPartOfShownText() {
+    #expect(showsLatestReading(lines: screenLines(texts: ["空いていますか？", "15 時以降なら"]), latestReading: shownLatestReading))
+    #expect(showsLatestReading(lines: screenLines(texts: ["今日の 午後は 空いて", "はい、15 時以降なら大丈夫です"]), latestReading: shownLatestReading))
+}
+
+/// 訳文の一部と一致する行は、4 文字なら映っていると数え、3 文字なら数えないこと (短い行の偶然の一致で読み直しを止めない)
 @Test func showsLatestReadingNeedsLineOfFourCharactersOrMore() {
-    #expect(showsLatestReading(lines: singleLine(text: "今日の午"), latestReading: shownLatestReading))
-    #expect(!showsLatestReading(lines: singleLine(text: "今日の"), latestReading: shownLatestReading))
+    #expect(showsLatestReading(lines: screenLines(texts: ["今日の午", "はい、15 時以降なら大丈夫です"]), latestReading: shownLatestReading))
+    #expect(!showsLatestReading(lines: screenLines(texts: ["今日の", "はい、15 時以降なら大丈夫です"]), latestReading: shownLatestReading))
 }
 
-/// 発言の原文だけが映っている画面 (チャットの画面そのもの) は、読み取り結果が映っているとは判定しないこと
-@Test func showsLatestReadingIsFalseForOriginalText() {
-    #expect(!showsLatestReading(lines: singleLine(text: "Are you free this afternoon?"), latestReading: shownLatestReading))
+/// 発言の原文の行は、映っている文に数えないこと (チャットの画面そのものを、キーボードの表示とみなさない)
+@Test func showsLatestReadingDoesNotCountOriginalText() {
+    #expect(
+        !showsLatestReading(
+            lines: screenLines(texts: ["Are you free this afternoon?", "Please check GitHub first", "はい、15 時以降なら大丈夫です"]),
+            latestReading: shownLatestReading
+        )
+    )
 }
 
-/// 返信案の文 (利用者が送った後にチャットに載る文) が映っている画面は、読み取り結果が映っているとは判定しないこと
+/// 返信案の文 (利用者が送った後にチャットに載る文) の行は、映っている文に数えないこと
 /// (送った後の画面を読み直せなくならないようにする)
-@Test func showsLatestReadingIsFalseForReplyText() {
-    #expect(!showsLatestReading(lines: singleLine(text: "Sure, after 3 pm works"), latestReading: shownLatestReading))
+@Test func showsLatestReadingDoesNotCountReplyText() {
+    #expect(
+        !showsLatestReading(lines: screenLines(texts: ["Sure, after 3 pm works", "今日の午後は空いていますか？"]), latestReading: shownLatestReading)
+    )
 }
 
-/// 訳さずに原文のまま持っている発言 (利用者の言語の発言) が映っている画面は、読み取り結果が映っているとは判定しないこと
-@Test func showsLatestReadingIsFalseForMessageKeptInOriginalText() {
-    #expect(!showsLatestReading(lines: singleLine(text: "了解です、あとで連絡します"), latestReading: shownLatestReading))
+/// 訳さずに原文のまま持っている発言 (利用者の言語の発言) の行は、映っている文に数えないこと
+@Test func showsLatestReadingDoesNotCountMessageKeptInOriginalText() {
+    #expect(
+        !showsLatestReading(lines: screenLines(texts: ["了解です、あとで連絡します", "今日の午後は空いていますか？"]), latestReading: shownLatestReading)
+    )
 }
 
-/// 訳しても変わらない語だけの行 (原文にも訳文にも入っている) が映っている画面は、読み取り結果が映っているとは判定しないこと
-@Test func showsLatestReadingIsFalseForLineThatIsAlsoInOriginalText() {
-    #expect(!showsLatestReading(lines: singleLine(text: "GitHub"), latestReading: shownLatestReading))
+/// 訳しても変わらない語だけの行 (原文にも訳文にも入っている) は、映っている文に数えないこと
+@Test func showsLatestReadingDoesNotCountLineThatIsAlsoInOriginalText() {
+    #expect(!showsLatestReading(lines: screenLines(texts: ["GitHub", "今日の午後は空いていますか？"]), latestReading: shownLatestReading))
 }
 
 /// 読み取り結果のどの文とも一致しない行だけの画面と、行が 1 つも無い画面は、読み取り結果が映っているとは判定しないこと
 @Test func showsLatestReadingIsFalseForUnrelatedOrNoLines() {
-    #expect(!showsLatestReading(lines: singleLine(text: "明日の会議は中止です"), latestReading: shownLatestReading))
+    #expect(!showsLatestReading(lines: screenLines(texts: ["明日の会議は中止です", "お疲れさまでした"]), latestReading: shownLatestReading))
     #expect(!showsLatestReading(lines: [], latestReading: shownLatestReading))
 }
 

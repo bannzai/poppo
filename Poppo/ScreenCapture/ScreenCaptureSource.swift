@@ -24,11 +24,12 @@ protocol ScreenCaptureSource: AnyObject {
     /// 出来事を渡して呼ぶ処理。start() を呼ぶ前に設定する
     var onEvent: ((ScreenCaptureEvent) -> Void)? { get set }
 
-    /// 映像を 1 枚受け取るたびに、frameReceived の出来事の後に呼ぶ処理。start() を呼ぶ前に設定する。
+    /// 画面の絵が入った映像を 1 枚受け取るたびに、frameReceived の出来事の後に呼ぶ処理。start() を呼ぶ前に設定する。
+    /// 画面の絵が入っていない映像 (画面が変わらない間に届く映像など) では呼ばない。
     /// receivedAt は受け取った時刻。makeImage は、その映像を画像にして返す処理で、呼ばれた時にだけ画像を作る
-    /// (映像は 1 秒に何十枚も届くため、読まない映像は画像にしない)。映像に画面の絵が入っていない時は nil を返し、
-    /// 画像にできない時はエラーを投げる。makeImage は、この処理が呼ばれている間だけ使える
-    var onFrameImage: ((_ receivedAt: Date, _ makeImage: () throws -> CGImage?) -> Void)? { get set }
+    /// (映像は 1 秒に何十枚も届くため、読まない映像は画像にしない)。画像にできない時はエラーを投げる。
+    /// makeImage は、この処理から戻った後に呼んでもよい。持っている間は、その映像の画面の絵が手放されない
+    var onFrameImage: ((_ receivedAt: Date, _ makeImage: @escaping () throws -> CGImage) -> Void)? { get set }
 
     /// 利用者に取り込む対象を選ばせ、選ばれたら映像の受け取りを始める。結果は onEvent に届く。
     /// 取り込み中でない時は、何度呼んでも対象を選ぶ画面を出し直すだけ
@@ -60,7 +61,7 @@ final class UnavailableScreenCaptureSource: ScreenCaptureSource {
     /// 出来事を渡して呼ぶ処理
     var onEvent: ((ScreenCaptureEvent) -> Void)?
     /// 映像を受け取った時に呼ぶ処理。この実体は映像を受け取らないため、呼ばない
-    var onFrameImage: ((_ receivedAt: Date, _ makeImage: () throws -> CGImage?) -> Void)?
+    var onFrameImage: ((_ receivedAt: Date, _ makeImage: @escaping () throws -> CGImage) -> Void)?
 
     /// 取り込めないことを、エラーとして onEvent に知らせる。何度呼んでも同じ結果になる
     func start() {

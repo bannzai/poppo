@@ -12,8 +12,8 @@ import ScreenCaptureKit
 final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
     /// 出来事を渡して呼ぶ処理。MainActor で呼ぶ
     var onEvent: ((ScreenCaptureEvent) -> Void)?
-    /// 映像を 1 枚受け取るたびに、受け取った時刻と、その映像を画像にする処理を渡して呼ぶ処理。MainActor で呼ぶ
-    var onFrameImage: ((_ receivedAt: Date, _ makeImage: () throws -> CGImage?) -> Void)?
+    /// 画面の絵が入った映像を 1 枚受け取るたびに、受け取った時刻と、その映像を画像にする処理を渡して呼ぶ処理。MainActor で呼ぶ
+    var onFrameImage: ((_ receivedAt: Date, _ makeImage: @escaping () throws -> CGImage) -> Void)?
     /// 映像を受け取っている stream。取り込みを始めていない間と、止めた後は nil
     private var stream: SCStream?
     /// 本体アプリの操作 (止める操作・対象の選び直し) で stream を止めている途中か。
@@ -191,16 +191,17 @@ extension SystemScreenCaptureSource: SCContentSharingPickerObserver {
 }
 
 extension SystemScreenCaptureSource: SCStreamOutput {
-    /// stream が映像を 1 枚出すたびに、システムが呼ぶ。受け取った時刻を onEvent に、その映像を画像にする処理を onFrameImage に知らせる。
-    /// 映像 (sampleBuffer) は、この呼び出しの中でだけ使い、外へ持ち出さない
+    /// stream が映像を 1 枚出すたびに、システムが呼ぶ。受け取った時刻を onEvent に知らせ、
+    /// 映像に画面の絵が入っている時は、その絵を画像にする処理を onFrameImage に知らせる。
+    /// 映像のうち、この呼び出しの外へ持ち出すのは画面の絵 (pixelBuffer) だけで、onFrameImage の受け手が持つ間だけ手放されない
+    /// (受け手の ScreenCaptureController は、見送った映像の最後の 1 枚だけを持つ)
     nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen else {
             return
         }
         // addStreamOutput の sampleHandlerQueue に .main を渡しているため、この関数は main queue (MainActor) で呼ばれる。
-        // Task で MainActor へ渡し直すと、映像を画像にするかを決める前に sampleBuffer をこの呼び出しの外へ持ち出すことになる
-        // nonisolated(unsafe): 下のクロージャはこの呼び出しの中で同じスレッドで実行し終わるため、sampleBuffer は同時に使われない
-        nonisolated(unsafe) let frameSampleBuffer = sampleBuffer
+        // nonisolated(unsafe): 画面の絵は、MainActor で動く下のクロージャと、その中で作る MainActor のクロージャからだけ使うため、同時に使われない
+        nonisolated(unsafe) let framePixelBuffer = sampleBuffer.imageBuffer
         let outputStreamID = ObjectIdentifier(stream)
         MainActor.assumeIsolated {
             guard self.stream.map(ObjectIdentifier.init) == outputStreamID else {
@@ -208,8 +209,11 @@ extension SystemScreenCaptureSource: SCStreamOutput {
             }
             let receivedAt = Date()
             self.onEvent?(.frameReceived(receivedAt))
+            guard let framePixelBuffer else {
+                return
+            }
             self.onFrameImage?(receivedAt) {
-                try frameSampleBuffer.imageBuffer.map { try makeCGImage(pixelBuffer: $0) }
+                try makeCGImage(pixelBuffer: framePixelBuffer)
             }
         }
     }

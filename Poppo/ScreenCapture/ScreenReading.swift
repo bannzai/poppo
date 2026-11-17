@@ -60,19 +60,27 @@ nonisolated func screenFingerprint(image: CGImage) -> [UInt8]? {
 /// 映っている画面を読み直すと、キーボードに出ている訳文と返信案を発言として読み、読み取り結果を上書きしてしまうため、
 /// 読み直さない判断に使う。画面全体の取り込みにキーボードが映ることは実機で確かめていない仮説
 /// (documents/DIRECTION.md「決めたこと」)。
-/// 映っていると判定するのは、Poppo が作って利用者の言語で出す文 (訳文と、返信案の意味) の一部になっている行がある時。
+/// 見るのは、Poppo が作って利用者の言語で出す文 (訳文と、返信案の意味) で、その文の一部になっている行が画面にあれば、その文が映っているとみなす。
 /// チャットに元からある文 (原文と、利用者が送った後にチャットに載る返信案の文) の一部でもある行は数えない
-/// (訳しても変わらない語 (製品の名前・URL 等) や、訳さずに並べた利用者の言語の発言で、チャットの画面を読み直せなくならないようにする)
+/// (訳しても変わらない語 (製品の名前・URL 等) や、訳さずに並べた利用者の言語の発言で、チャットの画面を読み直せなくならないようにする)。
+/// 映っていると判定するのは、そういう文が 2 つ以上映っている時 (見る文が 1 つしか無い読み取り結果では、その 1 つが映っている時)。
+/// チャットに届いた利用者の言語の発言が、たまたま訳文の 1 つと同じ言い回し (「ありがとうございます」等) だった時に、
+/// その発言が画面にある間ずっと読み直せなくならないようにするため
 func showsLatestReading(lines: [RecognizedTextLine], latestReading: LatestReading) -> Bool {
-    let shownTexts = (latestReading.messages.map(\.translatedText) + latestReading.replySuggestions.map(\.meaning))
-        .map { removingWhitespaces(text: $0) }
     let chatTexts = (latestReading.messages.map(\.originalText) + latestReading.replySuggestions.map(\.text))
         .map { removingWhitespaces(text: $0) }
-    return lines.map { removingWhitespaces(text: $0.text) }.contains { lineText in
+    let shownTexts = Set(
+        (latestReading.messages.map(\.translatedText) + latestReading.replySuggestions.map(\.meaning)).map { removingWhitespaces(text: $0) }
+    ).subtracting(chatTexts)
+    let lineTexts = lines.map { removingWhitespaces(text: $0.text) }.filter { lineText in
         // 4 文字: キーボードは長い文を折り返して出すため、行は文の一部として探す。短い行 (「はい」等) が
         // たまたま文の一部に一致して読み直しを止めないよう、4 文字以上の行だけを見る。見積もりで、実機では測っていない
-        lineText.count >= 4 && shownTexts.contains { $0.contains(lineText) } && !chatTexts.contains { $0.contains(lineText) }
+        lineText.count >= 4 && !chatTexts.contains { $0.contains(lineText) }
     }
+    // 2 つ: キーボードは開いた時に、返信案 3 つと直前の発言の翻訳が同時に見える高さにしてある (PoppoKeyboard/KeyboardView.swift) ため、
+    // キーボードが映っていれば 2 つ以上の文が映る。1 つだけの一致は、チャットの発言との偶然の一致として扱う
+    return !shownTexts.isEmpty
+        && shownTexts.filter { shownText in lineTexts.contains { shownText.contains($0) } }.count >= min(2, shownTexts.count)
 }
 
 /// 文から空白と改行を取り除いて返す。文字の読み取りは、行の折り返しや文字の間に空白を入れることがあるため、比べる前にそろえる
