@@ -122,10 +122,22 @@ final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
             return
         }
         stream = newStream
+        // nonisolated(unsafe): SCStream は Sendable でないが、下のクロージャの中では MainActor でだけ使う
+        nonisolated(unsafe) let startingStream = newStream
         // @Sendable: このクロージャはどのスレッドで呼ばれるか分からないため、MainActor のクロージャとして扱わせない
-        newStream.startCapture { @Sendable [startedStreamID = ObjectIdentifier(newStream)] error in
+        newStream.startCapture { @Sendable error in
             Task { @MainActor in
-                guard self.stream.map(ObjectIdentifier.init) == startedStreamID else {
+                guard self.stream === startingStream else {
+                    // 始まるのを待っている間に手放された stream (対象の選び直しで、まだ始まっていない stream を「既に止まっている」として手放した時)。
+                    // 手放した後に始まっていたら止める。持ち主がいないまま画面を取り込み続けさせない。
+                    // 止められなかった時は、取り込みが続いているかもしれないことを stopFailed で知らせる
+                    if error == nil {
+                        self.stopCapture(stream: startingStream) { failureDescription in
+                            if let failureDescription {
+                                self.onEvent?(.stopFailed(failureDescription))
+                            }
+                        }
+                    }
                     return
                 }
                 if let error {
