@@ -23,9 +23,10 @@ struct KeyboardView: View {
                 onInsertText: onInsertText
             )
         }
-        // 280: 上段 (切り替えるキーと、何分前の内容か) を除いた残りに、返信案 2 つと直前の発言の翻訳が同時に見える高さとして置いた値。
-        // 立ち上げ時の 216 では返信案 1 つぶんしか残らない。実機での見え方を確かめて決め直す (documents/DIRECTION.md「決めたこと」)
-        .frame(height: 280)
+        // 340: 開いた時に、返信案 3 つと直前の発言の翻訳が同時に見える高さとして置いた値。
+        // simulator (iPhone 17) で見本の読み取り結果を出して測った: 返信案 3 つ (うち 1 つは 2 行) が約 200pt を使い、
+        // 280 では直前の発言が 30pt ほどしか見えなかった。実機での見え方を確かめて決め直す (documents/DIRECTION.md「決めたこと」)
+        .frame(height: 340)
     }
 }
 
@@ -118,6 +119,9 @@ struct KeyboardContentView: View {
                 }
                 // 返信案と、返信案が答える直前の発言が下にあるため、開いた時に下の端を見せる
                 .defaultScrollAnchor(.bottom)
+                // スクロールの端のぼかしを出さない。上の端にかかった発言の翻訳がぼけて読めなくなるため
+                // (simulator で、上の端の 1 行がぼけるのを確かめた)
+                .scrollEdgeEffectHidden()
             } else {
                 Spacer()
                 // ja: Poppo を開いてチャットの読み取りを始めると翻訳と返信案がここに出ます
