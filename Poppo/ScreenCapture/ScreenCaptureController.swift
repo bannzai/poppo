@@ -289,7 +289,8 @@ final class ScreenCaptureController {
             lines = try await recognizeTextLines(image)
         } catch {
             if isCapturing(captureCount: captureCount) {
-                // 文字を読めなかった画面は「読んだ画面」として覚えない。画面が変わらないままでも、次の間隔で読み直せるようにする
+                // 文字を読めなかった画面は「読んだ画面」として覚えない。同じ画面の映像が次に届いた時に読み直せるようにする
+                // (画面が変わらず映像が届かない間は読み直さない)
                 lastScreenFingerprint = nil
             }
             recordReading(captureCount: captureCount) {

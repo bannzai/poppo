@@ -689,8 +689,8 @@ private let otherChatLines = [
     #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
 }
 
-/// 文字の読み取りが失敗した画面は、画面の画素が変わらないままでも、次の間隔 (2 秒後) の映像で読み直して保存すること
-/// (一時的な失敗の後、チャットの画面が動かない間ずっと読まないままにならないようにする)
+/// 文字の読み取りが失敗した画面は、次に届いた映像が同じ画素のままでも、読み直して保存すること
+/// (失敗した画面を「読んだ画面」として覚えると、画面の画素が変わるまで読み直せなくなる)
 @Test func screenReadingReadsSameScreenAgainAfterRecognitionFailure() async throws {
     let source = FakeScreenCaptureSource()
     let reader = FakeScreenReader()
