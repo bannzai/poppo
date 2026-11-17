@@ -11,12 +11,22 @@
         }
       }
     },
-    "Open Poppo and start reading a chat to see translations and reply suggestions here" : {
+    "Open '%@' and start reading a chat to see translations and reply suggestions here" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Poppo を開いてチャットの読み取りを始めると翻訳と返信案がここに出ます"
+            "value" : "「%@」を開いてチャットの読み取りを始めると翻訳と返信案がここに出ます"
+          }
+        }
+      }
+    },
+    "Poppo" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Poppo"
           }
         }
       }

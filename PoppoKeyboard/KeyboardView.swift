@@ -124,8 +124,8 @@ struct KeyboardContentView: View {
                 .scrollEdgeEffectHidden()
             } else {
                 Spacer()
-                // ja: Poppo を開いてチャットの読み取りを始めると翻訳と返信案がここに出ます
-                Text("Open Poppo and start reading a chat to see translations and reply suggestions here")
+                // ja: 「Poppo」を開いてチャットの読み取りを始めると翻訳と返信案がここに出ます
+                Text("Open '\(Text("Poppo"))' and start reading a chat to see translations and reply suggestions here")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
