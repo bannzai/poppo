@@ -10,7 +10,7 @@
 ## Xcode プロジェクト構成の変更
 
 - `Poppo.xcodeproj` をプロジェクト構成の唯一の正とする。XcodeGen と `project.yml` は使わず、`xcodegen generate` を実行しない (理由: [ADR 0001](documents/adr/0001-manage-xcode-project-directly.md)。機械検査: `~/.agents/skills/create-new-app/scripts/check-setup.sh` の `xcode-project-source` 項目)
-- ソースのディレクトリ (`Poppo/`・`PoppoKeyboard/`・`PoppoTests/`) は Xcode の同期フォルダで、ファイルを足す・消すだけでターゲットに反映される。ターゲットに入れないファイル (拡張の Info.plist 等) は `Config/` に置く
+- ソースのディレクトリ (`Poppo/`・`PoppoKeyboard/`・`PoppoTests/`・`Shared/`) は Xcode の同期フォルダで、ファイルを足す・消すだけでターゲットに反映される。`Shared/` は本体アプリとキーボード拡張の両方のターゲットに入るため、両方から使う型だけを置く。ターゲットに入れないファイル (拡張の Info.plist 等) は `Config/` に置く
 - ターゲット、Build Settings、Build Phases、Scheme、Swift Package の変更は Xcode の GUI で行う。自動化が必要な場合は、プロジェクト構成を `Poppo.xcodeproj/project.pbxproj`、Scheme を `Poppo.xcodeproj/xcshareddata/xcschemes/*.xcscheme` で直接編集する
 - 変更後は `git diff -- Poppo.xcodeproj` で意図した差分だけであることを確認し、下記の CI で検証する
 
