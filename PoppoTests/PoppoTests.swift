@@ -28,15 +28,10 @@ import Testing
 }
 
 /// 写真へのアクセスの許可を求める時の説明文の日本語訳 (Poppo/InfoPlist.xcstrings) が、ビルドしたアプリに入っていること
-@Test func photoLibraryUsageDescriptionHasJapaneseLocalization() throws {
+@Test func photoLibraryUsageDescriptionHasJapaneseLocalization() {
     #expect(
-        try #require(
-            NSDictionary(
-                contentsOf: try #require(
-                    Bundle.main.url(forResource: "InfoPlist", withExtension: "strings", subdirectory: nil, localization: "ja")
-                )
-            ) as? [String: String]
-        )["NSPhotoLibraryUsageDescription"]
+        Bundle.main.url(forResource: "InfoPlist", withExtension: "strings", subdirectory: nil, localization: "ja")
+            .flatMap { NSDictionary(contentsOf: $0) as? [String: String] }?["NSPhotoLibraryUsageDescription"]
             == "直近のスクリーンショットを並べて、翻訳する 1 枚を選べるようにします。スクリーンショットはこの端末の中でだけ読み取ります。"
     )
 }
