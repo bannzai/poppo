@@ -127,6 +127,7 @@
 			buildConfigurationList = B12BF1954A2903A0422C0AAB /* Build configuration list for PBXNativeTarget "PoppoKeyboard" */;
 			buildPhases = (
 				8C89879FEDBC936880423C87 /* Sources */,
+				5B7D2E9A41C36F08D2A9E471 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -147,6 +148,7 @@
 			buildConfigurationList = 21A5EF69DD5655EC6B7EA1D9 /* Build configuration list for PBXNativeTarget "Poppo" */;
 			buildPhases = (
 				E4C97F9B0322526ABEE43F97 /* Sources */,
+				3C1A8F6E9D2B47A5E0F4C812 /* Resources */,
 				F8EC8797D2F85429F68D7DCF /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -180,6 +182,7 @@
 			knownRegions = (
 				Base,
 				en,
+				ja,
 			);
 			mainGroup = A735306C23C6607F34478511;
 			minimizedProjectReferenceProxies = 1;
@@ -193,6 +196,23 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3C1A8F6E9D2B47A5E0F4C812 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B7D2E9A41C36F08D2A9E471 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4E09B0C3C69594998EF1623F /* Sources */ = {
