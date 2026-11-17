@@ -50,12 +50,14 @@ button{font-family:inherit}
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2450D8"},"$preview":{"width":390,"height":844}}'>
+/** ホーム (開いた直後) の画面に渡す値を作る。canvas の Tweaks で変えられるのは強調の色だけ */
 class Component extends DCLogic {
+/** 強調の色と、直近のスクリーンショットの見本 (撮った時期と、読み上げ用の説明) を返す */
 renderVals() {
-const whens = ['2 分前', '18 分前', '1 時間前', '3 時間前', '昨日', '昨日'];
 return {
+// 既定の強調の色。白い背景の上でコントラスト比が 4.5:1 を超える青として置いた仮の値で、見た目の方向が決まったら決め直す
 accent: this.props.accent ?? '#2450D8',
-shots: whens.map((when) => ({ when: when, label: when + 'に撮ったスクリーンショットを読む' })),
+shots: ['2 分前', '18 分前', '1 時間前', '3 時間前', '昨日', '昨日'].map((when) => ({ when: when, label: when + 'に撮ったスクリーンショットを読む' })),
 };
 }
 }

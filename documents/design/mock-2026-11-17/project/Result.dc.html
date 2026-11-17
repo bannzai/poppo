@@ -52,20 +52,22 @@ button{font-family:inherit}
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2450D8"},"$preview":{"width":390,"height":844}}'>
+/** スクリーンショットの読み取り結果の画面に渡す値を作る。canvas の Tweaks で変えられるのは強調の色だけ */
 class Component extends DCLogic {
+/** 強調の色と、見本の発言 (原文と訳文) と、見本の返信案 (送る文・その意味・コピーのボタンの読み上げ用の説明) を返す */
 renderVals() {
-const replies = [
-{ text: 'Yes, still on. 3pm works better for me.', meaning: 'はい、予定どおりで。15 時の方が助かります' },
-{ text: 'Mornings are fine. Let’s keep the original time.', meaning: '午前で大丈夫です。元の時間のままにしましょう' },
-{ text: 'Could we push it to Thursday instead?', meaning: '代わりに木曜に延ばせますか？' },
-];
 return {
+// 既定の強調の色。白い背景の上でコントラスト比が 4.5:1 を超える青として置いた仮の値で、見た目の方向が決まったら決め直す
 accent: this.props.accent ?? '#2450D8',
 messages: [
 { originalText: 'Hey, are we still on for the release review tomorrow?', translatedText: '明日のリリースレビュー、予定どおりやる？' },
 { originalText: 'I can move it to 3pm if mornings are tight for you.', translatedText: '午前が厳しければ 15 時に動かせるよ' },
 ],
-replies: replies.map((reply) => ({ text: reply.text, meaning: reply.meaning, copyLabel: '「' + reply.meaning + '」の返信案をコピー' })),
+replies: [
+{ text: 'Yes, still on. 3pm works better for me.', meaning: 'はい、予定どおりで。15 時の方が助かります' },
+{ text: 'Mornings are fine. Let’s keep the original time.', meaning: '午前で大丈夫です。元の時間のままにしましょう' },
+{ text: 'Could we push it to Thursday instead?', meaning: '代わりに木曜に延ばせますか？' },
+].map((reply) => ({ text: reply.text, meaning: reply.meaning, copyLabel: '「' + reply.meaning + '」の返信案をコピー' })),
 };
 }
 }

@@ -56,16 +56,18 @@ button{font-family:inherit}
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2450D8"},"$preview":{"width":390,"height":844}}'>
+/** 他のアプリで開いたキーボードの画面に渡す値を作る。canvas の Tweaks で変えられるのは強調の色だけ */
 class Component extends DCLogic {
+/** 強調の色と、見本の返信案 (送る文・その意味・入力のボタンの読み上げ用の説明) を返す */
 renderVals() {
-const replies = [
+return {
+// 既定の強調の色。白い背景の上でコントラスト比が 4.5:1 を超える青として置いた仮の値で、見た目の方向が決まったら決め直す
+accent: this.props.accent ?? '#2450D8',
+replies: [
 { text: 'Yes, still on. 3pm works better for me.', meaning: 'はい、予定どおりで。15 時の方が助かります' },
 { text: 'Mornings are fine. Let’s keep the original time.', meaning: '午前で大丈夫です。元の時間のままにしましょう' },
 { text: 'Could we push it to Thursday instead?', meaning: '代わりに木曜に延ばせますか？' },
-];
-return {
-accent: this.props.accent ?? '#2450D8',
-replies: replies.map((reply) => ({ text: reply.text, meaning: reply.meaning, insertLabel: '「' + reply.meaning + '」の返信案を入力する' })),
+].map((reply) => ({ text: reply.text, meaning: reply.meaning, insertLabel: '「' + reply.meaning + '」の返信案を入力する' })),
 };
 }
 }
