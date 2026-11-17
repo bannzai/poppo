@@ -14,6 +14,57 @@ private func translationResponse(clientIdentifier: String?, targetText: String) 
     )
 }
 
+/// 訳す先の言語は、利用者が端末で選んだ言語の並びの先頭にすること (アプリが対応していない言語でも、その言語にする)
+@Test func userLanguageIsFirstPreferredLanguage() {
+    #expect(userLanguage(preferredLanguages: ["ko-KR", "en-US"]).languageCode == Locale.LanguageCode("ko"))
+    #expect(userLanguage(preferredLanguages: ["ja-JP"]).languageCode == Locale.LanguageCode("ja"))
+}
+
+/// 利用者が選んだ言語の並びが空の時は、訳す先の言語を、アプリが動いている言語にすること
+@Test func userLanguageFallsBackToLanguageTheAppRunsIn() {
+    #expect(userLanguage(preferredLanguages: []) == Locale.current.language)
+}
+
+/// 端末の言語の文と外国語の文が混ざった並びでは、外国語の文だけを、元の順のまま、判定した原文の言語と一緒に訳す処理へ渡し、
+/// 返ってきた訳文を元の位置に戻して、端末の言語の文はそのまま返すこと。
+/// 偽物の訳す処理は、受け取った原文の言語・受け取った順の位置・文をつないだ文字列を返す
+@Test func translateForeignTextsTranslatesOnlyForeignTextsAndKeepsPositions() async throws {
+    #expect(
+        try await translateForeignTexts(
+            texts: [
+                "Can you review my pull request this afternoon?",
+                "今日は午後から会議があるので、少し遅れます",
+                "Sure, I will take a look after lunch",
+            ],
+            targetLanguage: Locale.Language(identifier: "ja"),
+            translate: { foreignTexts, sourceLanguage in
+                foreignTexts.enumerated().map { "\(sourceLanguage.languageCode?.identifier ?? "") \($0): \($1)" }
+            }
+        ) == [
+            "en 0: Can you review my pull request this afternoon?",
+            "今日は午後から会議があるので、少し遅れます",
+            "en 1: Sure, I will take a look after lunch",
+        ]
+    )
+}
+
+/// 訳す処理が投げた失敗 (言語が入っていない等) は、そのまま呼び出し元へ伝えること
+@Test func translateForeignTextsRethrowsErrorFromTranslate() async {
+    await #expect(throws: ChatReadingError.incompleteTranslation) {
+        _ = try await translateForeignTexts(
+            texts: ["Can you review my pull request this afternoon?"],
+            targetLanguage: Locale.Language(identifier: "ja"),
+            translate: { _, _ in throw ChatReadingError.incompleteTranslation }
+        )
+    }
+}
+
+/// Translation に渡す依頼は、文を渡した順に並べ、文の位置 (0 始まり) を文字列にした clientIdentifier を持つこと
+@Test func translationRequestsCarryPositionAsClientIdentifier() {
+    #expect(translationRequests(texts: ["Hello", "Goodbye"]).map(\.sourceText) == ["Hello", "Goodbye"])
+    #expect(translationRequests(texts: ["Hello", "Goodbye"]).map(\.clientIdentifier) == ["0", "1"])
+}
+
 /// 利用者の言語 (日本語) で書かれた文は「その言語で書かれている」と判定し、ほかの言語 (英語) の文と空の文は判定しないこと。
 /// 言語の判定は NaturalLanguage の実物を通す
 @Test func isWrittenTellsWhetherTextIsInTheLanguage() {

@@ -99,7 +99,9 @@ struct ChatReadingView: View {
             return try await readChat(
                 image: image,
                 recognizeTextLines: { try await recognizeTextLines(image: $0) },
-                translateTexts: { try await translateOnDevice(texts: $0, targetLanguage: Locale.current.language) },
+                translateTexts: {
+                    try await translateOnDevice(texts: $0, targetLanguage: userLanguage(preferredLanguages: Locale.preferredLanguages))
+                },
                 canGenerateReplies: SystemLanguageModel.default.isAvailable,
                 generateReplyTexts: { try await generateReplyTexts(messages: $0) }
             )
