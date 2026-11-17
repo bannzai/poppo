@@ -120,36 +120,7 @@ struct DebugMenuView: View {
             }
             Section {
                 if let diagnostics = screenCaptureController.diagnostics {
-                    LabeledContent {
-                        Text(verbatim: debugDiagnosticsText(date: diagnostics.startedAt))
-                    } label: {
-                        Text(verbatim: "始めた時刻")
-                    }
-                    .accessibilityIdentifier("debug_capture_started_at")
-                    LabeledContent {
-                        Text(verbatim: debugDiagnosticsText(date: diagnostics.stoppedAt))
-                    } label: {
-                        Text(verbatim: "止めた時刻")
-                    }
-                    .accessibilityIdentifier("debug_capture_stopped_at")
-                    LabeledContent {
-                        Text(verbatim: debugDiagnosticsText(stopReason: diagnostics.stopReason))
-                    } label: {
-                        Text(verbatim: "止まった理由")
-                    }
-                    .accessibilityIdentifier("debug_capture_stop_reason")
-                    LabeledContent {
-                        Text(verbatim: debugDiagnosticsText(date: diagnostics.lastFrameReceivedAt))
-                    } label: {
-                        Text(verbatim: "最後に映像を受け取った時刻")
-                    }
-                    .accessibilityIdentifier("debug_capture_last_frame_at")
-                    LabeledContent {
-                        Text(verbatim: String(diagnostics.receivedFrameCount))
-                    } label: {
-                        Text(verbatim: "受け取った映像の数")
-                    }
-                    .accessibilityIdentifier("debug_capture_frame_count")
+                    DebugScreenCaptureDiagnosticsRows(diagnostics: diagnostics)
                 } else {
                     Text(verbatim: "記録なし (まだ取り込みを始めていない)")
                         .accessibilityIdentifier("debug_capture_no_diagnostics")
@@ -165,7 +136,21 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "画面の取り込みの診断の記録")
             } footer: {
-                Text(verbatim: "直近の 1 回の取り込みの記録。始めた時刻があり、止めた時刻が「なし」のまま取り込み中の表示が出ていない時は、止まる前にアプリが終了している")
+                Text(verbatim: "直近の 1 回の取り込みの記録。始めた時刻があり、止めた時刻が「なし」のまま取り込み中の表示が出ていない時は、止まる前にアプリが終了している。読み取りの各段は、取り込み中に画面が変わるたびに 1 回進む")
+            }
+            Section {
+                NavigationLink {
+                    List {
+                        DebugScreenCaptureDiagnosticsRows(diagnostics: debugSampleDiagnostics)
+                    }
+                } label: {
+                    Text(verbatim: "診断の記録の見本を開く")
+                }
+                .accessibilityIdentifier("debug_open_sample_diagnostics")
+            } header: {
+                Text(verbatim: "診断の記録の表示")
+            } footer: {
+                Text(verbatim: "simulator では取り込みが始まらず記録が出ないため、見本の値で表示を確かめる")
             }
         }
         .navigationTitle(Text(verbatim: "開発者メニュー"))
@@ -213,6 +198,129 @@ struct DebugMenuView: View {
         savedLatestReading = latestReadingFileURL().flatMap { loadLatestReading(fileURL: $0) }
     }
 }
+
+/// 診断の記録 1 つの中身を、開発者メニューの行として並べる。List か Section の中に置く
+struct DebugScreenCaptureDiagnosticsRows: View {
+    /// 表示する診断の記録
+    let diagnostics: ScreenCaptureDiagnostics
+
+    var body: some View {
+        LabeledContent {
+            Text(verbatim: debugDiagnosticsText(date: diagnostics.startedAt))
+        } label: {
+            Text(verbatim: "始めた時刻")
+        }
+        .accessibilityIdentifier("debug_capture_started_at")
+        LabeledContent {
+            Text(verbatim: debugDiagnosticsText(date: diagnostics.stoppedAt))
+        } label: {
+            Text(verbatim: "止めた時刻")
+        }
+        .accessibilityIdentifier("debug_capture_stopped_at")
+        LabeledContent {
+            Text(verbatim: debugDiagnosticsText(stopReason: diagnostics.stopReason))
+        } label: {
+            Text(verbatim: "止まった理由")
+        }
+        .accessibilityIdentifier("debug_capture_stop_reason")
+        LabeledContent {
+            Text(verbatim: debugDiagnosticsText(date: diagnostics.lastFrameReceivedAt))
+        } label: {
+            Text(verbatim: "最後に映像を受け取った時刻")
+        }
+        .accessibilityIdentifier("debug_capture_last_frame_at")
+        LabeledContent {
+            Text(verbatim: String(diagnostics.receivedFrameCount))
+        } label: {
+            Text(verbatim: "受け取った映像の数")
+        }
+        .accessibilityIdentifier("debug_capture_frame_count")
+        DebugScreenReadingStageRow(title: "文字の読み取り", stage: diagnostics.reading.recognition)
+            .accessibilityIdentifier("debug_reading_recognition")
+        DebugScreenReadingStageRow(title: "翻訳", stage: diagnostics.reading.translation)
+            .accessibilityIdentifier("debug_reading_translation")
+        DebugScreenReadingStageRow(title: "返信案の生成", stage: diagnostics.reading.replyGeneration)
+            .accessibilityIdentifier("debug_reading_reply_generation")
+        DebugScreenReadingStageRow(title: "保存", stage: diagnostics.reading.saving)
+            .accessibilityIdentifier("debug_reading_saving")
+        LabeledContent {
+            Text(verbatim: String(diagnostics.reading.noMessagesCount))
+        } label: {
+            Text(verbatim: "発言が無かった回数")
+        }
+        .accessibilityIdentifier("debug_reading_no_messages_count")
+        LabeledContent {
+            Text(verbatim: String(diagnostics.reading.unchangedMessagesCount))
+        } label: {
+            Text(verbatim: "発言が前と同じで訳さなかった回数")
+        }
+        .accessibilityIdentifier("debug_reading_unchanged_messages_count")
+        LabeledContent {
+            Text(verbatim: String(diagnostics.reading.untranslatableCount))
+        } label: {
+            Text(verbatim: "訳す必要が無いか訳せない言語だった回数")
+        }
+        .accessibilityIdentifier("debug_reading_untranslatable_count")
+        LabeledContent {
+            Text(verbatim: String(diagnostics.reading.shownLatestReadingCount))
+        } label: {
+            Text(verbatim: "キーボードの表示が映っていて読み直さなかった回数")
+        }
+        .accessibilityIdentifier("debug_reading_shown_latest_reading_count")
+    }
+}
+
+/// 読み取りの 1 つの段の記録を、開発者メニューの 1 行として出す。成功と失敗の回数、最後の時刻、最後のエラーの内容を縦に並べる
+struct DebugScreenReadingStageRow: View {
+    /// 段の名前
+    let title: String
+    /// 表示する段の記録
+    let stage: ScreenReadingStageDiagnostics
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: title)
+            Text(verbatim: "成功 \(stage.successCount) 回 (最後: \(debugDiagnosticsText(date: stage.lastSucceededAt)))")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Text(verbatim: "失敗 \(stage.failureCount) 回 (最後: \(debugDiagnosticsText(date: stage.lastFailedAt)))")
+                .font(.footnote)
+                .foregroundStyle(stage.failureCount > 0 ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            if let lastFailureDescription = stage.lastFailureDescription {
+                Text(verbatim: "最後のエラー: \(lastFailureDescription)")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// 開発者メニューで診断の記録の表示を確かめる時に使う、見本の診断の記録。
+/// 取り込み中に文字を 12 回読み、そのうち 3 回で翻訳と保存まで進み、返信案の生成は 1 回失敗した、という値
+private let debugSampleDiagnostics = ScreenCaptureDiagnostics(
+    startedAt: Date(timeIntervalSinceReferenceDate: 800_000_000),
+    stoppedAt: nil,
+    stopReason: nil,
+    lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 800_000_090),
+    receivedFrameCount: 5400,
+    reading: ScreenReadingDiagnostics(
+        recognition: ScreenReadingStageDiagnostics(successCount: 12, lastSucceededAt: Date(timeIntervalSinceReferenceDate: 800_000_088)),
+        translation: ScreenReadingStageDiagnostics(successCount: 3, lastSucceededAt: Date(timeIntervalSinceReferenceDate: 800_000_089)),
+        replyGeneration: ScreenReadingStageDiagnostics(
+            successCount: 2,
+            lastSucceededAt: Date(timeIntervalSinceReferenceDate: 800_000_050),
+            failureCount: 1,
+            lastFailedAt: Date(timeIntervalSinceReferenceDate: 800_000_089),
+            lastFailureDescription: "com.example.model 4: 見本のエラーの内容"
+        ),
+        saving: ScreenReadingStageDiagnostics(successCount: 3, lastSucceededAt: Date(timeIntervalSinceReferenceDate: 800_000_089)),
+        noMessagesCount: 4,
+        unchangedMessagesCount: 3,
+        untranslatableCount: 1,
+        shownLatestReadingCount: 1
+    )
+)
 
 /// 診断の記録の時刻を、開発者メニューに出す文にして返す。date が nil の時は「なし」を返す
 private func debugDiagnosticsText(date: Date?) -> String {
