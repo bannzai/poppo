@@ -46,6 +46,7 @@ launched_at:
 | 2026-11-17 | 立ち上げ情報 | リポジトリ名は poppo、公開設定は public、対象は iOS 27 以降の SwiftUI アプリ (https://github.com/bannzai/IdeaMemo/issues/380#issuecomment-6933582850 ) | bannzai |
 | 2026-11-17 | 立ち上げ | ビルド・simulator・ブラウザの動作確認は外部のマシン (GitHub Actions と simtunnel) で行い、開発マシンの負荷を避ける | bannzai |
 | 2026-11-17 | 立ち上げ | Xcode のプロジェクトは `Poppo.xcodeproj` を直接管理する (documents/adr/0001-manage-xcode-project-directly.md) | agent |
+| 2026-11-17 | 立ち上げ | iPhone 専用で作る (iPad には対応しない)。公開した後は対応する端末を減らせないため、後から足せる側を選んだ | agent |
 | 2026-11-17 | 立ち上げ | 作るかの判断が返るまでは、端末内だけで処理する構成 (サーバー・外部の API・課金なし) を前提に雛形を作る。端末外へ送る構成と課金は、判断が返るまで実装しない | agent |
 | 2026-11-17 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1 ) | 作る。保存するデータの形 (読み取り結果 = `LatestReading`。documents/design/data-structure/latest-reading.html) は見せた形で進める (発言: 「大まかには良さそうだからこれで進めてよい」) | bannzai |
 | 2026-11-17 | 作るかの判断 | 機能を足す: スクリーンショットからの読み取り。本体アプリを開くと直近に撮ったスクリーンショットをすぐ選べ、その翻訳と返信案が本体アプリの画面に出て、コピーして貼り付けられる | bannzai |

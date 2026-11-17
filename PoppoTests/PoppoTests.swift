@@ -14,9 +14,10 @@ import Testing
     #expect(Bundle.main.localizations.contains("ja"))
 }
 
-/// 本体アプリの Asset Catalog (Poppo/Assets.xcassets) が、ビルドしたアプリに入っていること
-@Test func appBundleContainsCompiledAssetCatalog() {
-    #expect(Bundle.main.url(forResource: "Assets", withExtension: "car") != nil)
+/// 本体アプリが iPhone 専用としてビルドされていること。
+/// 公開した後は対応する端末を減らせないため、iPad への対応は決めてから足す。意図せず iPad が入った時に落とす
+@Test func appSupportsOnlyIPhone() {
+    #expect(Bundle.main.object(forInfoDictionaryKey: "UIDeviceFamily") as? [Int] == [1])
 }
 
 /// キーボード拡張の String Catalog (PoppoKeyboard/Localizable.xcstrings) の日本語訳が、アプリに埋め込まれた拡張に入っていること
