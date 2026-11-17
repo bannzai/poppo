@@ -1,0 +1,298 @@
+<title>Poppo の読み取り結果</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+  /* 1 段組の資料。上から「これは何か → 型定義 → 操作とデータの表 → 持たないもの → 決めてほしい点」の順に読む */
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --fg: #1b2430;
+    --muted: #5a6675;
+    --line: #d6dbe2;
+    --accent: #0e6e75;
+    --read: #1f5fbf;
+    --read-bg: #e6eefb;
+    --write: #9a5a00;
+    --write-bg: #fbf0dc;
+    --none-bg: #eceff3;
+    --code-bg: #10161d;
+    --code-fg: #e3e8ee;
+    --code-comment: #8fa3b5;
+    --code-key: #7fd1d8;
+    --font-display: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161c;
+      --surface: #1a2029;
+      --fg: #e4e8ee;
+      --muted: #9aa6b4;
+      --line: #313a47;
+      --accent: #5cc4cc;
+      --read: #8db6f5;
+      --read-bg: #1c2c47;
+      --write: #f0bd6a;
+      --write-bg: #3b2c12;
+      --none-bg: #252d38;
+      --code-bg: #0b0f14;
+      --code-fg: #e3e8ee;
+      --code-comment: #8fa3b5;
+      --code-key: #7fd1d8;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161c;
+    --surface: #1a2029;
+    --fg: #e4e8ee;
+    --muted: #9aa6b4;
+    --line: #313a47;
+    --accent: #5cc4cc;
+    --read: #8db6f5;
+    --read-bg: #1c2c47;
+    --write: #f0bd6a;
+    --write-bg: #3b2c12;
+    --none-bg: #252d38;
+    --code-bg: #0b0f14;
+    --code-fg: #e3e8ee;
+    --code-comment: #8fa3b5;
+    --code-key: #7fd1d8;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.8;
+  }
+  .page {
+    max-width: 860px;
+    margin-inline: auto;
+    padding-block: 40px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+  header { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(26px, 5vw, 36px);
+    line-height: 1.3;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 20px;
+    line-height: 1.4;
+    margin: 0;
+    text-wrap: balance;
+  }
+  p { margin: 0; max-width: 40em; }
+  .lead { color: var(--muted); }
+  section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--none-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .scroll { overflow-x: auto; min-width: 0; }
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    color: var(--code-fg);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 18px 20px;
+    border-radius: 8px;
+    min-width: max-content;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  pre .c { color: var(--code-comment); }
+  pre .k { color: var(--code-key); font-weight: 600; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 640px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  th {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.who { white-space: nowrap; color: var(--muted); }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 8px;
+    border-radius: 999px;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .tag.read { background: var(--read-bg); color: var(--read); }
+  .tag.write { background: var(--write-bg); color: var(--write); }
+  .tag.none { background: var(--none-bg); color: var(--muted); }
+  ul { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; max-width: 42em; }
+  .ask {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ask h2 { color: var(--accent); }
+  .session-origin { border-color: var(--line) !important; color: var(--muted); margin: 0 !important; }
+  .session-origin pre { min-width: 0; background: none; color: inherit; padding: 0; font-size: 12px; overflow-wrap: anywhere; }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">POPPO / 新しいデータ構造</div>
+    <h1>読み取り結果</h1>
+    <p class="lead">本体アプリが画面を読むたびに保存し、キーボードが読む唯一のデータ。App Group の共有コンテナに 1 つのファイルとして置き、常に最新の 1 つだけを上書きで持つ。</p>
+  </header>
+
+<aside class="session-origin" style="font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid #d0d7de;border-radius:6px;padding:8px 12px;margin:0 0 16px">
+<div>tmux window: 2.1.326 (poppo:0)</div>
+<div>セッション再開:</div>
+<pre style="margin:4px 0 0;white-space:pre-wrap">cd /Users/bannzai/ghq/github.com/bannzai/poppo
+claude --resume f9d1a877-c94a-4489-ad19-3bf9b3508b47</pre>
+</aside>
+
+  <section>
+    <h2>型定義 (Swift)</h2>
+    <div class="scroll">
+<pre><code><span class="c">/// 読み取り結果。本体アプリが直前に画面から読んだ発言と、その翻訳と、返信案の組。
+/// 本体アプリが画面を読むたびに上書きし、キーボードはこれを読んで表示する。</span>
+<span class="k">struct</span> LatestReading: Codable {
+    <span class="c">/// 画面を読んだ時刻。キーボードが「何分前の内容か」を出すのに使う</span>
+    <span class="k">let</span> capturedAt: Date
+    <span class="c">/// 画面に見えていた発言。画面の上から下の順</span>
+    <span class="k">let</span> messages: [TranslatedMessage]
+    <span class="c">/// 返信案。端末内のモデルが使えない端末では空</span>
+    <span class="k">let</span> replySuggestions: [ReplySuggestion]
+}
+
+<span class="c">/// 画面から読んだ 1 つの発言と、その翻訳</span>
+<span class="k">struct</span> TranslatedMessage: Codable {
+    <span class="c">/// 画面から読んだままの文 (相手の言語)</span>
+    <span class="k">let</span> originalText: String
+    <span class="c">/// 利用者の言語に訳した文</span>
+    <span class="k">let</span> translatedText: String
+}
+
+<span class="c">/// 1 つの返信案</span>
+<span class="k">struct</span> ReplySuggestion: Codable {
+    <span class="c">/// タップした時に入力欄へ入る文 (相手の言語)</span>
+    <span class="k">let</span> text: String
+    <span class="c">/// その文の意味を利用者の言語で書いた文。送る前に内容を確かめるために出す</span>
+    <span class="k">let</span> meaning: String
+}</code></pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>利用者の操作と、その時に読み書きするデータ</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>利用者の操作</th><th>動く側</th><th>読み書きするデータ</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>本体アプリで「取り込みを開始」を押し、画面全体を選ぶ</td>
+            <td class="who">本体アプリ</td>
+            <td><span class="tag none">なし</span>まだ何も保存しない</td>
+          </tr>
+          <tr>
+            <td>チャットアプリを開いて会話を表示する</td>
+            <td class="who">本体アプリ (背面)</td>
+            <td><span class="tag write">書く</span><code>LatestReading</code> の全体を上書きする (<code>capturedAt</code>・<code>messages</code>・<code>replySuggestions</code>)</td>
+          </tr>
+          <tr>
+            <td>入力欄をタップし、キーボードを Poppo に切り替える</td>
+            <td class="who">キーボード</td>
+            <td><span class="tag read">読む</span><code>LatestReading</code> の全体。<code>capturedAt</code> から「何分前の内容か」を出す</td>
+          </tr>
+          <tr>
+            <td>相手の発言の翻訳を読む</td>
+            <td class="who">キーボード</td>
+            <td><span class="tag read">読む</span><code>messages[].translatedText</code> (原文は <code>originalText</code>)</td>
+          </tr>
+          <tr>
+            <td>返信案の意味を確かめてタップする</td>
+            <td class="who">キーボード</td>
+            <td><span class="tag read">読む</span><code>replySuggestions[].meaning</code> を表示し、<code>text</code> を入力欄に入れる。保存はしない</td>
+          </tr>
+          <tr>
+            <td>チャットの画面が進む (新しい発言が届く・スクロールする)</td>
+            <td class="who">本体アプリ (背面)</td>
+            <td><span class="tag write">書く</span><code>LatestReading</code> の全体を新しい内容で上書きする。前の内容は残らない</td>
+          </tr>
+          <tr>
+            <td>本体アプリで「取り込みを停止」を押す</td>
+            <td class="who">本体アプリ</td>
+            <td><span class="tag write">消す</span><code>LatestReading</code> のファイルを削除する</td>
+          </tr>
+          <tr>
+            <td>設定で「読み取り結果を削除」を押す</td>
+            <td class="who">本体アプリ</td>
+            <td><span class="tag write">消す</span><code>LatestReading</code> のファイルを削除する</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>持たないもの</h2>
+    <ul>
+      <li>過去の読み取り結果。上書きするので、残るのは最新の 1 つだけ</li>
+      <li>画面の画像。文字を読んだ後は保存しない</li>
+      <li>発言した人の名前、どのアプリの画面か、会話を区別する番号</li>
+      <li>利用者がどの返信案を選んだかの記録</li>
+    </ul>
+    <p class="lead">依頼の文は「直前の翻訳と返信案がすぐ出てくる」で、履歴や会話ごとの管理は含まれていないため、足していない。</p>
+  </section>
+
+  <section class="ask">
+    <h2>見てほしい点</h2>
+    <ul>
+      <li>返信案に <code>meaning</code> (意味を自分の言語で書いた文) を持たせている。相手の言語の文だけでは、送る前に内容を確かめられないため。依頼の文には無い項目なので、要らなければ外す</li>
+      <li>履歴を持たず、取り込みを止めたら消す。後から履歴が欲しくなった時は、この型とは別の保存先を足す</li>
+    </ul>
+  </section>
+</div>

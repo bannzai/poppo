@@ -1,0 +1,16 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Translations and reply suggestions for your chats right on your keyboard" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットの翻訳と返信案をキーボードに届けます"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

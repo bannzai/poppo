@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # PR を作る前のブランチでも、開発マシンでビルドせずに同じ検査を流せるようにする
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    # iOS 27 の SDK と simulator が入っている GitHub-hosted runner は xcode-27 だけ
+    # (macos-latest / macos-26 の Xcode は 26 系。https://github.com/actions/runner-images の images/macos/xcode-27-arm64-Readme.md)
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Xcode と simulator の版を記録
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+
+      - name: ビルド (make build-ios)
+        run: make build-ios
+
+      # iPhone Duo は使わない (Xcode 27.1 の既知の問題で、iPhone Duo の simulator では大半の app extension を実行できない)
+      - name: テスト (make test)
+        run: make test DESTINATION='platform=iOS Simulator,name=iPhone 17,OS=latest'

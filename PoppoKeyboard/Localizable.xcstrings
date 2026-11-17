@@ -1,0 +1,16 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Translations and reply suggestions will appear here" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳と返信案はここに表示されます"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
