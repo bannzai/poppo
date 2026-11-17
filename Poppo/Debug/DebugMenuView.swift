@@ -297,7 +297,7 @@ struct DebugScreenReadingStageRow: View {
 }
 
 /// 開発者メニューで診断の記録の表示を確かめる時に使う、見本の診断の記録。
-/// 取り込み中に 3 回読み、文字の読み取りと翻訳と保存は成功し、返信案の生成は 1 回失敗した、という値
+/// 取り込み中に文字を 12 回読み、そのうち 3 回で翻訳と保存まで進み、返信案の生成は 1 回失敗した、という値
 private let debugSampleDiagnostics = ScreenCaptureDiagnostics(
     startedAt: Date(timeIntervalSinceReferenceDate: 800_000_000),
     stoppedAt: nil,

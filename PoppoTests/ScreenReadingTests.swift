@@ -578,6 +578,34 @@ private let otherChatLines = [
     #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
 }
 
+/// 文字の読み取りが失敗した画面は、画面の画素が変わらないままでも、次の間隔 (2 秒後) の映像で読み直して保存すること
+/// (一時的な失敗の後、チャットの画面が動かない間ずっと読まないままにならないようにする)
+@Test func screenReadingReadsSameScreenAgainAfterRecognitionFailure() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    reader.recognitionError = NSError(domain: "com.example.vision", code: 9, userInfo: [NSLocalizedDescriptionKey: "request failed"])
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+    reader.recognitionError = nil
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1003, image: try makeScreenImage(gray: 0.2))
+
+    #expect(reader.recognitionCallCount == 2)
+    #expect(controller.diagnostics?.reading.recognition.failureCount == 1)
+    #expect(controller.diagnostics?.reading.recognition.successCount == 1)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL)?.capturedAt == Date(timeIntervalSinceReferenceDate: 1003))
+}
+
 /// 翻訳が失敗した時は、翻訳の失敗をエラーの内容つきで記録し、前に保存した読み取り結果を残し、
 /// 同じ発言が映っている間は翻訳を繰り返さないこと
 @Test func screenReadingRecordsTranslationFailureAndKeepsPreviousLatestReading() async throws {

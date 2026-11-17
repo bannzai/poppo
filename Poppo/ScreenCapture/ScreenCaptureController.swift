@@ -238,6 +238,10 @@ final class ScreenCaptureController {
         do {
             lines = try await recognizeTextLines(image)
         } catch {
+            if isCapturing(captureCount: captureCount) {
+                // 文字を読めなかった画面は「読んだ画面」として覚えない。画面が変わらないままでも、次の間隔で読み直せるようにする
+                lastScreenFingerprint = nil
+            }
             recordReading(captureCount: captureCount) {
                 $0.recognition.recordFailure(date: now(), failureDescription: screenReadingFailureDescription(error: error))
             }
