@@ -5,8 +5,11 @@ import UIKit
 nonisolated enum ScreenshotAccess {
     /// 利用者がまだ許可を選んでいない。許可を求める導線を出す
     case notRequested
-    /// 許可されている (選んだ写真だけの許可を含む)。直近のスクリーンショットを並べる
+    /// すべての写真が許可されている。直近のスクリーンショットを並べる
     case allowed
+    /// 利用者が選んだ写真だけが許可されている。選んだ中のスクリーンショットを並べる。
+    /// 新しく撮ったスクリーンショットは選んだ写真に入らず並ばないため、すべての写真を許可する導線も出す
+    case limited
     /// 許可されていない。設定アプリで許可する導線を出す
     case denied
 }
@@ -16,8 +19,10 @@ nonisolated func screenshotAccess(authorizationStatus: PHAuthorizationStatus) ->
     switch authorizationStatus {
     case .notDetermined:
         return .notRequested
-    case .authorized, .limited:
+    case .authorized:
         return .allowed
+    case .limited:
+        return .limited
     case .denied, .restricted:
         return .denied
     @unknown default:
@@ -28,12 +33,17 @@ nonisolated func screenshotAccess(authorizationStatus: PHAuthorizationStatus) ->
 /// 写真ライブラリから、直近に撮ったスクリーンショットを新しい順に limit 枚まで取る。
 /// 写真へのアクセスが許可されている時に呼ぶ
 func fetchRecentScreenshots(limit: Int) -> [PHAsset] {
+    let fetchResult = PHAsset.fetchAssets(with: .image, options: recentScreenshotFetchOptions(limit: limit))
+    return fetchResult.objects(at: IndexSet(integersIn: 0..<fetchResult.count))
+}
+
+/// 写真ライブラリへの問い合わせの条件。スクリーンショットだけを、撮った日時の新しい順に、limit 枚まで取る
+func recentScreenshotFetchOptions(limit: Int) -> PHFetchOptions {
     let options = PHFetchOptions()
     options.predicate = NSPredicate(format: "(mediaSubtypes & %d) != 0", PHAssetMediaSubtype.photoScreenshot.rawValue)
     options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
     options.fetchLimit = limit
-    let fetchResult = PHAsset.fetchAssets(with: .image, options: options)
-    return fetchResult.objects(at: IndexSet(integersIn: 0..<fetchResult.count))
+    return options
 }
 
 /// 写真ライブラリの 1 枚を、targetSize に合わせた画像として読み出す。

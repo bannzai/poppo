@@ -44,16 +44,7 @@ struct RecentScreenshotsView: View {
                     // ja: 設定で写真へのアクセスをオンにすると直近のスクリーンショットがここに並びます
                     Text("Turn on photo access in Settings to see your recent screenshots here")
                 } actions: {
-                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                        Button {
-                            openURL(settingsURL)
-                        } label: {
-                            // ja: 設定を開く
-                            Text("Open Settings")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("photo_access_open_settings_button")
-                    }
+                    openSettingsButton
                 }
             case .allowed:
                 if screenshots.isEmpty {
@@ -65,30 +56,26 @@ struct RecentScreenshotsView: View {
                         Text("Take a screenshot of a chat and open this app again")
                     }
                 } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            // ja: 直近のスクリーンショット
-                            Text("Recent screenshots")
-                                .font(.headline)
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                                ForEach(screenshots, id: \.localIdentifier) { screenshot in
-                                    NavigationLink {
-                                        ChatReadingView(screenshot: screenshot)
-                                    } label: {
-                                        ScreenshotThumbnail(screenshot: screenshot)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel(
-                                        screenshot.creationDate.map {
-                                            Text($0, format: Date.FormatStyle(date: .abbreviated, time: .shortened))
-                                        }
-                                        // ja: スクリーンショット
-                                        ?? Text("Screenshot")
-                                    )
-                                }
-                            }
-                        }
-                        .padding()
+                    screenshotGrid
+                }
+            case .limited:
+                VStack(spacing: 0) {
+                    VStack(spacing: 8) {
+                        // ja: 選んだ写真だけを表示しています
+                        Text("Only the photos you selected are shown")
+                            .font(.subheadline.bold())
+                        // ja: 新しく撮ったスクリーンショットを並べるには設定ですべての写真へのアクセスを許可してください
+                        Text("Allow access to all photos in Settings to see new screenshots")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        openSettingsButton
+                    }
+                    .padding()
+                    if screenshots.isEmpty {
+                        Spacer()
+                    } else {
+                        screenshotGrid
                     }
                 }
             }
@@ -103,17 +90,62 @@ struct RecentScreenshotsView: View {
         }
     }
 
-    /// 写真へのアクセスが許可されている時に、直近のスクリーンショットを取り直す。
+    /// 設定アプリの、本体アプリの画面を開くボタン。利用者が写真へのアクセスの許可を変えられるように出す
+    @ViewBuilder private var openSettingsButton: some View {
+        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+            Button {
+                openURL(settingsURL)
+            } label: {
+                // ja: 設定を開く
+                Text("Open Settings")
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("photo_access_open_settings_button")
+        }
+    }
+
+    /// 取れたスクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
+    private var screenshotGrid: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                // ja: 直近のスクリーンショット
+                Text("Recent screenshots")
+                    .font(.headline)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(screenshots, id: \.localIdentifier) { screenshot in
+                        NavigationLink {
+                            ChatReadingView(screenshot: screenshot)
+                        } label: {
+                            ScreenshotThumbnail(screenshot: screenshot)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            screenshot.creationDate.map {
+                                Text($0, format: Date.FormatStyle(date: .abbreviated, time: .shortened))
+                            }
+                            // ja: スクリーンショット
+                            ?? Text("Screenshot")
+                        )
+                    }
+                }
+            }
+            .padding()
+        }
+    }
+
+    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近のスクリーンショットを取り直す。
     /// 許可を選ぶ前には取らない。許可が要る操作を初めて行うとシステムが許可の確認を出すため、利用者が許可の導線を押す前に確認を出さない
     /// (Apple の文書: 「The first time your app performs an operation that requires authorization, the system automatically and
     /// asynchronously prompts the user for it.」
     /// https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app )
     private func loadScreenshots() {
-        guard screenshotAccess(authorizationStatus: authorizationStatus) == .allowed else {
+        switch screenshotAccess(authorizationStatus: authorizationStatus) {
+        case .allowed, .limited:
+            // 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
+            screenshots = fetchRecentScreenshots(limit: 30)
+        case .notRequested, .denied:
             return
         }
-        // 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
-        screenshots = fetchRecentScreenshots(limit: 30)
     }
 }
 

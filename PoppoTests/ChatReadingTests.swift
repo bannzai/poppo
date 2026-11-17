@@ -220,12 +220,40 @@ private let recognizedChatLines = [
     #expect(replySuggestions.map(\.meaning) == ["やあ"])
 }
 
-/// 言語が入っていない以外の失敗 (発言が無い等) では、言語のダウンロードを促さず、その失敗を持った失敗の状態になること
-@Test func phaseIsFailedForOtherErrors() async {
-    guard case .failed(let error) = await chatReadingPhase(read: { throw ChatReadingError.noMessages }) else {
-        Issue.record("失敗の状態になっていない")
-        return
+/// テストで画面の状態を比べるために、状態を名前に直す (ChatReadingPhase は中身を持つ状態があり、== で比べられないため)
+private func phaseName(phase: ChatReadingPhase) -> String {
+    switch phase {
+    case .reading:
+        "reading"
+    case .loaded:
+        "loaded"
+    case .needsLanguageDownload:
+        "needsLanguageDownload"
+    case .noMessages:
+        "noMessages"
+    case .untranslatableLanguage:
+        "untranslatableLanguage"
+    case .failed:
+        "failed"
     }
+}
 
-    #expect(error as? ChatReadingError == .noMessages)
+/// 画像から発言を読み取れなかった時は、画面の状態が、チャットの文字が見つからなかったことを出す状態になること
+@Test func phaseIsNoMessagesWhenNoChatTextIsFound() async {
+    #expect(phaseName(phase: await chatReadingPhase(read: { throw ChatReadingError.noMessages })) == "noMessages")
+}
+
+/// 原文の言語を翻訳できない時は、画面の状態が、翻訳できない言語であることを出す状態になること
+@Test func phaseIsUntranslatableLanguageWhenLanguageCannotBeTranslated() async {
+    #expect(
+        phaseName(phase: await chatReadingPhase(read: { throw ChatReadingError.untranslatableLanguage }))
+            == "untranslatableLanguage"
+    )
+}
+
+/// 画像を読み出せない・訳文が足りない・それ以外の失敗では、画面の状態が、もう一度読み取ることを選べる失敗の状態になること
+@Test func phaseIsFailedForOtherErrors() async {
+    #expect(phaseName(phase: await chatReadingPhase(read: { throw ChatReadingError.imageUnavailable })) == "failed")
+    #expect(phaseName(phase: await chatReadingPhase(read: { throw ChatReadingError.incompleteTranslation })) == "failed")
+    #expect(phaseName(phase: await chatReadingPhase(read: { throw CocoaError(.featureUnsupported) })) == "failed")
 }

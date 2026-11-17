@@ -14,3 +14,8 @@ import UIKit
 
     #expect(pasteboard.string == "Sounds good")
 }
+
+/// 返信案を pasteboard に入れる時の設定が、入れた文をほかの端末へ渡さない設定になっていること
+@Test func replySuggestionPasteboardOptionsKeepItemsOnThisDevice() {
+    #expect(replySuggestionPasteboardOptions()[.localOnly] as? Bool == true)
+}

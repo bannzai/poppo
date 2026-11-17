@@ -11,12 +11,17 @@ enum ChatReadingPhase {
     case loaded(messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
     /// 訳す言語が端末に入っておらず、言語のダウンロードを促している
     case needsLanguageDownload(source: Locale.Language, target: Locale.Language)
-    /// 読み取りに失敗した
-    case failed(any Error)
+    /// 画像から発言を 1 つも読み取れなかった
+    case noMessages
+    /// 原文の言語を利用者の言語に翻訳できない
+    case untranslatableLanguage
+    /// 上のどれでもない理由で読み取りに失敗した。もう一度読み取ることを選べる
+    case failed
 }
 
 /// 読み取りの処理 read を実行し、その結果から画面の状態を決める。
-/// 訳す言語が端末に入っていない失敗 (ChatReadingError.languageNotInstalled) は言語のダウンロードを促す状態に、ほかの失敗は失敗の状態にする
+/// 訳す言語が端末に入っていない失敗 (ChatReadingError.languageNotInstalled) は言語のダウンロードを促す状態に、
+/// 発言が無い失敗 (noMessages) と翻訳できない言語の失敗 (untranslatableLanguage) はそれぞれの状態に、ほかの失敗は failed にする
 func chatReadingPhase(
     read: @MainActor () async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
 ) async -> ChatReadingPhase {
@@ -25,8 +30,12 @@ func chatReadingPhase(
         return .loaded(messages: reading.messages, replySuggestions: reading.replySuggestions)
     } catch ChatReadingError.languageNotInstalled(let source, let target) {
         return .needsLanguageDownload(source: source, target: target)
+    } catch ChatReadingError.noMessages {
+        return .noMessages
+    } catch ChatReadingError.untranslatableLanguage {
+        return .untranslatableLanguage
     } catch {
-        return .failed(error)
+        return .failed
     }
 }
 
@@ -131,28 +140,25 @@ struct ChatReadingPhaseView: View {
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("language_download_button")
             }
-        case .failed(let error):
-            switch error as? ChatReadingError {
-            case .noMessages:
-                // ja: チャットの文字が見つかりませんでした
-                ContentUnavailableView("No chat text found", systemImage: "text.magnifyingglass")
-            case .untranslatableLanguage:
-                // ja: この言語はあなたの言語に翻訳できません
-                ContentUnavailableView("This language can't be translated into your language", systemImage: "character.bubble")
-            default:
-                ContentUnavailableView {
-                    // ja: このスクリーンショットを読み取れませんでした
-                    Label("Couldn't read this screenshot", systemImage: "exclamationmark.triangle")
-                } actions: {
-                    Button {
-                        retry()
-                    } label: {
-                        // ja: もう一度試す
-                        Text("Try again")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("chat_reading_retry_button")
+        case .noMessages:
+            // ja: チャットの文字が見つかりませんでした
+            ContentUnavailableView("No chat text found", systemImage: "text.magnifyingglass")
+        case .untranslatableLanguage:
+            // ja: この言語はあなたの言語に翻訳できません
+            ContentUnavailableView("This language can't be translated into your language", systemImage: "character.bubble")
+        case .failed:
+            ContentUnavailableView {
+                // ja: このスクリーンショットを読み取れませんでした
+                Label("Couldn't read this screenshot", systemImage: "exclamationmark.triangle")
+            } actions: {
+                Button {
+                    retry()
+                } label: {
+                    // ja: もう一度試す
+                    Text("Try again")
                 }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("chat_reading_retry_button")
             }
         }
     }

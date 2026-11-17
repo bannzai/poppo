@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Allow access to all photos in Settings to see new screenshots" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく撮ったスクリーンショットを並べるには設定ですべての写真へのアクセスを許可してください"
+          }
+        }
+      }
+    },
     "Allow photo access" : {
       "localizations" : {
         "ja" : {
@@ -87,6 +97,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットがまだありません"
+          }
+        }
+      }
+    },
+    "Only the photos you selected are shown" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだ写真だけを表示しています"
           }
         }
       }
