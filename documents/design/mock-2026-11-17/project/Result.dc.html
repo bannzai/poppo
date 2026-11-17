@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Poppo 読み取り結果</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+a{color:#2450D8}a:hover{color:#1A3BA6}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 56px 20px 24px; background: #FFFFFF; color: #14171C; font-family: 'Noto Sans JP', 'Hiragino Sans', sans-serif; display: flex; flex-direction: column; gap: 20px">
+  <div style="display: flex; align-items: center; gap: 8px">
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 2px; min-height: 44px; font-size: 16px; text-decoration: none; color: {{accent}}">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      戻る
+    </a>
+    <h1 style="margin: 0; font-size: 17px; line-height: 1.4; font-weight: 700">読み取り結果</h1>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 13px; line-height: 1.4; font-weight: 700; color: #5B6472">翻訳</h2>
+    <sc-for list="{{messages}}" as="message" hint-placeholder-count="2">
+      <div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: #F3F5F8">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6">{{message.translatedText}}</p>
+        <p lang="en" style="margin: 0; font-size: 13px; line-height: 1.5; color: #5B6472">{{message.originalText}}</p>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 13px; line-height: 1.4; font-weight: 700; color: #5B6472">返信案</h2>
+    <sc-for list="{{replies}}" as="reply" hint-placeholder-count="3">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 14px; border-radius: 12px; border: 1px solid #DFE3EA">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0">
+          <p lang="en" style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 500">{{reply.text}}</p>
+          <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #5B6472">{{reply.meaning}}</p>
+        </div>
+        <button aria-label="{{reply.copyLabel}}" style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 56px; height: 56px; border: 0; border-radius: 10px; background: transparent; color: {{accent}}; font-size: 11px; font-weight: 700; cursor: pointer">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg>
+          コピー
+        </button>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2450D8"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const replies = [
+{ text: 'Yes, still on. 3pm works better for me.', meaning: 'はい、予定どおりで。15 時の方が助かります' },
+{ text: 'Mornings are fine. Let’s keep the original time.', meaning: '午前で大丈夫です。元の時間のままにしましょう' },
+{ text: 'Could we push it to Thursday instead?', meaning: '代わりに木曜に延ばせますか？' },
+];
+return {
+accent: this.props.accent ?? '#2450D8',
+messages: [
+{ originalText: 'Hey, are we still on for the release review tomorrow?', translatedText: '明日のリリースレビュー、予定どおりやる？' },
+{ originalText: 'I can move it to 3pm if mornings are tight for you.', translatedText: '午前が厳しければ 15 時に動かせるよ' },
+],
+replies: replies.map((reply) => ({ text: reply.text, meaning: reply.meaning, copyLabel: '「' + reply.meaning + '」の返信案をコピー' })),
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-17T01:25:00Z" },
+  "title": "Poppo 主要画面のモック",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "ホーム (開いた直後)" },
+    "Result.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "スクリーンショットの読み取り結果" },
+    "Capturing.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "取り込み中" },
+    "Keyboard.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "他のアプリで開いたキーボード" }
+  },
+  "order": ["Main.dc.html", "Result.dc.html", "Capturing.dc.html", "Keyboard.dc.html"],
+  "notes": {
+    "heading": { "x": 0, "y": -300, "text": "Poppo 主要画面", "kind": "title1", "maxW": 1800 }
+  },
+  "designSystems": []
+}
