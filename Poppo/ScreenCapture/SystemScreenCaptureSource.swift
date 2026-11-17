@@ -43,11 +43,14 @@ final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
     }
 
     /// 利用者が選んだ対象 (filter) の映像の受け取りを始める。結果は onEvent に届く。
-    /// 既に映像を受け取っている時は何もしない
+    /// 既に映像を受け取っている時 (取り込み中に利用者が対象を選び直した時) は、前の対象の stream を止めて、選び直した対象で始め直す
     private func startStream(filter: SCContentFilter) {
-        guard stream == nil else {
-            return
-        }
+        // iOS の SCStream は対象を差し替えられない (updateContentFilter は iOS で使えない) ため、stream を作り直す。
+        // Apple のサンプルと同じ扱い: 「When the picker returns a filter, the sample tears down any prior stream and builds a fresh SCStream」
+        // ( https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-on-ios )。
+        // 止めた stream の出来事は、stream を手放した後は onEvent に届かない
+        stream?.stopCapture(completionHandler: nil)
+        stream = nil
         let newStream = SCStream(filter: filter, configuration: SCStreamConfiguration(), delegate: self)
         do {
             try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
