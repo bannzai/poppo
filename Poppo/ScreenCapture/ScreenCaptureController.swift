@@ -25,7 +25,7 @@ final class ScreenCaptureController {
     private(set) var failedToDeleteLatestReading = false
 
     /// 取り込みの実体を作る処理。利用者が取り込みを始める操作をするまで呼ばない
-    private let makeSource: () -> any ScreenCaptureSource
+    private let makeSource: @MainActor () -> any ScreenCaptureSource
     /// 読み取り結果を置くファイルの場所。取り込みが終わった時に削除する。App Group を使えない時は nil
     private let latestReadingFileURL: URL?
     /// 診断の記録を置くファイルの場所。nil の時は保存しない
@@ -41,7 +41,7 @@ final class ScreenCaptureController {
     /// diagnosticsFileURL は診断の記録を置く場所 (nil なら保存しない)、now は今の時刻を返す処理。
     /// diagnosticsFileURL に前回の記録があれば、それを diagnostics として読み込む (アプリが終了した後でも前回の記録を見られるようにするため)
     init(
-        makeSource: @escaping () -> any ScreenCaptureSource,
+        makeSource: @escaping @MainActor () -> any ScreenCaptureSource,
         latestReadingFileURL: URL?,
         diagnosticsFileURL: URL?,
         now: @escaping () -> Date
