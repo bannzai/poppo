@@ -21,7 +21,8 @@ struct ScreenReadingStageDiagnostics: Codable, Equatable {
     var failureCount = 0
     /// 最後に失敗した時刻。一度も失敗していない時は nil
     var lastFailedAt: Date?
-    /// 最後の失敗のエラーの内容 (エラーの種類と説明)。一度も失敗していない時は nil。画面から読んだ文字は含めない
+    /// 最後の失敗のエラーの内容 (エラーの種類と説明)。一度も失敗していない時は nil。
+    /// システムのエラーの説明をそのまま持つため、そこに画面から読んだ文字が含まれないかは確かめていない (DEBUG ビルドだけが端末内に保存する)
     var lastFailureDescription: String?
 
     /// この段が date に成功したことを記録する
@@ -40,7 +41,7 @@ struct ScreenReadingStageDiagnostics: Codable, Equatable {
 
 /// 取り込んだ画面の読み取りの記録。直近の 1 回の取り込みの間に、各段が成功・失敗した回数と、読まずに済ませた回数を残す。
 /// 実機で「本体アプリが背面にいる間に、読み取り・翻訳・返信案の生成・保存が動くか」を確かめるために使う。
-/// 画面から読んだ文字・翻訳・返信案は含めない
+/// 読み取った発言・翻訳・返信案を持つ項目は無い (エラーの内容については ScreenReadingStageDiagnostics.lastFailureDescription)
 struct ScreenReadingDiagnostics: Codable, Equatable {
     /// 文字の読み取りの段 (映像を画像にして、画像の文字を読む)
     var recognition = ScreenReadingStageDiagnostics()

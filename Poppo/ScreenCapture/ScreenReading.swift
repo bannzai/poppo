@@ -88,7 +88,8 @@ private func removingWhitespaces(text: String) -> String {
     text.filter { !$0.isWhitespace }
 }
 
-/// 読み取りの段のエラーを、診断の記録に残す文にして返す。画面から読んだ文字は含めない。
+/// 読み取りの段のエラーを、診断の記録に残す文にして返す。この関数は、画面から読んだ文字を文に足さない
+/// (システムのエラーの説明はそのまま使う。そこに画面の文字が含まれないかは確かめていない)。
 /// このアプリが定義したエラー (ChatReadingError・FrameImageConversionError) は、エラーの名前と値 (言語・結果のコード・画素の形式)、
 /// ほかのエラーは、エラーのドメイン・コード・説明にする
 nonisolated func screenReadingFailureDescription(error: any Error) -> String {
