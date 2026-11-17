@@ -24,7 +24,8 @@ import Testing
 /// 写真ライブラリを読むアプリに必須の項目 (Apple の文書: 「This key is required if your app uses APIs that have read or write access
 /// to the user’s photo library.」 https://developer.apple.com/documentation/bundleresources/information-property-list/nsphotolibraryusagedescription )
 @Test func appHasPhotoLibraryUsageDescription() {
-    #expect((Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryUsageDescription") as? String)?.isEmpty == false)
+    // 翻訳ファイル (InfoPlist.strings) の値で補われた結果ではなく、Info.plist そのものに入っていることを見るため、infoDictionary を読む
+    #expect((Bundle.main.infoDictionary?["NSPhotoLibraryUsageDescription"] as? String)?.isEmpty == false)
 }
 
 /// 写真へのアクセスの許可を求める時の説明文の日本語訳 (Poppo/InfoPlist.xcstrings) が、ビルドしたアプリに入っていること
