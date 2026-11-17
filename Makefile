@@ -10,11 +10,17 @@ DESTINATION ?= platform=iOS Simulator,id=$(SIMULATOR_UDID)
 # 実機ビルドの署名に使う Team ID。public リポジトリのため project.pbxproj に書かず、fastlane と同じ環境変数から渡す
 DEVELOPMENT_TEAM ?= $(FASTLANE_TEAM_ID)
 
-.PHONY: build-ios device install-device ios test clean verify
+.PHONY: build-ios build-ios-device device install-device ios test clean verify
 
 # Simulator 向けビルド。generic destination なら simulator の起動なしでビルドできる
 build-ios:
 	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+
+# 実機向けの SDK でのビルドだけを、署名なしで行う (実機には入れられない)。
+# ScreenCaptureKit は iOS Simulator の SDK に入っておらず、画面の取り込みの実体 (Poppo/ScreenCapture/SystemScreenCaptureSource.swift) は
+# simulator 向けビルドではコンパイルされないため、コンパイルが通ることをこの target で確かめる
+build-ios-device:
+	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
 
 # 実機向けビルド。code signing が必要なため、provisioning profile の自動生成とこの Mac へのデバイス登録を CLI から行えるようにする
 device:
@@ -53,10 +59,10 @@ clean:
 	rm -rf $(DERIVED_DATA)
 
 # CI (.github/workflows/ci.yml) と同じ検査をローカルでまとめて行う。通常は CI に任せ、CI では原因を調べられない時だけ使う
-verify: build-ios test
+verify: build-ios build-ios-device test
 
 # 引数なしの make で ios を実行する (人が手で動作確認するための入口。検査・テストは CI が行う)
 .DEFAULT_GOAL := ios
 
-# build-ios と test は同じ DerivedData を使うため、-j 指定でも並列に起動させない (各 target は xcodebuild 1 本で、make 側の並列化で速くなるものは無い)
+# build-ios・build-ios-device・test は同じ DerivedData を使うため、-j 指定でも並列に起動させない (各 target は xcodebuild 1 本で、make 側の並列化で速くなるものは無い)
 .NOTPARALLEL:

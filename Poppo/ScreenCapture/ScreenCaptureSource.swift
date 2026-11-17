@@ -26,3 +26,29 @@ protocol ScreenCaptureSource: AnyObject {
     /// 映像の受け取りを止める。呼んだ後は onEvent に出来事が届かない。取り込み中でない時は何もしない
     func stop()
 }
+
+/// 本体アプリが使う取り込みの実体を作って返す。
+/// ScreenCaptureKit がある環境 (実機) では SystemScreenCaptureSource、無い環境 (iOS Simulator) では UnavailableScreenCaptureSource
+func makeScreenCaptureSource() -> any ScreenCaptureSource {
+    #if canImport(ScreenCaptureKit)
+    return SystemScreenCaptureSource()
+    #else
+    return UnavailableScreenCaptureSource()
+    #endif
+}
+
+#if !canImport(ScreenCaptureKit)
+/// ScreenCaptureKit が無い環境 (iOS Simulator) で使う取り込みの実体。画面は取り込まず、始める操作にエラーを返す
+final class UnavailableScreenCaptureSource: ScreenCaptureSource {
+    /// 出来事を渡して呼ぶ処理
+    var onEvent: ((ScreenCaptureEvent) -> Void)?
+
+    /// 取り込めないことを、エラーとして onEvent に知らせる。何度呼んでも同じ結果になる
+    func start() {
+        onEvent?(.failed("ScreenCaptureKit is not available in this environment (iOS Simulator)"))
+    }
+
+    /// 取り込みを始められないため、何もしない
+    func stop() {}
+}
+#endif

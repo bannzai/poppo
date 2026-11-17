@@ -1,3 +1,7 @@
+// ScreenCaptureKit は iOS Simulator の SDK に入っていない (Xcode 27.1 の iPhoneSimulator.sdk に ScreenCaptureKit.framework が無く、
+// simulator 向けビルドは「Unable to resolve module dependency: 'ScreenCaptureKit'」で失敗する)。
+// このファイルは実機向けの SDK でだけコンパイルし、simulator では UnavailableScreenCaptureSource を使う
+#if canImport(ScreenCaptureKit)
 import CoreMedia
 import Foundation
 import ScreenCaptureKit
@@ -140,3 +144,4 @@ nonisolated func isUserStopped(error: any Error) -> Bool {
 nonisolated func screenCaptureFailureDescription(error: any Error) -> String {
     "\((error as NSError).domain) \((error as NSError).code): \(error.localizedDescription)"
 }
+#endif

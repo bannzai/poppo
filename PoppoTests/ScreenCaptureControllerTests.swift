@@ -155,18 +155,22 @@ func makeScreenCaptureController(
     #expect(loadScreenCaptureDiagnostics(fileURL: diagnosticsFileURL)?.lastFrameReceivedAt == Date(timeIntervalSinceReferenceDate: 1001.5))
 }
 
-/// 取り込み中でない時に届いた映像は数えないこと
-@Test func screenCaptureIgnoresFramesWhenNotCapturing() {
+/// 取り込みを止めた後に届いた映像は数えないこと (止めた後の記録が、止めた時点のまま残る)
+@Test func screenCaptureIgnoresFramesAfterStop() {
     let source = FakeScreenCaptureSource()
     let controller = makeScreenCaptureController(
         source: source, clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)), latestReadingFileURL: nil, diagnosticsFileURL: nil
     )
     controller.start()
-
+    source.onEvent?(.started)
     source.onEvent?(.frameReceived(Date(timeIntervalSinceReferenceDate: 1000.5)))
+    controller.stop()
 
-    #expect(controller.status == .notStarted)
-    #expect(controller.diagnostics == nil)
+    source.onEvent?(.frameReceived(Date(timeIntervalSinceReferenceDate: 1002)))
+
+    #expect(controller.status == .stopped)
+    #expect(controller.diagnostics?.receivedFrameCount == 1)
+    #expect(controller.diagnostics?.lastFrameReceivedAt == Date(timeIntervalSinceReferenceDate: 1000.5))
 }
 
 /// 停止の操作で「止めた」になり、取り込みの実体の stop が呼ばれ、止めた時刻と理由が保存され、読み取り結果が削除されること

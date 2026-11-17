@@ -5,7 +5,7 @@ import SwiftUI
 struct PoppoApp: App {
     /// 取り込みの状態。どの画面へ進んでも取り込み中の表示と停止の操作を出せるよう、アプリの入口で 1 つだけ持つ
     @State private var screenCaptureController = ScreenCaptureController(
-        makeSource: { SystemScreenCaptureSource() },
+        makeSource: makeScreenCaptureSource,
         latestReadingFileURL: latestReadingFileURL(),
         diagnosticsFileURL: screenCaptureDiagnosticsFileURL(),
         now: { Date() }

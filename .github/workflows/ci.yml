@@ -47,6 +47,10 @@ jobs:
       - name: ビルド (make build-ios)
         run: make build-ios
 
+      # ScreenCaptureKit は iOS Simulator の SDK に無く、画面の取り込みの実体は simulator 向けビルドではコンパイルされないため、実機向けの SDK でもビルドする
+      - name: 実機向けの SDK でのビルド (make build-ios-device)
+        run: make build-ios-device
+
       # iPhone Duo は使わない (Xcode 27.1 の既知の問題で、iPhone Duo の simulator では大半の app extension を実行できない)
       - name: テスト (make test)
         run: make test DESTINATION='platform=iOS Simulator,name=iPhone 17,OS=latest'

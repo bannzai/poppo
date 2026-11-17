@@ -44,7 +44,7 @@ struct ContentView: View {
     ContentView()
         .environment(
             ScreenCaptureController(
-                makeSource: { SystemScreenCaptureSource() },
+                makeSource: makeScreenCaptureSource,
                 latestReadingFileURL: nil,
                 diagnosticsFileURL: nil,
                 now: { Date() }

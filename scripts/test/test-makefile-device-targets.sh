@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Makefile の device / install-device のテスト。xcodebuild と xcrun を記録するだけの偽物に差し替えて、
-# 署名の Team ID が空の時に止まることと、入れる実機の決め方の優先順 (DEVICE > IOS_DEVICE_UDID > 自動) を確かめる。
+# Makefile の build-ios-device / device / install-device のテスト。xcodebuild と xcrun を記録するだけの偽物に差し替えて、
+# 署名の Team ID が空の時に止まること (build-ios-device は署名しないので止まらないこと) と、
+# 入れる実機の決め方の優先順 (DEVICE > IOS_DEVICE_UDID > 自動) を確かめる。
 # Usage: bash scripts/test/test-makefile-device-targets.sh
 # 偽物を PATH の先頭に置くため、本物の xcodebuild・xcrun は呼ばれない (ビルドもしない)。
 # 書く場所は一時ディレクトリと、Makefile が使う tmp/devices.json だけ。何度実行しても同じ結果になる
@@ -86,6 +87,11 @@ run_make "$work/one-device.json" device DEVELOPMENT_TEAM=TEAM123
 check "device: Team ID がある時は成功する" succeeded
 check "device: Team ID を xcodebuild に渡す" called "DEVELOPMENT_TEAM=TEAM123 build"
 check "device: 実機向け (generic/platform=iOS) でビルドする" called "-destination generic/platform=iOS -allowProvisioningUpdates"
+
+run_make "$work/one-device.json" build-ios-device DEVELOPMENT_TEAM= FASTLANE_TEAM_ID=
+check "build-ios-device: Team ID が空でも成功する (署名しない)" succeeded
+check "build-ios-device: 実機向け (generic/platform=iOS) で、署名なしでビルドする" called "-destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO build"
+check "build-ios-device: 実機に入れる操作をしない" not_called "devicectl"
 
 run_make "$work/one-device.json" install-device DEVELOPMENT_TEAM=TEAM123 DEVICE=PHONE-A IOS_DEVICE_UDID=PHONE-B
 check "install-device: DEVICE と IOS_DEVICE_UDID の両方がある時は DEVICE に入れる" called "devicectl device install app --device PHONE-A "
