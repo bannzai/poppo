@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Poppo キーボード</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+a{color:#2450D8}a:hover{color:#1A3BA6}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FFFFFF; color: #14171C; font-family: 'Noto Sans JP', 'Hiragino Sans', sans-serif; display: flex; flex-direction: column">
+  <div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding: 64px 16px 12px; display: flex; flex-direction: column; gap: 12px">
+    <p style="margin: 0; font-size: 12px; line-height: 1.4; color: #5B6472">他のチャットアプリの画面 (見本)</p>
+    <div lang="en" style="display: flex; flex-direction: column; gap: 8px">
+      <p style="margin: 0; align-self: flex-start; max-width: 280px; padding: 10px 12px; border-radius: 12px; background: #F3F5F8; font-size: 15px; line-height: 1.5">Hey, are we still on for the release review tomorrow?</p>
+      <p style="margin: 0; align-self: flex-start; max-width: 280px; padding: 10px 12px; border-radius: 12px; background: #F3F5F8; font-size: 15px; line-height: 1.5">I can move it to 3pm if mornings are tight for you.</p>
+    </div>
+    <div style="margin-top: auto; display: flex; align-items: center; height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 10px; border: 1px solid #DFE3EA; font-size: 15px; color: #5B6472">メッセージを入力</div>
+  </div>
+
+  <div style="flex-shrink: 0; box-sizing: border-box; padding: 10px 10px 28px; background: #E9ECF1; border-top: 1px solid #DFE3EA; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 4px">
+      <p style="margin: 0; font-size: 13px; line-height: 1.4; font-weight: 700">Poppo</p>
+      <p style="margin: 0; font-size: 12px; line-height: 1.4; color: #4A5361">2 分前に読んだ内容</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; background: #FFFFFF">
+      <p style="margin: 0; font-size: 12px; line-height: 1.4; font-weight: 700; color: #5B6472">翻訳</p>
+      <p style="margin: 0; font-size: 14px; line-height: 1.6">明日のリリースレビュー、予定どおりやる？</p>
+      <p style="margin: 0; font-size: 14px; line-height: 1.6">午前が厳しければ 15 時に動かせるよ</p>
+    </div>
+
+    <sc-for list="{{replies}}" as="reply" hint-placeholder-count="3">
+      <button aria-label="{{reply.insertLabel}}" style="display: flex; flex-direction: column; gap: 2px; padding: 9px 12px; min-height: 56px; border: 0; border-radius: 10px; background: #FFFFFF; text-align: left; cursor: pointer; color: inherit">
+        <span lang="en" style="font-size: 15px; line-height: 1.4; font-weight: 500; color: {{accent}}">{{reply.text}}</span>
+        <span style="font-size: 12px; line-height: 1.5; color: #5B6472">{{reply.meaning}}</span>
+      </button>
+    </sc-for>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 2px">
+      <button aria-label="次のキーボードに切り替える" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 44px; border: 0; border-radius: 8px; background: #C9D0DB; color: #14171C; cursor: pointer">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"></path></svg>
+      </button>
+      <button aria-label="1 文字消す" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 44px; border: 0; border-radius: 8px; background: #C9D0DB; color: #14171C; cursor: pointer">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7z"></path><path d="M13 10l4 4"></path><path d="M17 10l-4 4"></path></svg>
+      </button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2450D8"},"$preview":{"width":390,"height":844}}'>
+/** 他のアプリで開いたキーボードの画面に渡す値を作る。canvas の Tweaks で変えられるのは強調の色だけ */
+class Component extends DCLogic {
+/** 強調の色と、見本の返信案 (送る文・その意味・入力のボタンの読み上げ用の説明) を返す */
+renderVals() {
+return {
+// 既定の強調の色。白い背景の上でコントラスト比が 4.5:1 を超える青として置いた仮の値で、見た目の方向が決まったら決め直す
+accent: this.props.accent ?? '#2450D8',
+replies: [
+{ text: 'Yes, still on. 3pm works better for me.', meaning: 'はい、予定どおりで。15 時の方が助かります' },
+{ text: 'Mornings are fine. Let’s keep the original time.', meaning: '午前で大丈夫です。元の時間のままにしましょう' },
+{ text: 'Could we push it to Thursday instead?', meaning: '代わりに木曜に延ばせますか？' },
+].map((reply) => ({ text: reply.text, meaning: reply.meaning, insertLabel: '「' + reply.meaning + '」の返信案を入力する' })),
+};
+}
+}
+</script>
+</body>
+</html>
