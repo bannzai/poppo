@@ -21,14 +21,14 @@ device:
 	@[ -n "$(DEVELOPMENT_TEAM)" ] || { echo "Error: DEVELOPMENT_TEAM が空です (FASTLANE_TEAM_ID を export するか DEVELOPMENT_TEAM=<Team ID> で指定してください)" >&2; exit 1; }
 	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) -destination 'generic/platform=iOS' -allowProvisioningUpdates -allowProvisioningDeviceRegistration DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) build
 
-# 実機ビルドを実機にインストールする。インストール先の解決順: DEVICE 変数 (名前 / UDID) > 環境変数 IOS_DEVICE_UDID > devicectl の JSON から実機を自動解決 (実機が 1 台ならそれ、複数台なら接続中の 1 台。決められなければ指定を求める)
+# 実機ビルドを実機にインストールする。インストール先の解決順: DEVICE 変数 (名前 / UDID) > 環境変数 IOS_DEVICE_UDID > devicectl の JSON から実機を自動解決 (決め方は scripts/resolve-physical-device.sh。決められなければ指定を求める)
 install-device: device
 	@mkdir -p tmp; \
 	device="$(DEVICE)"; \
 	[ -n "$$device" ] || device="$(IOS_DEVICE_UDID)"; \
 	if [ -z "$$device" ]; then \
 		xcrun devicectl list devices --json-output tmp/devices.json > /dev/null; \
-		device=$$(jq -r '[.result.devices[] | select(.hardwareProperties.reality == "physical")] | if length == 1 then .[0] else (map(select(.connectionProperties.tunnelState == "connected")) | if length == 1 then .[0] else empty end) end | .identifier // empty' tmp/devices.json); \
+		device=$$(bash scripts/resolve-physical-device.sh tmp/devices.json || true); \
 	fi; \
 	[ -n "$$device" ] || { echo "Error: 実機が見つかりません (IOS_DEVICE_UDID を export するか DEVICE=<名前|UDID> で指定してください)" >&2; exit 1; }; \
 	xcrun devicectl device install app --device "$$device" "$(IOS_APP)"; \

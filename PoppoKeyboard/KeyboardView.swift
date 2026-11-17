@@ -22,6 +22,8 @@ struct KeyboardView: View {
             Spacer()
         }
         .padding()
+        // 立ち上げ時点の仮の高さ。翻訳と返信案を数行並べられる広さとして置いた値で、
+        // 表示する内容が決まる時 (https://github.com/bannzai/poppo/issues/4 ) に決め直す
         .frame(height: 216)
     }
 }
