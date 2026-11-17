@@ -25,7 +25,10 @@
 | 紹介ページ・利用規約・プライバシーポリシーの表示 | webtunnel (GitHub Actions の runner 上の Chromium)。caller workflow は `.github/workflows/browser-session.yml` | `docs/` を静的サーバでそのまま配信して開く。今の `docs/` は Markdown だけで、公開時に GitHub Pages (Jekyll) が HTML にした後の表示はこの経路では確かめられない。紹介ページ (`docs/index.html`) を作る時に、Jekyll でビルドした出力を配信するよう workflow を直す |
 | 取り込み → 読み取り → 翻訳 → 返信案 → キーボードへの表示の通し | 実機 (iOS 27)。「ユーザー作業の一覧」issue の「実機・実環境での確認」に書いて owner に頼む | 下の「simulator で確かめられないこと」のため |
 
-simtunnel と webtunnel は、リポジトリの Secrets に `TS_OIDC_CLIENT_ID` と `TS_OIDC_AUDIENCE` が登録されるまで使えない (`gh secret list` で確かめる)。
+simtunnel と webtunnel は、リポジトリの Secrets の `TS_OIDC_CLIENT_ID` と `TS_OIDC_AUDIENCE` で tailnet に参加する (`gh secret list` で確かめる)。2026-11-17 に両方の caller workflow を初めて実行し、次を確かめた。
+
+- simtunnel: iPhone 17 (iOS 27.2) の simulator でアプリが起動し、画面の撮影とタップができた ( https://github.com/bannzai/poppo/actions/runs/44035813671 )。この回は準備完了まで約 21 分かかり (うち WebDriverAgent のビルドが約 10 分)、`simtunnel up --wait` の待ち時間の上限 (20 分) を超えた。`up --wait` が上限で終わっても run は進んでいるので、`simtunnel status <session>` が成功するまで待つ
+- webtunnel: `docs/` の Markdown は変換されずに原文のまま表示され、日本語は文字化けした ( https://github.com/bannzai/poppo/actions/runs/44039659729 )。配信の対象外のファイル (`documents/design/` のモック等) は、runner 上の checkout を `file:///home/runner/work/poppo/poppo/<リポジトリ内のパス>` で開くと描画を確かめられた
 
 ### simulator で確かめられないこと
 
