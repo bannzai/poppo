@@ -611,6 +611,16 @@ func makeScreenCaptureController(
     )
 }
 
+/// 診断の記録をファイルに保存するのは DEBUG ビルドだけであること (DEBUG ビルドには置き場所があり、それ以外のビルドには無い)。
+/// テストを走らせた構成の側だけを確かめる
+@Test func screenCaptureDiagnosticsFileIsUsedOnlyInDebugBuild() {
+    #if DEBUG
+    #expect(screenCaptureDiagnosticsFileURL()?.lastPathComponent == "screen-capture-diagnostics.json")
+    #else
+    #expect(screenCaptureDiagnosticsFileURL() == nil)
+    #endif
+}
+
 /// エラーを診断の記録に残す文が、エラーのドメイン・コード・説明を「ドメイン コード: 説明」の形で含むこと
 @Test func screenCaptureFailureDescriptionContainsDomainCodeAndMessage() {
     #expect(
