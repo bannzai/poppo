@@ -427,6 +427,41 @@ private let otherChatLines = [
     #expect(controller.diagnostics?.reading == ScreenReadingDiagnostics())
 }
 
+/// 翻訳の途中で利用者が取り込む対象を選び直した時 (取り込み中に、新しい対象の映像が始まったと知らされる) は、
+/// 前の対象の画面の読み取りの結果を保存せず、選び直した後の画面は、前の対象と同じ画素・同じ発言でも読んで保存すること
+@Test func screenReadingDiscardsResultOfPreviousTargetWhenTargetIsReselected() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    source.onEvent?(.frameReceived(Date(timeIntervalSinceReferenceDate: 1001)))
+    reader.onTranslate = {
+        reader.onTranslate = nil
+        source.onEvent?(.started)
+    }
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(controller.status == .capturing)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
+    #expect(controller.diagnostics?.reading.saving == ScreenReadingStageDiagnostics())
+    #expect(controller.diagnostics?.receivedFrameCount == 1)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001.5, image: try makeScreenImage(gray: 0.2))
+
+    #expect(loadLatestReading(fileURL: latestReadingFileURL)?.capturedAt == Date(timeIntervalSinceReferenceDate: 1001.5))
+    #expect(controller.diagnostics?.reading.saving.successCount == 1)
+}
+
 /// 取り込みを止めて始め直した後は、前の取り込みで読んだ画面と同じ画素・同じ発言の画面でも読み直して保存すること
 /// (止めた時に読み取り結果を消しているため)
 @Test func screenReadingReadsSameScreenAgainAfterCaptureRestarts() async throws {

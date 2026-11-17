@@ -51,8 +51,8 @@ final class ScreenCaptureController {
     /// 進んでいる途中の、取り込んだ画面の読み取り。読み取っていない間は nil。
     /// 途中の間は次の読み取りを始めない。テストは、この値を待って読み取りが終わったことを知る
     @ObservationIgnored private(set) var readingTask: Task<Void, Never>?
-    /// 何回目の取り込みか。映像の受け取りが始まるたびに 1 増える。
-    /// 読み取りの途中で取り込みが終わった (止めた後に始め直した時を含む) ことを見分けるのに使う
+    /// 何回目の取り込みか。映像の受け取りが始まるたびに 1 増える (取り込み中に対象を選び直して、新しい対象の映像が始まった時を含む)。
+    /// 読み取りの途中で、読んでいた対象の取り込みが終わった (止めた後に始め直した時と、対象を選び直した時を含む) ことを見分けるのに使う
     private var captureCount = 0
     /// 今の取り込みで、最後に映像を画像にした時の、その映像を受け取った時刻。まだ画像にしていない時は nil
     private var lastImageMadeAt: Date?
@@ -123,15 +123,17 @@ final class ScreenCaptureController {
     private func handle(event: ScreenCaptureEvent) {
         switch event {
         case .started:
+            // 取り込み中に届く started は、利用者が取り込む対象を選び直して、新しい対象の映像が始まったことを表す。
+            // 前の対象の画面の読み取りが途中でも、その結果を新しい対象の読み取り結果として保存しないよう、取り込みの回を進める
+            captureCount += 1
+            lastImageMadeAt = nil
+            lastScreenFingerprint = nil
+            lastTriedMessageTexts = nil
             guard status != .capturing else {
                 return
             }
             status = .capturing
             failedToDeleteLatestReading = false
-            captureCount += 1
-            lastImageMadeAt = nil
-            lastScreenFingerprint = nil
-            lastTriedMessageTexts = nil
             diagnostics = ScreenCaptureDiagnostics(
                 startedAt: now(),
                 stoppedAt: nil,
