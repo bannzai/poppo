@@ -1,18 +1,24 @@
 import SwiftUI
 
-/// 立ち上げ時点の仮の最初の画面。画面の取り込みと翻訳の実装が入るまで、アプリが起動することだけを示す
+/// 本体アプリの最初の画面。直近のスクリーンショットを選ぶ画面を出し、選んだ 1 枚の読み取りの画面へ進む
 struct ContentView: View {
     var body: some View {
-        VStack(spacing: 12) {
-            Text(verbatim: "Poppo")
-                .font(.largeTitle.bold())
-            // ja: チャットの翻訳と返信案をキーボードに届けます
-            Text("Translations and reply suggestions for your chats right on your keyboard")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        NavigationStack {
+            RecentScreenshotsView()
+                .navigationTitle(Text(verbatim: "Poppo"))
+                #if DEBUG
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            DebugMenuView()
+                        } label: {
+                            Image(systemName: "ladybug")
+                        }
+                        .accessibilityIdentifier("debug_menu_button")
+                    }
+                }
+                #endif
         }
-        .padding()
     }
 }
 

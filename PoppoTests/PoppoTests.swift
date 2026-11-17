@@ -20,6 +20,23 @@ import Testing
     #expect(Bundle.main.object(forInfoDictionaryKey: "UIDeviceFamily") as? [Int] == [1])
 }
 
+/// 写真へのアクセスの許可を求める時にシステムが出す説明文が、ビルドしたアプリの Info.plist に入っていること。
+/// 写真ライブラリを読むアプリに必須の項目 (Apple の文書: 「This key is required if your app uses APIs that have read or write access
+/// to the user’s photo library.」 https://developer.apple.com/documentation/bundleresources/information-property-list/nsphotolibraryusagedescription )
+@Test func appHasPhotoLibraryUsageDescription() {
+    // 翻訳ファイル (InfoPlist.strings) の値で補われた結果ではなく、Info.plist そのものに入っていることを見るため、infoDictionary を読む
+    #expect((Bundle.main.infoDictionary?["NSPhotoLibraryUsageDescription"] as? String)?.isEmpty == false)
+}
+
+/// 写真へのアクセスの許可を求める時の説明文の日本語訳 (Poppo/InfoPlist.xcstrings) が、ビルドしたアプリに入っていること
+@Test func photoLibraryUsageDescriptionHasJapaneseLocalization() {
+    #expect(
+        Bundle.main.url(forResource: "InfoPlist", withExtension: "strings", subdirectory: nil, localization: "ja")
+            .flatMap { NSDictionary(contentsOf: $0) as? [String: String] }?["NSPhotoLibraryUsageDescription"]
+            == "直近のスクリーンショットを並べて、翻訳する 1 枚を選べるようにします。スクリーンショットはこの端末の中でだけ読み取ります。"
+    )
+}
+
 /// キーボード拡張の String Catalog (PoppoKeyboard/Localizable.xcstrings) の日本語訳が、アプリに埋め込まれた拡張に入っていること
 @Test func keyboardExtensionBundleContainsJapaneseLocalization() throws {
     #expect(

@@ -1,0 +1,24 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSPhotoLibraryUsageDescription" : {
+      "comment" : "Privacy - Photo Library Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Poppo lists your recent screenshots so you can pick one to translate. Screenshots are read only on this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近のスクリーンショットを並べて、翻訳する 1 枚を選べるようにします。スクリーンショットはこの端末の中でだけ読み取ります。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
