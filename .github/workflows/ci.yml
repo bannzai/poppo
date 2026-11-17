@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # PR は新しい push が来たら前の実行を取り消す。main への push は取り消さず、commit ごとの結果を残す
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   script-tests:

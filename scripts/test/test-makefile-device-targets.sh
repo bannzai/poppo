@@ -67,6 +67,8 @@ check() {
 
 # 直前の make が失敗し、出力に引数の文字列を含む時に成り立つ
 failed_with() { [ "$code" -ne 0 ] && printf '%s' "$output" | grep -qF "$1"; }
+# 直前の make の出力が引数の文字列を含まない時に成り立つ
+output_lacks() { ! printf '%s' "$output" | grep -qF "$1"; }
 # 直前の make が成功した時に成り立つ
 succeeded() { [ "$code" -eq 0 ]; }
 # 直前の make が失敗した時に成り立つ
@@ -100,6 +102,12 @@ check "install-device: どちらも空の時は devicectl の一覧から決め�
 run_make "$work/no-device.json" install-device DEVELOPMENT_TEAM=TEAM123 DEVICE= IOS_DEVICE_UDID=
 check "install-device: 実機を決められない時はエラーで止まる" failed_with "実機が見つかりません"
 check "install-device: 実機を決められない時はアプリを入れない" not_called "device install app"
+
+echo '{"result":' > "$work/broken.json"
+run_make "$work/broken.json" install-device DEVELOPMENT_TEAM=TEAM123 DEVICE= IOS_DEVICE_UDID=
+check "install-device: devicectl の一覧を読めない時は、読めないことを伝えて止まる" failed_with "JSON として読めません"
+check "install-device: devicectl の一覧を読めない時に「実機が見つかりません」と言わない" output_lacks "実機が見つかりません"
+check "install-device: devicectl の一覧を読めない時はアプリを入れない" not_called "device install app"
 
 run_make "$work/one-device.json" install-device DEVELOPMENT_TEAM= FASTLANE_TEAM_ID= DEVICE=PHONE-A
 check "install-device: Team ID が空の時はエラーで止まる" failed_with "DEVELOPMENT_TEAM が空です"

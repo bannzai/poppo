@@ -81,6 +81,18 @@ expect_argument_error() {
   fi
 }
 
+# jq が PATH に無い時は exit 4 (PATH を空のディレクトリだけにし、bash は絶対パスで起動する)
+mkdir -p "$work/empty-bin"
+PATH="$work/empty-bin" "$(command -v bash)" "$script" "$work/one-disconnected.json" > "$work/no-jq.out" 2> "$work/no-jq.err"
+no_jq_code=$?
+if [ "$no_jq_code" -eq 4 ] && [ ! -s "$work/no-jq.out" ] && grep -qF "jq が見つかりません" "$work/no-jq.err"; then
+  echo "PASS: jq が無い時は exit 4 で、jq が無いことを伝える"
+  pass=$((pass + 1))
+else
+  echo "FAIL: jq が無い時は exit 4 で、jq が無いことを伝える (exit=${no_jq_code} エラー出力='$(cat "$work/no-jq.err")')"
+  fail=$((fail + 1))
+fi
+
 expect_argument_error "引数が無い時は使い方のエラー (exit 2)"
 expect_argument_error "引数が 2 つの時は使い方のエラー (exit 2)" "$work/one-disconnected.json" "$work/one-disconnected.json"
 
