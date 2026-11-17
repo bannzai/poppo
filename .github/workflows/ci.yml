@@ -31,6 +31,9 @@ jobs:
       - name: Makefile の実機向け target のテスト
         run: bash scripts/test/test-makefile-device-targets.sh
 
+      - name: 本体アプリとキーボード拡張の App Group の設定のテスト
+        run: bash scripts/test/test-app-group-entitlements.sh
+
   build-and-test:
     # iOS 27 の SDK と simulator が入っている GitHub-hosted runner は xcode-27 だけ
     # (macos-latest / macos-26 の Xcode は 26 系。https://github.com/actions/runner-images の images/macos/xcode-27-arm64-Readme.md)
@@ -46,6 +49,10 @@ jobs:
 
       - name: ビルド (make build-ios)
         run: make build-ios
+
+      # ScreenCaptureKit は iOS Simulator の SDK に無く、画面の取り込みの実体は simulator 向けビルドではコンパイルされないため、実機向けの SDK でもビルドする
+      - name: 実機向けの SDK でのビルド (make build-ios-device)
+        run: make build-ios-device
 
       # iPhone Duo は使わない (Xcode 27.1 の既知の問題で、iPhone Duo の simulator では大半の app extension を実行できない)
       - name: テスト (make test)

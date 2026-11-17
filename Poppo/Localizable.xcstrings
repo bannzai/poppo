@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Agree and start" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意して始める"
+          }
+        }
+      }
+    },
     "Allow access to all photos in Settings to see new screenshots" : {
       "localizations" : {
         "ja" : {
@@ -31,6 +41,36 @@
         }
       }
     },
+    "Before you start" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始める前に"
+          }
+        }
+      }
+    },
+    "Capturing your screen" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面を取り込んでいます"
+          }
+        }
+      }
+    },
+    "Choose your entire screen on the next system screen" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次に出るシステムの画面で画面全体を選んでください"
+          }
+        }
+      }
+    },
     "Copied" : {
       "localizations" : {
         "ja" : {
@@ -51,12 +91,32 @@
         }
       }
     },
+    "Couldn't clear the translations shown on the keyboard" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーボードに出す翻訳を消せませんでした"
+          }
+        }
+      }
+    },
     "Couldn't read this screenshot" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "このスクリーンショットを読み取れませんでした"
+          }
+        }
+      }
+    },
+    "Couldn't stop screen capture" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の取り込みを止められませんでした"
           }
         }
       }
@@ -181,6 +241,26 @@
         }
       }
     },
+    "Screen capture" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の取り込み"
+          }
+        }
+      }
+    },
+    "Screen capture stopped because of an error" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エラーで画面の取り込みが止まりました"
+          }
+        }
+      }
+    },
     "Screenshot" : {
       "localizations" : {
         "ja" : {
@@ -191,12 +271,52 @@
         }
       }
     },
+    "Start screen capture" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の取り込みを始める"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
+          }
+        }
+      }
+    },
     "Take a screenshot of a chat and open this app again" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "チャットのスクリーンショットを撮ってからこのアプリを開き直してください"
+          }
+        }
+      }
+    },
+    "The screen video is never saved and never leaves this device" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の映像は保存せずこの端末の外へ送りません"
+          }
+        }
+      }
+    },
+    "The text on your entire screen including other apps is read while screen capture is on" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り込み中は他のアプリを含む画面全体の文字を読み取ります"
           }
         }
       }
@@ -247,6 +367,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定で写真へのアクセスをオンにすると直近のスクリーンショットがここに並びます"
+          }
+        }
+      }
+    },
+    "You can stop anytime from this app" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリからいつでも止められます"
           }
         }
       }
