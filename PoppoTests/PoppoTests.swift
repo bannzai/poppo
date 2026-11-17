@@ -7,3 +7,23 @@ import Testing
 @Test func appBundleIdentifierIsPoppo() {
     #expect(Bundle.main.bundleIdentifier == "com.bannzai.poppo")
 }
+
+/// 本体アプリの String Catalog (Poppo/Localizable.xcstrings) の日本語訳が、ビルドしたアプリに入っていること。
+/// ターゲットにリソースのビルドフェーズが無いと、同期フォルダの String Catalog は組み込まれず、日本語の端末でも英語のまま表示される
+@Test func appBundleContainsJapaneseLocalization() {
+    #expect(Bundle.main.localizations.contains("ja"))
+}
+
+/// 本体アプリの Asset Catalog (Poppo/Assets.xcassets) が、ビルドしたアプリに入っていること
+@Test func appBundleContainsCompiledAssetCatalog() {
+    #expect(Bundle.main.url(forResource: "Assets", withExtension: "car") != nil)
+}
+
+/// キーボード拡張の String Catalog (PoppoKeyboard/Localizable.xcstrings) の日本語訳が、アプリに埋め込まれた拡張に入っていること
+@Test func keyboardExtensionBundleContainsJapaneseLocalization() throws {
+    #expect(
+        try #require(
+            Bundle.main.builtInPlugInsURL.flatMap { Bundle(url: $0.appendingPathComponent("PoppoKeyboard.appex")) }
+        ).localizations.contains("ja")
+    )
+}
