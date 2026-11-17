@@ -6,8 +6,8 @@ struct ScreenCaptureEntryView: View {
     let status: ScreenCaptureStatus
     /// 取り込みが終わった時に、読み取り結果を削除できなかったか
     let failedToDeleteLatestReading: Bool
-    /// 同意の画面で利用者が同意した時に呼ぶ処理。取り込む対象を選ぶシステムの画面を出す
-    let start: () -> Void
+    /// 入口を押した時に呼ぶ処理。同意の画面を開く
+    let openConsent: () -> Void
 
     var body: some View {
         VStack(spacing: 8) {
@@ -21,9 +21,7 @@ struct ScreenCaptureEntryView: View {
                     .foregroundStyle(.red)
                     .accessibilityIdentifier("screen_capture_delete_failed")
             }
-            NavigationLink {
-                ScreenCaptureConsentView(status: status, start: start)
-            } label: {
+            Button(action: openConsent) {
                 // ja: 画面の取り込みを始める
                 Label("Start screen capture", systemImage: "record.circle")
                     .frame(maxWidth: .infinity)
@@ -37,14 +35,12 @@ struct ScreenCaptureEntryView: View {
 }
 
 /// 取り込みを始める前の同意の画面。何を読むか・端末の外へ送らないこと・いつでも止められることを説明し、同意の操作で取り込みを始める。
-/// 取り込みが始まると、この画面を閉じて前の画面へ戻る
+/// 取り込みが始まった時にこの画面を閉じるのは、この画面を開いた側 (ContentView) が行う
 struct ScreenCaptureConsentView: View {
     /// 今の取り込みの状態
     let status: ScreenCaptureStatus
     /// 利用者が同意した時に呼ぶ処理。取り込む対象を選ぶシステムの画面を出す
     let start: () -> Void
-    /// この画面を閉じて前の画面へ戻る処理
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         List {
@@ -78,11 +74,6 @@ struct ScreenCaptureConsentView: View {
         }
         // ja: 画面の取り込み
         .navigationTitle(Text("Screen capture"))
-        .onChange(of: status) {
-            if status == .capturing {
-                dismiss()
-            }
-        }
     }
 }
 

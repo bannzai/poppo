@@ -5,6 +5,8 @@ import SwiftUI
 struct ContentView: View {
     /// 取り込みの状態
     @Environment(ScreenCaptureController.self) private var screenCaptureController
+    /// 同意の画面を開いているか。入口を押した時に true にし、取り込みが始まった時に false にして閉じる
+    @State private var isScreenCaptureConsentPresented = false
 
     var body: some View {
         NavigationStack {
@@ -15,8 +17,18 @@ struct ContentView: View {
                         ScreenCaptureEntryView(
                             status: screenCaptureController.status,
                             failedToDeleteLatestReading: screenCaptureController.failedToDeleteLatestReading,
-                            start: { screenCaptureController.start() }
+                            openConsent: { isScreenCaptureConsentPresented = true }
                         )
+                    }
+                }
+                // 同意の画面を開くかどうかを、入口 (取り込み中は画面から消える) ではなく、常に画面にあるこの view が持つ。
+                // 入口の中のリンクで開くと、取り込みが始まって入口が消えた時に、開いた画面へ状態が届くかが入口の有無に左右される
+                .navigationDestination(isPresented: $isScreenCaptureConsentPresented) {
+                    ScreenCaptureConsentView(status: screenCaptureController.status, start: { screenCaptureController.start() })
+                }
+                .onChange(of: screenCaptureController.status) {
+                    if screenCaptureController.status == .capturing {
+                        isScreenCaptureConsentPresented = false
                     }
                 }
                 #if DEBUG
