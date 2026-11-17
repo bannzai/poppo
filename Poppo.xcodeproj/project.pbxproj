@@ -66,6 +66,15 @@
 			path = Poppo;
 			sourceTree = "<group>";
 		};
+		C4D51A7E93B2F6084E1D7A25 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		FCFCE8990E209F3329B36511 /* PoppoKeyboard */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			explicitFileTypes = {
@@ -93,6 +102,7 @@
 			children = (
 				9AF323C0E8F01505F081AB24 /* Poppo */,
 				FCFCE8990E209F3329B36511 /* PoppoKeyboard */,
+				C4D51A7E93B2F6084E1D7A25 /* Shared */,
 				1F7AEC36A51487D6F3A41539 /* PoppoTests */,
 				25BB2CDC7A0D5B52DCD77AA1 /* Products */,
 			);
@@ -135,6 +145,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				FCFCE8990E209F3329B36511 /* PoppoKeyboard */,
+				C4D51A7E93B2F6084E1D7A25 /* Shared */,
 			);
 			name = PoppoKeyboard;
 			packageProductDependencies = (
@@ -158,6 +169,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				9AF323C0E8F01505F081AB24 /* Poppo */,
+				C4D51A7E93B2F6084E1D7A25 /* Shared */,
 			);
 			name = Poppo;
 			packageProductDependencies = (
@@ -259,6 +271,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_KEY_CFBundleDisplayName = Poppo;
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Poppo lists your recent screenshots so you can pick one to translate. Screenshots are read only on this device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -279,6 +292,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_KEY_CFBundleDisplayName = Poppo;
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Poppo lists your recent screenshots so you can pick one to translate. Screenshots are read only on this device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;

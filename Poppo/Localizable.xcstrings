@@ -1,12 +1,252 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Translations and reply suggestions for your chats right on your keyboard" : {
+    "Allow access to all photos in Settings to see new screenshots" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "チャットの翻訳と返信案をキーボードに届けます"
+            "value" : "新しく撮ったスクリーンショットを並べるには設定ですべての写真へのアクセスを許可してください"
+          }
+        }
+      }
+    },
+    "Allow photo access" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真へのアクセスを許可"
+          }
+        }
+      }
+    },
+    "Allow photo access to see your recent screenshots here" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真へのアクセスを許可すると直近のスクリーンショットがここに並びます"
+          }
+        }
+      }
+    },
+    "Copied" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーしました"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー"
+          }
+        }
+      }
+    },
+    "Couldn't read this screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このスクリーンショットを読み取れませんでした"
+          }
+        }
+      }
+    },
+    "Download language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語をダウンロード"
+          }
+        }
+      }
+    },
+    "Download the language to translate this screenshot on your device" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末で翻訳するには言語のダウンロードが必要です"
+          }
+        }
+      }
+    },
+    "No chat text found" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットの文字が見つかりませんでした"
+          }
+        }
+      }
+    },
+    "No screenshots yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットがまだありません"
+          }
+        }
+      }
+    },
+    "Only the photos you selected are shown" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだ写真だけを表示しています"
+          }
+        }
+      }
+    },
+    "Open Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定を開く"
+          }
+        }
+      }
+    },
+    "Photo access is turned off" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真へのアクセスがオフになっています"
+          }
+        }
+      }
+    },
+    "Pick a screenshot to translate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットを選んで翻訳"
+          }
+        }
+      }
+    },
+    "Reading the screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットを読み取っています"
+          }
+        }
+      }
+    },
+    "Recent screenshots" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近のスクリーンショット"
+          }
+        }
+      }
+    },
+    "Reply suggestions" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信案"
+          }
+        }
+      }
+    },
+    "Reply suggestions aren't available on this device right now" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今この端末では返信案を作れません"
+          }
+        }
+      }
+    },
+    "Screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショット"
+          }
+        }
+      }
+    },
+    "Take a screenshot of a chat and open this app again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットのスクリーンショットを撮ってからこのアプリを開き直してください"
+          }
+        }
+      }
+    },
+    "This language can't be translated into your language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この言語はあなたの言語に翻訳できません"
+          }
+        }
+      }
+    },
+    "Translation" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳"
+          }
+        }
+      }
+    },
+    "Translation language needed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳用の言語が必要です"
+          }
+        }
+      }
+    },
+    "Try again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度試す"
+          }
+        }
+      }
+    },
+    "Turn on photo access in Settings to see your recent screenshots here" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定で写真へのアクセスをオンにすると直近のスクリーンショットがここに並びます"
           }
         }
       }
