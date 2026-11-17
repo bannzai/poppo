@@ -118,7 +118,10 @@ struct KeyboardContentView: View {
                     }
                 }
                 // 返信案と、返信案が答える直前の発言が下にあるため、開いた時に下の端を見せる
-                .defaultScrollAnchor(.bottom)
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                // 中身が高さより短い時 (返信案が無い時など) は上に寄せる。役割を分けずに下の端を指定すると、短い中身も下に寄り、
+                // 上に大きな空きができる (simulator で、返信案なしの見本が下に寄るのを確かめた)
+                .defaultScrollAnchor(.top, for: .alignment)
                 // スクロールの端のぼかしを出さない。上の端にかかった発言の翻訳がぼけて読めなくなるため
                 // (simulator で、上の端の 1 行がぼけるのを確かめた)
                 .scrollEdgeEffectHidden()
