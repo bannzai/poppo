@@ -26,6 +26,8 @@ final class FakeScreenReader {
     var replyTexts = ["Sounds good"]
     /// 返信の文の生成が投げるエラー。nil の時は replyTexts を返す
     var replyGenerationError: (any Error)?
+    /// 返信の文の生成が呼ばれた時に、文を返す前に実行する処理 (生成の途中の状態をテストが見るのに使う)
+    var onGenerateReplies: (() -> Void)?
     /// 文字の読み取りが呼ばれた回数
     private(set) var recognitionCallCount = 0
     /// 翻訳が呼ばれた回数
@@ -57,9 +59,10 @@ final class FakeScreenReader {
         return texts.map { "訳: " + $0 }
     }
 
-    /// 呼ばれた回数を数え、replyGenerationError を投げるか replyTexts を返す
+    /// 呼ばれた回数を数え、onGenerateReplies を実行してから、replyGenerationError を投げるか replyTexts を返す
     func generateReplyTexts() throws -> [String] {
         replyGenerationCallCount += 1
+        onGenerateReplies?()
         if let replyGenerationError {
             throw replyGenerationError
         }
@@ -388,6 +391,90 @@ private let otherChatLines = [
     #expect(reader.recognitionCallCount == 2)
     #expect(controller.diagnostics?.reading.saving.successCount == 1)
     #expect(controller.diagnostics?.reading.unchangedMessagesCount == 1)
+}
+
+/// 前の読み取りが長くかかった後に、見送った映像を読んだ時は、その時刻から 2 秒経つまで次の映像を画像にしないこと
+/// (見送った映像を受け取った時刻ではなく、実際に画像にした時刻から数える)
+@Test func screenReadingWaitsTwoSecondsAfterReadingSkippedFrameLate() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1001))
+    let controller = makeScreenReadingController(
+        source: source, reader: reader, clock: clock, latestReadingFileURL: temporaryFileURL(), diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    let skippedImage = try makeScreenImage(gray: 0.5)
+    reader.onRecognize = {
+        reader.onRecognize = nil
+        source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1002)) { skippedImage }
+        clock.now = Date(timeIntervalSinceReferenceDate: 1006)
+    }
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+    #expect(reader.recognitionCallCount == 2)
+    let nextImage = try makeScreenImage(gray: 0.8)
+    var makeImageCallCount = 0
+
+    source.onFrameImage?(Date(timeIntervalSinceReferenceDate: 1007.5)) {
+        makeImageCallCount += 1
+        return nextImage
+    }
+    #expect(makeImageCallCount == 0)
+
+    await waitUntilIdle(controller: controller)
+    #expect(reader.waitedSeconds == [1, 0.5])
+    #expect(makeImageCallCount == 1)
+}
+
+/// 翻訳の成功は、返信案の生成が終わるのを待たずに、発言の翻訳が終わった時点で診断の記録に残ること
+/// (返信案の生成が返ってこない時に、止まった段が翻訳ではなく返信案の生成だと見分けられるようにする)
+@Test func screenReadingRecordsTranslationSuccessBeforeReplyGenerationEnds() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: temporaryFileURL(),
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    var readingDuringReplyGeneration: ScreenReadingDiagnostics?
+    reader.onGenerateReplies = { readingDuringReplyGeneration = controller.diagnostics?.reading }
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(readingDuringReplyGeneration?.translation.successCount == 1)
+    #expect(readingDuringReplyGeneration?.replyGeneration == ScreenReadingStageDiagnostics())
+    #expect(controller.diagnostics?.reading.translation.successCount == 1)
+    #expect(controller.diagnostics?.reading.replyGeneration.successCount == 1)
+}
+
+/// 訳文の数が発言の数と合わない時は、翻訳の成功を記録せず、翻訳の失敗だけを記録すること
+@Test func screenReadingRecordsOnlyFailureWhenTranslationCountDoesNotMatch() async throws {
+    let source = FakeScreenCaptureSource()
+    let controller = ScreenCaptureController(
+        makeSource: { source },
+        latestReadingFileURL: temporaryFileURL(),
+        diagnosticsFileURL: nil,
+        now: { Date(timeIntervalSinceReferenceDate: 1000) },
+        recognizeTextLines: { _ in chatLines },
+        translateTexts: { _ in ["訳が 1 つだけ"] },
+        canGenerateReplies: { false },
+        generateReplyTexts: { _ in [] },
+        wait: { _ in }
+    )
+    controller.start()
+    source.onEvent?(.started)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(controller.diagnostics?.reading.translation.successCount == 0)
+    #expect(controller.diagnostics?.reading.translation.failureCount == 1)
+    #expect(controller.diagnostics?.reading.translation.lastFailureDescription == "ChatReadingError.incompleteTranslation")
 }
 
 /// 見送った映像を読むのを待っている間に取り込みが止まった時は、見送った映像を画像にせず、何も保存しないこと

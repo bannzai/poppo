@@ -246,8 +246,10 @@ final class ScreenCaptureController {
         self.skippedFrame = nil
         readScreenIfChanged(
             receivedAt: skippedFrame.receivedAt,
-            // 見送った映像は受け取った時刻より後に画像にするため、前に画像にした時刻から 2 秒後 (画像にしてよくなった時刻) を、画像にした時刻とする
-            imageMadeAt: lastImageMadeAt.map { max($0.addingTimeInterval(2), skippedFrame.receivedAt) } ?? skippedFrame.receivedAt,
+            // 見送った映像は受け取った時刻より後に画像にするため、今の時刻を、画像にした時刻とする (前の読み取りが長くかかった後も、
+            // 次の映像を画像にするまで 2 秒空ける)。今の時刻が、受け取った時刻や、画像にしてよくなった時刻 (前に画像にした時刻の 2 秒後) より
+            // 前になる時 (時計が戻った時) は、後の方の時刻にする
+            imageMadeAt: max(now(), skippedFrame.receivedAt, lastImageMadeAt?.addingTimeInterval(2) ?? skippedFrame.receivedAt),
             makeImage: skippedFrame.makeImage
         )
     }
@@ -341,7 +343,14 @@ final class ScreenCaptureController {
                 translateTexts: { texts in
                     guard didTranslateMessages else {
                         didTranslateMessages = true
-                        return try await self.translateTexts(texts)
+                        let translatedTexts = try await self.translateTexts(texts)
+                        // 翻訳の成功は、返信案の生成を待たずにここで記録する。返信案の生成が返ってこない時に、
+                        // 診断の記録が「翻訳は成功、返信案の生成は結果なし」になり、止まった段を見分けられるようにするため。
+                        // 訳文の数が合わない時は、readChat が翻訳の失敗 (incompleteTranslation) にするため、成功にしない
+                        if translatedTexts.count == texts.count {
+                            self.recordReading(captureCount: captureCount) { $0.translation.recordSuccess(date: self.now()) }
+                        }
+                        return translatedTexts
                     }
                     // readChat の 2 回目の翻訳は、返信の文の意味を作る翻訳で、返信案の生成の段に入る
                     do {
@@ -374,7 +383,6 @@ final class ScreenCaptureController {
             return
         }
         recordReading(captureCount: captureCount) {
-            $0.translation.recordSuccess(date: now())
             if reading.replySuggestions.isEmpty {
                 $0.replyGeneration.recordFailure(
                     date: now(),
