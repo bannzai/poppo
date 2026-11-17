@@ -77,28 +77,40 @@ struct ScreenCaptureConsentView: View {
     }
 }
 
-/// 取り込み中であることと、停止の操作を出す帯。取り込み中は、本体アプリのどの画面でも下端に出す
+/// 取り込み中であることと、停止の操作を出す帯。取り込み中は、本体アプリのどの画面でも下端に出す。
+/// 直前の停止の操作で止められなかった時は、そのことも出す (停止の操作はそのまま出し、もう一度止められるようにする)
 struct ScreenCaptureCapturingBar: View {
+    /// 直前の停止の操作で、取り込みを止められなかったか
+    let failedToStop: Bool
     /// 停止の操作をした時に呼ぶ処理。取り込みを止める
     let stop: () -> Void
 
     var body: some View {
-        HStack {
-            Label {
-                // ja: 画面を取り込んでいます
-                Text("Capturing your screen")
-            } icon: {
-                Image(systemName: "record.circle")
+        VStack(alignment: .leading, spacing: 8) {
+            if failedToStop {
+                // ja: 画面の取り込みを止められませんでした
+                Text("Couldn't stop screen capture")
+                    .font(.footnote)
                     .foregroundStyle(.red)
+                    .accessibilityIdentifier("screen_capture_stop_failed")
             }
-            .accessibilityIdentifier("screen_capture_capturing_label")
-            Spacer()
-            Button(role: .destructive, action: stop) {
-                // ja: 停止
-                Text("Stop")
+            HStack {
+                Label {
+                    // ja: 画面を取り込んでいます
+                    Text("Capturing your screen")
+                } icon: {
+                    Image(systemName: "record.circle")
+                        .foregroundStyle(.red)
+                }
+                .accessibilityIdentifier("screen_capture_capturing_label")
+                Spacer()
+                Button(role: .destructive, action: stop) {
+                    // ja: 停止
+                    Text("Stop")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("screen_capture_stop_button")
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("screen_capture_stop_button")
         }
         .padding()
         .background(.bar)

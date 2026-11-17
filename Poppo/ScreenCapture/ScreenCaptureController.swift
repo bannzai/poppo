@@ -23,6 +23,9 @@ final class ScreenCaptureController {
     private(set) var diagnostics: ScreenCaptureDiagnostics?
     /// 取り込みが終わった時に、読み取り結果を削除できなかったか。削除できた時と、まだ終わっていない時は false
     private(set) var failedToDeleteLatestReading = false
+    /// 直前の止める操作で取り込みを止められなかった時の、エラーの種類 (ドメインとコード) と説明。
+    /// 止められた時・止める操作をやり直した時・取り込みが終わった時は nil。nil でない間は、画面を取り込み続けているかもしれない
+    private(set) var stopFailureDescription: String?
 
     /// 取り込みの実体を作る処理。利用者が取り込みを始める操作をするまで呼ばない
     private let makeSource: @MainActor () -> any ScreenCaptureSource
@@ -68,13 +71,15 @@ final class ScreenCaptureController {
         source?.start()
     }
 
-    /// 取り込みを止め、読み取り結果を削除する。取り込み中でない時は何もしない
+    /// 取り込みを止める操作をする。取り込み中でない時は何もしない。
+    /// 状態が「止めた」になり読み取り結果を削除するのは、取り込みの実体が止まったと知らせた時。
+    /// 止められなかった時は「取り込み中」のまま stopFailureDescription にエラーが入る (止まっていないのに止めたと出さない)
     func stop() {
         guard status == .capturing else {
             return
         }
+        stopFailureDescription = nil
         source?.stop()
-        finishCapturing(status: .stopped, stopReason: .stoppedInApp)
     }
 
     /// 取り込みの実体が知らせた出来事で、状態と診断の記録を移す
@@ -112,6 +117,16 @@ final class ScreenCaptureController {
                 return
             }
             finishCapturing(status: .stopped, stopReason: .stoppedOutsideApp)
+        case .stoppedByApp:
+            guard status == .capturing else {
+                return
+            }
+            finishCapturing(status: .stopped, stopReason: .stoppedInApp)
+        case .stopFailed(let failureDescription):
+            guard status == .capturing else {
+                return
+            }
+            stopFailureDescription = failureDescription
         case .failed(let failureDescription):
             if status == .capturing {
                 finishCapturing(status: .failed, stopReason: .error(failureDescription))
@@ -133,6 +148,7 @@ final class ScreenCaptureController {
     /// 止まった後は画面を読んでいないため、取り込み中に読んだ内容をキーボードに出し続けない
     private func finishCapturing(status: ScreenCaptureStatus, stopReason: ScreenCaptureStopReason) {
         self.status = status
+        stopFailureDescription = nil
         diagnostics?.stoppedAt = now()
         diagnostics?.stopReason = stopReason
         saveDiagnostics()

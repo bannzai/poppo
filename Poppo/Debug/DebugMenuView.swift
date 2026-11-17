@@ -100,12 +100,21 @@ struct DebugMenuView: View {
                 NavigationLink {
                     Color.clear
                         .safeAreaInset(edge: .bottom) {
-                            ScreenCaptureCapturingBar(stop: {})
+                            ScreenCaptureCapturingBar(failedToStop: false, stop: {})
                         }
                 } label: {
                     Text(verbatim: "取り込み中の表示を開く")
                 }
                 .accessibilityIdentifier("debug_open_capture_capturing")
+                NavigationLink {
+                    Color.clear
+                        .safeAreaInset(edge: .bottom) {
+                            ScreenCaptureCapturingBar(failedToStop: true, stop: {})
+                        }
+                } label: {
+                    Text(verbatim: "取り込み中の表示を開く (止められなかった後)")
+                }
+                .accessibilityIdentifier("debug_open_capture_capturing_stop_failed")
             } header: {
                 Text(verbatim: "画面の取り込みの画面")
             }
@@ -144,6 +153,14 @@ struct DebugMenuView: View {
                 } else {
                     Text(verbatim: "記録なし (まだ取り込みを始めていない)")
                         .accessibilityIdentifier("debug_capture_no_diagnostics")
+                }
+                if let stopFailureDescription = screenCaptureController.stopFailureDescription {
+                    LabeledContent {
+                        Text(verbatim: stopFailureDescription)
+                    } label: {
+                        Text(verbatim: "停止の操作の失敗 (取り込みは続いているかもしれない)")
+                    }
+                    .accessibilityIdentifier("debug_capture_stop_failure")
                 }
             } header: {
                 Text(verbatim: "画面の取り込みの診断の記録")

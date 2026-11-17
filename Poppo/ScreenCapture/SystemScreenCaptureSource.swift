@@ -13,6 +13,9 @@ final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
     var onEvent: ((ScreenCaptureEvent) -> Void)?
     /// 映像を受け取っている stream。取り込みを始めていない間と、止めた後は nil
     private var stream: SCStream?
+    /// 本体アプリの操作 (止める操作・対象の選び直し) で stream を止めている途中か。
+    /// 途中の間は、止まったかどうかを stopCapture の結果で決めるため、システムからの「止まった」知らせと対象の選び直しを受けない
+    private var isStoppingStream = false
 
     /// 取り込む対象を選ぶシステムの画面を出す。利用者が対象を選ぶと映像の受け取りを始める。
     /// 何度呼んでも、システムの画面からの知らせを受ける登録は 1 つだけになる
@@ -28,10 +31,37 @@ final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
         SCContentSharingPicker.shared.present()
     }
 
-    /// 映像の受け取りを止め、stream を手放す。取り込み中でない時は、システムの画面からの知らせを受けるのをやめるだけ
+    /// 映像の受け取りを止める。止まったら stream を手放して stoppedByApp を、止められなかったら stream を持ったまま stopFailed を onEvent に知らせる
+    /// (止められなかった stream は映像を受け取り続けているかもしれないため、手放さずにもう一度止められるようにする)。
+    /// 取り込み中でない時と、止めている途中の時は、システムの画面からの知らせを受けるのをやめるだけ
     func stop() {
-        stream?.stopCapture(completionHandler: nil)
-        releaseStream()
+        // 止める操作の後に届いた対象の選択で取り込みを始め直さないよう、先にシステムの画面からの知らせを受けるのをやめる
+        SCContentSharingPicker.shared.remove(self)
+        SCContentSharingPicker.shared.isActive = false
+        guard let stream, !isStoppingStream else {
+            return
+        }
+        isStoppingStream = true
+        stopCapture(stream: stream) { failureDescription in
+            self.isStoppingStream = false
+            if let failureDescription {
+                self.onEvent?(.stopFailed(failureDescription))
+            } else {
+                self.releaseStream()
+                self.onEvent?(.stoppedByApp)
+            }
+        }
+    }
+
+    /// stream の映像の受け取りを止め、結果を MainActor で completion に渡す。
+    /// 止まった時 (既に止まっていた時を含む) は nil、止められなかった時はエラーを診断の記録に残す文を渡す
+    private func stopCapture(stream: SCStream, completion: @escaping @MainActor (String?) -> Void) {
+        // @Sendable: このクロージャはどのスレッドで呼ばれるか分からないため、MainActor のクロージャとして扱わせない
+        stream.stopCapture { @Sendable error in
+            Task { @MainActor in
+                completion(error.flatMap { isAlreadyStopped(error: $0) ? nil : screenCaptureFailureDescription(error: $0) })
+            }
+        }
     }
 
     /// stream を手放し、システムの画面からの知らせを受けるのをやめる。以後、手放した stream の出来事は onEvent に届かない。
@@ -43,14 +73,37 @@ final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
     }
 
     /// 利用者が選んだ対象 (filter) の映像の受け取りを始める。結果は onEvent に届く。
-    /// 既に映像を受け取っている時 (取り込み中に利用者が対象を選び直した時) は、前の対象の stream を止めて、選び直した対象で始め直す
+    /// 既に映像を受け取っている時 (取り込み中に利用者が対象を選び直した時) は、前の対象の stream が止まってから、選び直した対象で始め直す。
+    /// 前の対象の stream を止められなかった時は、始め直さずに stopFailed を知らせる (前の対象の映像を受け取ったままになる)
     private func startStream(filter: SCContentFilter) {
+        guard let replacedStream = stream else {
+            beginStream(filter: filter)
+            return
+        }
         // iOS の SCStream は対象を差し替えられない (updateContentFilter は iOS で使えない) ため、stream を作り直す。
         // Apple のサンプルと同じ扱い: 「When the picker returns a filter, the sample tears down any prior stream and builds a fresh SCStream」
-        // ( https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-on-ios )。
-        // 止めた stream の出来事は、stream を手放した後は onEvent に届かない
-        stream?.stopCapture(completionHandler: nil)
-        stream = nil
+        // ( https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-on-ios )
+        // nonisolated(unsafe): SCContentFilter は Sendable でないが、filter は MainActor の中でだけ使う
+        nonisolated(unsafe) let selectedFilter = filter
+        isStoppingStream = true
+        stopCapture(stream: replacedStream) { failureDescription in
+            self.isStoppingStream = false
+            if let failureDescription {
+                self.onEvent?(.stopFailed(failureDescription))
+            } else if SCContentSharingPicker.shared.isActive {
+                self.stream = nil
+                self.beginStream(filter: selectedFilter)
+            } else {
+                // 前の対象の stream を止めている途中に止める操作 (stop()) があった。選び直した対象では始めない
+                self.releaseStream()
+                self.onEvent?(.stoppedByApp)
+            }
+        }
+    }
+
+    /// 対象 (filter) の stream を新しく作り、映像の受け取りを始める。結果は onEvent に届く。
+    /// stream を持っていない時に呼ぶ
+    private func beginStream(filter: SCContentFilter) {
         let newStream = SCStream(filter: filter, configuration: SCStreamConfiguration(), delegate: self)
         do {
             try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
@@ -94,6 +147,11 @@ extension SystemScreenCaptureSource: SCContentSharingPickerObserver {
         // nonisolated(unsafe): SCContentFilter は Sendable でないが、この関数は filter を MainActor に渡した後は触らないため、同時に使われない
         nonisolated(unsafe) let selectedFilter = filter
         Task { @MainActor in
+            // 止める操作 (stop() が isActive を false にする) の後と、stream を止めている途中に届いた選択では、取り込みを始めない。
+            // 止めた後に取り込みが始まり直ると、利用者が止めたつもりの画面を読み続ける
+            guard SCContentSharingPicker.shared.isActive, !self.isStoppingStream else {
+                return
+            }
             self.startStream(filter: selectedFilter)
         }
     }
@@ -127,7 +185,8 @@ extension SystemScreenCaptureSource: SCStreamDelegate {
     /// stream が止まった時に、システムが呼ぶ。利用者がアプリの外で止めたのか、エラーで止まったのかを onEvent に知らせる
     nonisolated func stream(_ stream: SCStream, didStopWithError error: any Error) {
         Task { @MainActor [stoppedStreamID = ObjectIdentifier(stream)] in
-            guard self.stream.map(ObjectIdentifier.init) == stoppedStreamID else {
+            // 本体アプリの操作で止めている途中は、止まったかどうかを stopCapture の結果で決める
+            guard self.stream.map(ObjectIdentifier.init) == stoppedStreamID, !self.isStoppingStream else {
                 return
             }
             self.releaseStream()
@@ -141,5 +200,11 @@ extension SystemScreenCaptureSource: SCStreamDelegate {
 /// error が「利用者がこのアプリの外 (システムの操作) で取り込みを止めた」ことを表すか (SCStreamError.Code.userStopped)
 nonisolated func isUserStopped(error: any Error) -> Bool {
     (error as? SCStreamError)?.code == .userStopped
+}
+
+/// error が「止めようとした stream は、既に映像を受け取っていなかった」ことを表すか (SCStreamError.Code.attemptToStopStreamState)。
+/// 止める操作にとっては、止まっているのと同じ結果
+nonisolated func isAlreadyStopped(error: any Error) -> Bool {
+    (error as? SCStreamError)?.code == .attemptToStopStreamState
 }
 #endif

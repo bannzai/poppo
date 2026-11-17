@@ -11,15 +11,21 @@ final class FakeScreenCaptureSource: ScreenCaptureSource {
     private(set) var startCallCount = 0
     /// stop が呼ばれた回数
     private(set) var stopCallCount = 0
+    /// stop が呼ばれた時に知らせる出来事。nil の時は何も知らせない (止める操作の結果がまだ届いていない間を表す)。
+    /// 既定は、本物の実体が止められた時と同じ stoppedByApp
+    var eventOnStop: ScreenCaptureEvent? = .stoppedByApp
 
     /// 呼ばれた回数を数えるだけで、出来事は知らせない
     func start() {
         startCallCount += 1
     }
 
-    /// 呼ばれた回数を数えるだけで、出来事は知らせない
+    /// 呼ばれた回数を数え、eventOnStop の出来事を知らせる
     func stop() {
         stopCallCount += 1
+        if let eventOnStop {
+            onEvent?(eventOnStop)
+        }
     }
 }
 
@@ -609,6 +615,129 @@ func makeScreenCaptureController(
             receivedFrameCount: 7
         )
     )
+}
+
+/// 止める操作の結果がまだ届いていない間は「取り込み中」のままで、読み取り結果も消さないこと (止まったと分かる前に、止めたと出さない)
+@Test func screenCaptureStaysCapturingUntilSourceReportsStopped() throws {
+    let source = FakeScreenCaptureSource()
+    source.eventOnStop = nil
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenCaptureController(
+        source: source,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 1001), label: "first"), fileURL: latestReadingFileURL)
+
+    controller.stop()
+
+    #expect(source.stopCallCount == 1)
+    #expect(controller.status == .capturing)
+    #expect(controller.diagnostics?.stoppedAt == nil)
+    #expect(controller.diagnostics?.stopReason == nil)
+    #expect(controller.stopFailureDescription == nil)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) != nil)
+
+    source.onEvent?(.stoppedByApp)
+
+    #expect(controller.status == .stopped)
+    #expect(controller.diagnostics?.stopReason == .stoppedInApp)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
+}
+
+/// 止める操作が失敗した時は「取り込み中」のままで、エラーが残り、読み取り結果も診断の記録の止めた時刻も変えないこと
+/// (画面を取り込み続けているかもしれないのに、止めたと出さない)。もう一度止めて止まると「止めた」になり、エラーが消えること
+@Test func screenCaptureStopFailureKeepsCapturingAndAllowsRetry() throws {
+    let source = FakeScreenCaptureSource()
+    source.eventOnStop = .stopFailed("com.apple.ScreenCaptureKit.SCStreamErrorDomain -3802: failed to stop")
+    let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1000))
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenCaptureController(source: source, clock: clock, latestReadingFileURL: latestReadingFileURL, diagnosticsFileURL: nil)
+    controller.start()
+    source.onEvent?(.started)
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 1001), label: "first"), fileURL: latestReadingFileURL)
+    clock.now = Date(timeIntervalSinceReferenceDate: 1060)
+
+    controller.stop()
+
+    #expect(controller.status == .capturing)
+    #expect(controller.stopFailureDescription == "com.apple.ScreenCaptureKit.SCStreamErrorDomain -3802: failed to stop")
+    #expect(controller.diagnostics?.stoppedAt == nil)
+    #expect(controller.diagnostics?.stopReason == nil)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) != nil)
+
+    source.eventOnStop = .stoppedByApp
+    clock.now = Date(timeIntervalSinceReferenceDate: 1090)
+    controller.stop()
+
+    #expect(source.stopCallCount == 2)
+    #expect(controller.status == .stopped)
+    #expect(controller.stopFailureDescription == nil)
+    #expect(controller.diagnostics?.stoppedAt == Date(timeIntervalSinceReferenceDate: 1090))
+    #expect(controller.diagnostics?.stopReason == .stoppedInApp)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
+}
+
+/// 止める操作が失敗した後、やり直した止める操作の結果が届くまでの間は、前の失敗のエラーを出さないこと
+@Test func screenCaptureClearsStopFailureWhenStopIsRetried() {
+    let source = FakeScreenCaptureSource()
+    source.eventOnStop = .stopFailed("failed to stop")
+    let controller = makeScreenCaptureController(
+        source: source, clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)), latestReadingFileURL: nil, diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    controller.stop()
+    #expect(controller.stopFailureDescription == "failed to stop")
+
+    source.eventOnStop = nil
+    controller.stop()
+
+    #expect(controller.status == .capturing)
+    #expect(controller.stopFailureDescription == nil)
+}
+
+/// 止める操作が失敗した後に、取り込みがアプリの外で止まると、「止めた」になってエラーが消えること
+@Test func screenCaptureClearsStopFailureWhenCaptureEnds() {
+    let source = FakeScreenCaptureSource()
+    source.eventOnStop = .stopFailed("failed to stop")
+    let controller = makeScreenCaptureController(
+        source: source, clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)), latestReadingFileURL: nil, diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    controller.stop()
+
+    source.onEvent?(.stoppedByUser)
+
+    #expect(controller.status == .stopped)
+    #expect(controller.stopFailureDescription == nil)
+    #expect(controller.diagnostics?.stopReason == .stoppedOutsideApp)
+}
+
+/// 取り込み中でない時に、止める操作の結果 (止まった・止められなかった) が届いても、状態・エラー・診断の記録・読み取り結果を変えないこと
+@Test func screenCaptureIgnoresStopResultsWhenNotCapturing() throws {
+    let source = FakeScreenCaptureSource()
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenCaptureController(
+        source: source,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
+
+    source.onEvent?(.stoppedByApp)
+    source.onEvent?(.stopFailed("failed to stop"))
+
+    #expect(controller.status == .notStarted)
+    #expect(controller.stopFailureDescription == nil)
+    #expect(controller.diagnostics == nil)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) != nil)
 }
 
 /// 診断の記録をファイルに保存するのは DEBUG ビルドだけであること (DEBUG ビルドには置き場所があり、それ以外のビルドには無い)。

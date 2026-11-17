@@ -10,6 +10,10 @@ enum ScreenCaptureEvent: Equatable {
     case selectionCancelled
     /// 利用者が、このアプリの外 (システムの操作) で取り込みを止めた
     case stoppedByUser
+    /// 本体アプリの止める操作 (stop()) で、映像の受け取りが止まった
+    case stoppedByApp
+    /// 本体アプリの止める操作 (stop()) が失敗した。映像の受け取りが続いているかもしれない。値はエラーの種類 (ドメインとコード) と説明
+    case stopFailed(String)
     /// エラーで取り込みを始められなかった、または止まった。値はエラーの種類 (ドメインとコード) と説明
     case failed(String)
 }
@@ -23,7 +27,8 @@ protocol ScreenCaptureSource: AnyObject {
     /// 取り込み中でない時は、何度呼んでも対象を選ぶ画面を出し直すだけ
     func start()
 
-    /// 映像の受け取りを止める。呼んだ後は onEvent に出来事が届かない。取り込み中でない時は何もしない
+    /// 映像の受け取りを止める。結果は onEvent に届く (止まれば stoppedByApp、止められなければ stopFailed)。
+    /// 取り込み中でない時は何も知らせない
     func stop()
 }
 

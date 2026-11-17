@@ -111,6 +111,16 @@
         }
       }
     },
+    "Couldn't stop screen capture" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の取り込みを止められませんでした"
+          }
+        }
+      }
+    },
     "Download language" : {
       "localizations" : {
         "ja" : {

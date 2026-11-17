@@ -46,7 +46,10 @@ struct ContentView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if screenCaptureController.status == .capturing {
-                ScreenCaptureCapturingBar(stop: { screenCaptureController.stop() })
+                ScreenCaptureCapturingBar(
+                    failedToStop: screenCaptureController.stopFailureDescription != nil,
+                    stop: { screenCaptureController.stop() }
+                )
             }
         }
     }
