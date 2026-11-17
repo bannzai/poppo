@@ -28,6 +28,9 @@ jobs:
       - name: Makefile の実機向け target のテスト
         run: bash scripts/test/test-makefile-device-targets.sh
 
+      - name: 本体アプリとキーボード拡張の App Group の設定のテスト
+        run: bash scripts/test/test-app-group-entitlements.sh
+
   build-and-test:
     # iOS 27 の SDK と simulator が入っている GitHub-hosted runner は xcode-27 だけ
     # (macos-latest / macos-26 の Xcode は 26 系。https://github.com/actions/runner-images の images/macos/xcode-27-arm64-Readme.md)

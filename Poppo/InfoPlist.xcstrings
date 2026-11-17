@@ -18,6 +18,23 @@
           }
         }
       }
+    },
+    "NSScreenCaptureUsageDescription" : {
+      "comment" : "Privacy - Screen Capture Usage Description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Poppo reads the chat on your screen to show translations and reply suggestions on its keyboard. The screen is read only on this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面のチャットを読み取って、翻訳と返信案をキーボードに出します。画面はこの端末の中でだけ読み取ります。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

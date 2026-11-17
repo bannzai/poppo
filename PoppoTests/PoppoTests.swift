@@ -37,6 +37,40 @@ import Testing
     )
 }
 
+/// 画面の取り込みの許可を求める時にシステムが出す説明文が、ビルドしたアプリの Info.plist に入っていること
+/// (Apple の文書: 「In the Info pane of the Xcode target editor, add a NSScreenCaptureUsageDescription key with a description
+/// of why your app requires screen recording access.」 https://developer.apple.com/documentation/screencapturekit )
+@Test func appHasScreenCaptureUsageDescription() {
+    #expect((Bundle.main.infoDictionary?["NSScreenCaptureUsageDescription"] as? String)?.isEmpty == false)
+}
+
+/// 画面の取り込みの許可を求める時の説明文の日本語訳 (Poppo/InfoPlist.xcstrings) が、ビルドしたアプリに入っていること
+@Test func screenCaptureUsageDescriptionHasJapaneseLocalization() {
+    #expect(
+        Bundle.main.url(forResource: "InfoPlist", withExtension: "strings", subdirectory: nil, localization: "ja")
+            .flatMap { NSDictionary(contentsOf: $0) as? [String: String] }?["NSScreenCaptureUsageDescription"]
+            == "画面のチャットを読み取って、翻訳と返信案をキーボードに出します。画面はこの端末の中でだけ読み取ります。"
+    )
+}
+
+/// 他のアプリへ切り替えた後も取り込みを続けるための宣言が、ビルドしたアプリの Info.plist に入っていること
+/// (Apple のサンプル: 「screen-capture in UIBackgroundModes, so the stream survives backgrounding for full-display capture.」
+/// https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-on-ios )
+@Test func appDeclaresScreenCaptureBackgroundMode() {
+    #expect(Bundle.main.infoDictionary?["UIBackgroundModes"] as? [String] == ["screen-capture"])
+}
+
+/// キーボード拡張が Full Access を求めていないこと (App Review Guidelines 4.4.1:
+/// 「Remain functional without full network access and without requiring full access」)
+@Test func keyboardExtensionDoesNotRequestOpenAccess() throws {
+    #expect(
+        ((try #require(
+            Bundle.main.builtInPlugInsURL.flatMap { Bundle(url: $0.appendingPathComponent("PoppoKeyboard.appex")) }
+        ).infoDictionary?["NSExtension"] as? [String: Any])?["NSExtensionAttributes"] as? [String: Any])?["RequestsOpenAccess"] as? Bool
+            == false
+    )
+}
+
 /// キーボード拡張の String Catalog (PoppoKeyboard/Localizable.xcstrings) の日本語訳が、アプリに埋め込まれた拡張に入っていること
 @Test func keyboardExtensionBundleContainsJapaneseLocalization() throws {
     #expect(
