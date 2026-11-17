@@ -39,7 +39,9 @@ final class ScreenCaptureController {
 
     /// makeSource は取り込みの実体を作る処理、latestReadingFileURL は取り込みが終わった時に削除する読み取り結果の場所、
     /// diagnosticsFileURL は診断の記録を置く場所 (nil なら保存しない)、now は今の時刻を返す処理。
-    /// diagnosticsFileURL に前回の記録があれば、それを diagnostics として読み込む (アプリが終了した後でも前回の記録を見られるようにするため)
+    /// diagnosticsFileURL に前回の記録があれば、それを diagnostics として読み込む (アプリが終了した後でも前回の記録を見られるようにするため)。
+    /// latestReadingFileURL に読み取り結果が残っていれば削除する。作った時点では取り込んでいないため、残っているのは
+    /// 取り込み中にアプリが終了した時に消せなかったもので、画面を読んでいない間はキーボードに出し続けない
     init(
         makeSource: @escaping @MainActor () -> any ScreenCaptureSource,
         latestReadingFileURL: URL?,
@@ -51,6 +53,7 @@ final class ScreenCaptureController {
         self.diagnosticsFileURL = diagnosticsFileURL
         self.now = now
         diagnostics = diagnosticsFileURL.flatMap { loadScreenCaptureDiagnostics(fileURL: $0) }
+        deleteLatestReadingWhileNotCapturing()
     }
 
     /// 利用者が同意した後に呼ぶ。取り込む対象を選ぶシステムの画面を出す。取り込み中の時は何もしない
@@ -133,12 +136,19 @@ final class ScreenCaptureController {
         diagnostics?.stoppedAt = now()
         diagnostics?.stopReason = stopReason
         saveDiagnostics()
-        if let latestReadingFileURL {
-            do {
-                try deleteLatestReading(fileURL: latestReadingFileURL)
-            } catch {
-                failedToDeleteLatestReading = true
-            }
+        deleteLatestReadingWhileNotCapturing()
+    }
+
+    /// 取り込んでいない時に呼び、latestReadingFileURL の読み取り結果を削除する。削除できなかった時は failedToDeleteLatestReading を true にする。
+    /// latestReadingFileURL が nil の時と、読み取り結果が無い時は何もしない
+    private func deleteLatestReadingWhileNotCapturing() {
+        guard let latestReadingFileURL else {
+            return
+        }
+        do {
+            try deleteLatestReading(fileURL: latestReadingFileURL)
+        } catch {
+            failedToDeleteLatestReading = true
         }
     }
 

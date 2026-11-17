@@ -114,6 +114,26 @@ func sampleLatestReading(capturedAt: Date, label: String) -> LatestReading {
     #expect(isStale(capturedAt: Date(timeIntervalSinceReferenceDate: 1000), now: Date(timeIntervalSinceReferenceDate: 9000)))
 }
 
+/// 「何分前の内容か」に使う時刻は、読んだ時刻が今以前ならそのまま返ること
+@Test func capturedAtIsUsedAsIsWhenNotAfterNow() {
+    #expect(
+        capturedAtNotAfterNow(capturedAt: Date(timeIntervalSinceReferenceDate: 1000), now: Date(timeIntervalSinceReferenceDate: 1600))
+            == Date(timeIntervalSinceReferenceDate: 1000)
+    )
+    #expect(
+        capturedAtNotAfterNow(capturedAt: Date(timeIntervalSinceReferenceDate: 1000), now: Date(timeIntervalSinceReferenceDate: 1000))
+            == Date(timeIntervalSinceReferenceDate: 1000)
+    )
+}
+
+/// 「何分前の内容か」に使う時刻は、読んだ時刻が今より後 (端末の時計を戻した時) なら今の時刻になること (「何分後」と出さない)
+@Test func capturedAtAfterNowIsReplacedWithNow() {
+    #expect(
+        capturedAtNotAfterNow(capturedAt: Date(timeIntervalSinceReferenceDate: 2000), now: Date(timeIntervalSinceReferenceDate: 1000))
+            == Date(timeIntervalSinceReferenceDate: 1000)
+    )
+}
+
 /// 読んだ時刻が今より後 (端末の時計を戻した時) の読み取り結果は、古い扱いにならないこと
 @Test func latestReadingCapturedInTheFutureIsNotStale() {
     #expect(!isStale(capturedAt: Date(timeIntervalSinceReferenceDate: 2000), now: Date(timeIntervalSinceReferenceDate: 1000)))

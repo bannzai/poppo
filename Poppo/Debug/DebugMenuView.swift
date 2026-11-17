@@ -82,7 +82,7 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "キーボードに渡す読み取り結果")
             } footer: {
-                Text(verbatim: "保存した後に、入力欄でキーボードを Poppo に切り替えると表示を確かめられる。取り込みが止まると、保存した見本も削除される")
+                Text(verbatim: "保存した後に、入力欄でキーボードを Poppo に切り替えると表示を確かめられる。取り込みが止まった時と、アプリを終了して開き直した時に、保存した見本も削除される")
             }
             Section {
                 NavigationLink {

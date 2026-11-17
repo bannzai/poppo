@@ -179,13 +179,13 @@ func makeScreenCaptureController(
     let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1000))
     let latestReadingFileURL = temporaryFileURL()
     let diagnosticsFileURL = temporaryFileURL()
-    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
     let controller = makeScreenCaptureController(
         source: source, clock: clock, latestReadingFileURL: latestReadingFileURL, diagnosticsFileURL: diagnosticsFileURL
     )
     controller.start()
     source.onEvent?(.started)
     source.onEvent?(.frameReceived(Date(timeIntervalSinceReferenceDate: 1001)))
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 1001), label: "first"), fileURL: latestReadingFileURL)
     clock.now = Date(timeIntervalSinceReferenceDate: 1060)
 
     controller.stop()
@@ -210,7 +210,6 @@ func makeScreenCaptureController(
 @Test func screenCaptureStopDoesNothingWhenNotCapturing() throws {
     let source = FakeScreenCaptureSource()
     let latestReadingFileURL = temporaryFileURL()
-    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
     let controller = makeScreenCaptureController(
         source: source,
         clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
@@ -218,6 +217,7 @@ func makeScreenCaptureController(
         diagnosticsFileURL: nil
     )
     controller.start()
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
 
     controller.stop()
 
@@ -232,10 +232,10 @@ func makeScreenCaptureController(
     let source = FakeScreenCaptureSource()
     let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1000))
     let latestReadingFileURL = temporaryFileURL()
-    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
     let controller = makeScreenCaptureController(source: source, clock: clock, latestReadingFileURL: latestReadingFileURL, diagnosticsFileURL: nil)
     controller.start()
     source.onEvent?(.started)
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 1001), label: "first"), fileURL: latestReadingFileURL)
     clock.now = Date(timeIntervalSinceReferenceDate: 1030)
 
     source.onEvent?(.stoppedByUser)
@@ -252,12 +252,12 @@ func makeScreenCaptureController(
     let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1000))
     let latestReadingFileURL = temporaryFileURL()
     let diagnosticsFileURL = temporaryFileURL()
-    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
     let controller = makeScreenCaptureController(
         source: source, clock: clock, latestReadingFileURL: latestReadingFileURL, diagnosticsFileURL: diagnosticsFileURL
     )
     controller.start()
     source.onEvent?(.started)
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 1001), label: "first"), fileURL: latestReadingFileURL)
     clock.now = Date(timeIntervalSinceReferenceDate: 1045)
 
     source.onEvent?(.failed("com.apple.ScreenCaptureKit.SCStreamErrorDomain -3824: missing background mode"))
@@ -281,7 +281,6 @@ func makeScreenCaptureController(
 @Test func screenCaptureFailureBeforeStartRecordsErrorAndKeepsLatestReading() throws {
     let source = FakeScreenCaptureSource()
     let latestReadingFileURL = temporaryFileURL()
-    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
     let controller = makeScreenCaptureController(
         source: source,
         clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
@@ -289,6 +288,7 @@ func makeScreenCaptureController(
         diagnosticsFileURL: nil
     )
     controller.start()
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
 
     source.onEvent?(.failed("picker failed"))
 
@@ -387,11 +387,6 @@ func makeScreenCaptureController(
     let directoryURL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
     let latestReadingFileURL = directoryURL.appending(path: "latest-reading.json")
     try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
-    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directoryURL.path)
-    defer {
-        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directoryURL.path)
-    }
     let controller = makeScreenCaptureController(
         source: source,
         clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
@@ -400,10 +395,227 @@ func makeScreenCaptureController(
     )
     controller.start()
     source.onEvent?(.started)
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 1001), label: "first"), fileURL: latestReadingFileURL)
+    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directoryURL.path)
+    defer {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directoryURL.path)
+    }
 
     controller.stop()
 
     #expect(controller.status == .stopped)
     #expect(controller.failedToDeleteLatestReading)
     #expect(loadLatestReading(fileURL: latestReadingFileURL) != nil)
+}
+
+/// 削除できなかった後に取り込みを始め直すと、削除できなかった印が消えること (新しい取り込みの間は、前の失敗を出し続けない)
+@Test func screenCaptureClearsDeleteFailureWhenCaptureStartsAgain() throws {
+    let source = FakeScreenCaptureSource()
+    let directoryURL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let latestReadingFileURL = directoryURL.appending(path: "latest-reading.json")
+    try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    let controller = makeScreenCaptureController(
+        source: source,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 1001), label: "first"), fileURL: latestReadingFileURL)
+    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directoryURL.path)
+    controller.stop()
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directoryURL.path)
+    #expect(controller.failedToDeleteLatestReading)
+
+    controller.start()
+    source.onEvent?(.started)
+
+    #expect(controller.status == .capturing)
+    #expect(!controller.failedToDeleteLatestReading)
+}
+
+/// 作った時に読み取り結果が残っていたら削除すること。作った時点では取り込んでいないため、残っているのは
+/// 取り込み中にアプリが終了した時に消せなかった読み取り結果で、キーボードに出し続けない
+@Test func screenCaptureDeletesLatestReadingLeftOnInit() throws {
+    let latestReadingFileURL = temporaryFileURL()
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
+
+    let controller = makeScreenCaptureController(
+        source: FakeScreenCaptureSource(),
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
+    #expect(controller.status == .notStarted)
+    #expect(!controller.failedToDeleteLatestReading)
+}
+
+/// 作った時に残っていた読み取り結果を削除できなかったら、そのことが controller に残ること (画面に出すため)
+@Test func screenCaptureRemembersFailureToDeleteLatestReadingOnInit() throws {
+    let directoryURL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let latestReadingFileURL = directoryURL.appending(path: "latest-reading.json")
+    try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
+    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directoryURL.path)
+    defer {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directoryURL.path)
+    }
+
+    #expect(
+        makeScreenCaptureController(
+            source: FakeScreenCaptureSource(),
+            clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+            latestReadingFileURL: latestReadingFileURL,
+            diagnosticsFileURL: nil
+        ).failedToDeleteLatestReading
+    )
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) != nil)
+}
+
+/// 取り込み中に、映像の受け取りが始まった知らせが重ねて届いても、診断の記録を作り直さないこと (始めた時刻と受け取った数が残る)
+@Test func screenCaptureIgnoresDuplicateStartedWhileCapturing() {
+    let source = FakeScreenCaptureSource()
+    let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1000))
+    let controller = makeScreenCaptureController(source: source, clock: clock, latestReadingFileURL: nil, diagnosticsFileURL: nil)
+    controller.start()
+    source.onEvent?(.started)
+    source.onEvent?(.frameReceived(Date(timeIntervalSinceReferenceDate: 1001)))
+    clock.now = Date(timeIntervalSinceReferenceDate: 1500)
+
+    source.onEvent?(.started)
+
+    #expect(controller.status == .capturing)
+    #expect(
+        controller.diagnostics == ScreenCaptureDiagnostics(
+            startedAt: Date(timeIntervalSinceReferenceDate: 1000),
+            stoppedAt: nil,
+            stopReason: nil,
+            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 1001),
+            receivedFrameCount: 1
+        )
+    )
+}
+
+/// 取り込み中でない時に「アプリの外で止めた」知らせが届いても、状態・診断の記録・読み取り結果を変えないこと
+@Test func screenCaptureIgnoresStoppedByUserWhenNotCapturing() throws {
+    let source = FakeScreenCaptureSource()
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenCaptureController(
+        source: source,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    try save(latestReading: sampleLatestReading(capturedAt: Date(timeIntervalSinceReferenceDate: 900), label: "first"), fileURL: latestReadingFileURL)
+
+    source.onEvent?(.stoppedByUser)
+
+    #expect(controller.status == .notStarted)
+    #expect(controller.diagnostics == nil)
+    #expect(loadLatestReading(fileURL: latestReadingFileURL) != nil)
+}
+
+/// 止めた後に始め直してエラーになった時は「エラーで止まった」になり、診断の記録が、そのエラーの記録に置き換わること
+@Test func screenCaptureFailureAfterStopReplacesDiagnosticsWithError() {
+    let source = FakeScreenCaptureSource()
+    let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1000))
+    let controller = makeScreenCaptureController(source: source, clock: clock, latestReadingFileURL: nil, diagnosticsFileURL: nil)
+    controller.start()
+    source.onEvent?(.started)
+    source.onEvent?(.frameReceived(Date(timeIntervalSinceReferenceDate: 1001)))
+    controller.stop()
+    clock.now = Date(timeIntervalSinceReferenceDate: 2000)
+    controller.start()
+
+    source.onEvent?(.failed("picker failed"))
+
+    #expect(controller.status == .failed)
+    #expect(
+        controller.diagnostics == ScreenCaptureDiagnostics(
+            startedAt: nil,
+            stoppedAt: Date(timeIntervalSinceReferenceDate: 2000),
+            stopReason: .error("picker failed"),
+            lastFrameReceivedAt: nil,
+            receivedFrameCount: 0
+        )
+    )
+}
+
+/// エラーで止まった後に始め直して映像の受け取りが始まると「取り込み中」に戻り、診断の記録が新しい 1 回のものに置き換わること
+@Test func screenCaptureRecoversFromFailureWhenCaptureStarts() {
+    let source = FakeScreenCaptureSource()
+    let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 1000))
+    let controller = makeScreenCaptureController(source: source, clock: clock, latestReadingFileURL: nil, diagnosticsFileURL: nil)
+    controller.start()
+    source.onEvent?(.failed("picker failed"))
+    clock.now = Date(timeIntervalSinceReferenceDate: 2000)
+
+    controller.start()
+    source.onEvent?(.started)
+
+    #expect(source.startCallCount == 2)
+    #expect(controller.status == .capturing)
+    #expect(
+        controller.diagnostics == ScreenCaptureDiagnostics(
+            startedAt: Date(timeIntervalSinceReferenceDate: 2000),
+            stoppedAt: nil,
+            stopReason: nil,
+            lastFrameReceivedAt: nil,
+            receivedFrameCount: 0
+        )
+    )
+}
+
+/// 診断の記録として読めない中身のファイルは、読み出しが nil を返すこと
+@Test func screenCaptureDiagnosticsIsNilWhenFileIsNotDiagnostics() throws {
+    let fileURL = temporaryFileURL()
+    try Data("{\"startedAt\": \"yesterday\"}".utf8).write(to: fileURL)
+
+    #expect(loadScreenCaptureDiagnostics(fileURL: fileURL) == nil)
+}
+
+/// 診断の記録を保存していない時は、読み出しが nil を返すこと
+@Test func screenCaptureDiagnosticsIsNilWhenNothingIsSaved() {
+    #expect(loadScreenCaptureDiagnostics(fileURL: temporaryFileURL()) == nil)
+}
+
+/// 診断の記録は、置く場所のディレクトリがまだ無くても保存でき、読み出すと同じ値が返ること
+@Test func screenCaptureDiagnosticsSaveCreatesDirectory() throws {
+    let fileURL = FileManager.default.temporaryDirectory
+        .appending(path: UUID().uuidString)
+        .appending(path: "screen-capture-diagnostics.json")
+
+    try save(
+        screenCaptureDiagnostics: ScreenCaptureDiagnostics(
+            startedAt: Date(timeIntervalSinceReferenceDate: 500),
+            stoppedAt: Date(timeIntervalSinceReferenceDate: 560),
+            stopReason: .error("stream failed"),
+            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 559),
+            receivedFrameCount: 7
+        ),
+        fileURL: fileURL
+    )
+
+    #expect(
+        loadScreenCaptureDiagnostics(fileURL: fileURL) == ScreenCaptureDiagnostics(
+            startedAt: Date(timeIntervalSinceReferenceDate: 500),
+            stoppedAt: Date(timeIntervalSinceReferenceDate: 560),
+            stopReason: .error("stream failed"),
+            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 559),
+            receivedFrameCount: 7
+        )
+    )
+}
+
+/// エラーを診断の記録に残す文が、エラーのドメイン・コード・説明を「ドメイン コード: 説明」の形で含むこと
+@Test func screenCaptureFailureDescriptionContainsDomainCodeAndMessage() {
+    #expect(
+        screenCaptureFailureDescription(
+            error: NSError(domain: "com.example.capture", code: -3824, userInfo: [NSLocalizedDescriptionKey: "missing background mode"])
+        ) == "com.example.capture -3824: missing background mode"
+    )
 }

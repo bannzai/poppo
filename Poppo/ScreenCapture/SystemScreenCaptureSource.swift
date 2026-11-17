@@ -139,9 +139,4 @@ extension SystemScreenCaptureSource: SCStreamDelegate {
 nonisolated func isUserStopped(error: any Error) -> Bool {
     (error as? SCStreamError)?.code == .userStopped
 }
-
-/// error を、診断の記録に残す文 (エラーのドメイン・コード・説明) にして返す
-nonisolated func screenCaptureFailureDescription(error: any Error) -> String {
-    "\((error as NSError).domain) \((error as NSError).code): \(error.localizedDescription)"
-}
 #endif

@@ -43,6 +43,12 @@ func deleteLatestReading(fileURL: URL) throws {
     try FileManager.default.removeItem(at: fileURL)
 }
 
+/// キーボードが「何分前の内容か」を出す時に使う、画面を読んだ時刻を返す。
+/// capturedAt が now より後 (読んだ後に端末の時計を戻した時) は now を返し、「何分後」と出さないようにする
+func capturedAtNotAfterNow(capturedAt: Date, now: Date) -> Date {
+    min(capturedAt, now)
+}
+
 /// 読み取り結果が古いか。古い読み取り結果は、キーボードが色を変えて出す。
 /// capturedAt は画面を読んだ時刻、now は今の時刻
 func isStale(capturedAt: Date, now: Date) -> Bool {

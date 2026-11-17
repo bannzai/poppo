@@ -27,6 +27,11 @@ protocol ScreenCaptureSource: AnyObject {
     func stop()
 }
 
+/// error を、診断の記録に残す文 (エラーのドメイン・コード・説明) にして返す
+nonisolated func screenCaptureFailureDescription(error: any Error) -> String {
+    "\((error as NSError).domain) \((error as NSError).code): \(error.localizedDescription)"
+}
+
 /// 本体アプリが使う取り込みの実体を作って返す。
 /// ScreenCaptureKit がある環境 (実機) では SystemScreenCaptureSource、無い環境 (iOS Simulator) では UnavailableScreenCaptureSource
 func makeScreenCaptureSource() -> any ScreenCaptureSource {

@@ -58,10 +58,9 @@ struct KeyboardContentView: View {
                 }
                 Spacer()
                 if let latestReading {
-                    // 古い読み取り結果は、今の画面と違う内容かもしれないと分かるように色と印を変える。
-                    // capturedAt が now より後 (端末の時計を戻した時) でも「これから」と出さないよう、now で頭打ちにする
+                    // 古い読み取り結果は、今の画面と違う内容かもしれないと分かるように色と印を変える
                     Label {
-                        Text(min(latestReading.capturedAt, now), format: .relative(presentation: .named))
+                        Text(capturedAtNotAfterNow(capturedAt: latestReading.capturedAt, now: now), format: .relative(presentation: .named))
                     } icon: {
                         if isStale(capturedAt: latestReading.capturedAt, now: now) {
                             Image(systemName: "exclamationmark.triangle")
