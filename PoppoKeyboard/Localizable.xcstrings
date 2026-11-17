@@ -1,12 +1,32 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Translations and reply suggestions will appear here" : {
+    "Next keyboard" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "翻訳と返信案はここに表示されます"
+            "value" : "次のキーボード"
+          }
+        }
+      }
+    },
+    "Open Poppo and start reading a chat to see translations and reply suggestions here" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Poppo を開いてチャットの読み取りを始めると翻訳と返信案がここに出ます"
+          }
+        }
+      }
+    },
+    "Reply suggestions aren't available on this device right now" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今この端末では返信案を作れません"
           }
         }
       }
