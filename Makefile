@@ -23,7 +23,8 @@ device:
 
 # 実機ビルドを実機にインストールする。インストール先の解決順: DEVICE 変数 (名前 / UDID) > 環境変数 IOS_DEVICE_UDID > devicectl の JSON から実機を自動解決 (決め方は scripts/resolve-physical-device.sh。決められなければ指定を求める)
 install-device: device
-	@mkdir -p tmp; \
+	@set -e; \
+	mkdir -p tmp; \
 	device="$(DEVICE)"; \
 	[ -n "$$device" ] || device="$(IOS_DEVICE_UDID)"; \
 	if [ -z "$$device" ]; then \

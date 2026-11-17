@@ -19,10 +19,14 @@ cat > "$work/bin/xcodebuild" <<'STUB'
 echo "xcodebuild $*" >> "$STUB_LOG"
 STUB
 
-# devicectl の一覧 (--json-output <path>) を求められた時だけ、テストが用意した JSON をその path に置く
+# devicectl の一覧 (--json-output <path>) を求められた時だけ、テストが用意した JSON をその path に置く。
+# STUB_FAIL_ON が空でなく、呼び出しがその文字列を含む時は、記録した後に失敗する (アプリを入れる操作の失敗を模すため)
 cat > "$work/bin/xcrun" <<'STUB'
 #!/usr/bin/env bash
 echo "xcrun $*" >> "$STUB_LOG"
+if [ -n "${STUB_FAIL_ON:-}" ]; then
+  case "$*" in *"$STUB_FAIL_ON"*) exit 1 ;; esac
+fi
 previous=""
 for argument in "$@"; do
   if [ "$previous" = "--json-output" ]; then
@@ -65,6 +69,8 @@ check() {
 failed_with() { [ "$code" -ne 0 ] && printf '%s' "$output" | grep -qF "$1"; }
 # 直前の make が成功した時に成り立つ
 succeeded() { [ "$code" -eq 0 ]; }
+# 直前の make が失敗した時に成り立つ
+failed() { [ "$code" -ne 0 ]; }
 # 直前の make が、引数の文字列を含む呼び出しを偽物の xcodebuild・xcrun にした時に成り立つ
 called() { grep -qF -- "$1" "$log"; }
 # 直前の make が、引数の文字列を含む呼び出しを 1 度もしなかった時に成り立つ
@@ -98,6 +104,12 @@ check "install-device: 実機を決められない時はアプリを入れない
 run_make "$work/one-device.json" install-device DEVELOPMENT_TEAM= FASTLANE_TEAM_ID= DEVICE=PHONE-A
 check "install-device: Team ID が空の時はエラーで止まる" failed_with "DEVELOPMENT_TEAM が空です"
 check "install-device: Team ID が空の時はアプリを入れない" not_called "device install app"
+
+export STUB_FAIL_ON="device install app"
+run_make "$work/one-device.json" install-device DEVELOPMENT_TEAM=TEAM123 DEVICE=PHONE-A
+unset STUB_FAIL_ON
+check "install-device: アプリを入れる操作が失敗した時は失敗で終わる" failed
+check "install-device: アプリを入れる操作が失敗した時は、前から入っているアプリを起動しない" not_called "device process launch"
 
 echo "passed: $pass, failed: $fail"
 [ "$fail" -eq 0 ]
