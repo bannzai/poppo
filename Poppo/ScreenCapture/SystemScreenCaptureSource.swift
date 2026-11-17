@@ -2,15 +2,18 @@
 // simulator 向けビルドは「Unable to resolve module dependency: 'ScreenCaptureKit'」で失敗する)。
 // このファイルは実機向けの SDK でだけコンパイルし、simulator では UnavailableScreenCaptureSource を使う
 #if canImport(ScreenCaptureKit)
+import CoreGraphics
 import CoreMedia
 import Foundation
 import ScreenCaptureKit
 
 /// ScreenCaptureKit を使う取り込みの実体。システムの画面で利用者に取り込む対象を選ばせ、選ばれた対象の映像を受け取る。
-/// 受け取った映像は、受け取った時刻を知らせるだけで、保存も送信もしない
+/// 受け取った映像は、受け取った時刻と、文字の読み取りに使う画像を作る処理を知らせるだけで、保存も送信もしない
 final class SystemScreenCaptureSource: NSObject, ScreenCaptureSource {
     /// 出来事を渡して呼ぶ処理。MainActor で呼ぶ
     var onEvent: ((ScreenCaptureEvent) -> Void)?
+    /// 映像を 1 枚受け取るたびに、受け取った時刻と、その映像を画像にする処理を渡して呼ぶ処理。MainActor で呼ぶ
+    var onFrameImage: ((_ receivedAt: Date, _ makeImage: () throws -> CGImage?) -> Void)?
     /// 映像を受け取っている stream。取り込みを始めていない間と、止めた後は nil
     private var stream: SCStream?
     /// 本体アプリの操作 (止める操作・対象の選び直し) で stream を止めている途中か。
@@ -188,17 +191,26 @@ extension SystemScreenCaptureSource: SCContentSharingPickerObserver {
 }
 
 extension SystemScreenCaptureSource: SCStreamOutput {
-    /// stream が映像を 1 枚出すたびに、システムが呼ぶ。受け取った時刻を onEvent に知らせる。映像の中身は使わない
+    /// stream が映像を 1 枚出すたびに、システムが呼ぶ。受け取った時刻を onEvent に、その映像を画像にする処理を onFrameImage に知らせる。
+    /// 映像 (sampleBuffer) は、この呼び出しの中でだけ使い、外へ持ち出さない
     nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen else {
             return
         }
-        // 映像 (sampleBuffer) は MainActor に渡さず、受け取った時刻だけを渡す
-        Task { @MainActor [receivedAt = Date(), outputStreamID = ObjectIdentifier(stream)] in
+        // addStreamOutput の sampleHandlerQueue に .main を渡しているため、この関数は main queue (MainActor) で呼ばれる。
+        // Task で MainActor へ渡し直すと、映像を画像にするかを決める前に sampleBuffer をこの呼び出しの外へ持ち出すことになる
+        // nonisolated(unsafe): 下のクロージャはこの呼び出しの中で同じスレッドで実行し終わるため、sampleBuffer は同時に使われない
+        nonisolated(unsafe) let frameSampleBuffer = sampleBuffer
+        let outputStreamID = ObjectIdentifier(stream)
+        MainActor.assumeIsolated {
             guard self.stream.map(ObjectIdentifier.init) == outputStreamID else {
                 return
             }
+            let receivedAt = Date()
             self.onEvent?(.frameReceived(receivedAt))
+            self.onFrameImage?(receivedAt) {
+                try frameSampleBuffer.imageBuffer.map { try makeCGImage(pixelBuffer: $0) }
+            }
         }
     }
 }

@@ -1,12 +1,15 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import Poppo
 
 /// テスト用の取り込みの実体。start と stop が呼ばれた回数を数えるだけで、画面は取り込まない。
-/// テストは onEvent を直接呼んで、取り込みの実体が知らせる出来事を流す
+/// テストは onEvent と onFrameImage を直接呼んで、取り込みの実体が知らせる出来事と映像を流す
 final class FakeScreenCaptureSource: ScreenCaptureSource {
     /// 出来事を渡して呼ぶ処理。controller が設定し、テストが呼ぶ
     var onEvent: ((ScreenCaptureEvent) -> Void)?
+    /// 映像を受け取った時に呼ぶ処理。controller が設定し、テストが呼ぶ
+    var onFrameImage: ((_ receivedAt: Date, _ makeImage: () throws -> CGImage?) -> Void)?
     /// start が呼ばれた回数
     private(set) var startCallCount = 0
     /// stop が呼ばれた回数
@@ -41,7 +44,8 @@ final class TestClock {
 }
 
 /// 偽物の取り込みの実体をつないだ controller を作って返す。source は偽物、clock は時計、
-/// latestReadingFileURL は取り込みが終わった時に削除する読み取り結果の場所、diagnosticsFileURL は診断の記録の場所
+/// latestReadingFileURL は取り込みが終わった時に削除する読み取り結果の場所、diagnosticsFileURL は診断の記録の場所。
+/// 取り込んだ画面を読む処理には、何も読めない偽物を渡す (画面の読み取りは ScreenReadingTests.swift が確かめる)
 func makeScreenCaptureController(
     source: FakeScreenCaptureSource,
     clock: TestClock,
@@ -52,7 +56,11 @@ func makeScreenCaptureController(
         makeSource: { source },
         latestReadingFileURL: latestReadingFileURL,
         diagnosticsFileURL: diagnosticsFileURL,
-        now: { clock.now }
+        now: { clock.now },
+        recognizeTextLines: { _ in [] },
+        translateTexts: { $0 },
+        canGenerateReplies: { false },
+        generateReplyTexts: { _ in [] }
     )
 }
 
@@ -67,7 +75,11 @@ func makeScreenCaptureController(
         },
         latestReadingFileURL: nil,
         diagnosticsFileURL: temporaryFileURL(),
-        now: { Date(timeIntervalSinceReferenceDate: 1000) }
+        now: { Date(timeIntervalSinceReferenceDate: 1000) },
+        recognizeTextLines: { _ in [] },
+        translateTexts: { $0 },
+        canGenerateReplies: { false },
+        generateReplyTexts: { _ in [] }
     )
 
     #expect(controller.status == .notStarted)
@@ -788,7 +800,11 @@ func makeScreenCaptureController(
         makeSource: makeScreenCaptureSource,
         latestReadingFileURL: nil,
         diagnosticsFileURL: nil,
-        now: { Date(timeIntervalSinceReferenceDate: 1000) }
+        now: { Date(timeIntervalSinceReferenceDate: 1000) },
+        recognizeTextLines: { _ in [] },
+        translateTexts: { $0 },
+        canGenerateReplies: { false },
+        generateReplyTexts: { _ in [] }
     )
 
     controller.start()
