@@ -1,0 +1,41 @@
+# GitHub Actions の macOS runner 上で iOS Simulator を起動し、開発マシンから操作する caller workflow。実体は bannzai/simtunnel の session.yml (reusable workflow)。
+# 参照: https://github.com/bannzai/simtunnel の PROJECT.md「各アプリ repo での実行（reusable workflow）」
+name: simulator-session
+# run-name は local/simtunnel CLI が run を特定するキーのためこの形式を維持する
+run-name: "session=${{ inputs.session }} device=${{ inputs.device }}"
+
+on:
+  workflow_dispatch: # fork PR に Secrets を渡さないため workflow_dispatch のみ
+    # session / device / duration_minutes は local/simtunnel の up が常に送るため宣言必須
+    # (未定義の input を送ると dispatch が拒否される)
+    inputs:
+      session:
+        required: true
+        default: poppo
+      device:
+        required: true
+        # iPhone Duo は使わない (Xcode 27.1 の既知の問題で、iPhone Duo の simulator では大半の app extension を実行できない)
+        default: iPhone 17
+      duration_minutes:
+        required: true
+        default: "60"
+
+jobs:
+  session:
+    # id-token: write が必要なのは reusable workflow を呼ぶこの job だけのため、job 単位で最小権限にする
+    permissions:
+      id-token: write # Tailscale の OIDC 認証に必要
+      contents: read
+    # タグ運用はしないため main の commit SHA で固定する (更新時は SHA を書き換える)
+    uses: bannzai/simtunnel/.github/workflows/session.yml@38fca12d3d337afc164d2054d13ef3dce88dc613 # main 2026-11-17
+    with:
+      session: ${{ inputs.session }}
+      device: ${{ inputs.device }}
+      duration_minutes: ${{ inputs.duration_minutes }}
+      # 最低対応が iOS 27 のため、Xcode 27 の入った runner を固定で指定する (local/simtunnel の up は runner を送らない)
+      runner: xcode-27
+      build_project: Poppo.xcodeproj
+      build_scheme: Poppo
+    secrets:
+      TS_OIDC_CLIENT_ID: ${{ secrets.TS_OIDC_CLIENT_ID }}
+      TS_OIDC_AUDIENCE: ${{ secrets.TS_OIDC_AUDIENCE }}

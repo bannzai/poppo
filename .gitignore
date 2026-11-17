@@ -1,0 +1,20 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+build/
+DerivedData/
+tmp/
+.claude/settings.local.json
+.envrc
+# simtunnel mcp-config が worktree ごとに書き込む接続設定 (セッション固有のためコミットしない)
+.mcp.json
+# 署名の Team ID などマシン固有の設定 (public リポジトリのため実値をコミットしない)
+Config.local.xcconfig
+
+# Firebase のクライアント設定ファイル (API キーを含む)。Firebase を使う構成に変えた時にコミットしないため
+lib/firebase_options.dart
+**/GoogleService-Info.plist
+**/google-services.json
+
+# bundler のローカルインストール先
+vendor/bundle/

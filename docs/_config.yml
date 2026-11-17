@@ -1,0 +1,5 @@
+# GitHub Pages (Jekyll) の設定。利用規約・プライバシーポリシー等の Markdown を HTML 化して
+# 拡張子なし URL (/Terms-ja) と .html の両方で配信するため .nojekyll は置かない
+title: Poppo
+description: 画面のチャットを読んで翻訳と返信案をキーボードに出す iOS アプリ
+lang: ja
