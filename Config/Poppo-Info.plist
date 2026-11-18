@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Poppo reads the chat on your screen to show translations and reply suggestions on its keyboard. The screen is read only on this device.</string>
 	<key>UIBackgroundModes</key>
