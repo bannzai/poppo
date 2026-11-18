@@ -36,8 +36,8 @@ claude --resume 71380c24-41f9-4422-8999-303bc71ea3d7</pre>
 <p class="lead">決まったこと (読み取った時の画面の画像と翻訳を、本体アプリの中に置いて 14 日で自動で消す。一覧 → アプリ × チャンネルごとの会話 → 読み取った時点のページ送り) を保存するための型の案。公開した後は保存済みのデータがあって変えにくくなるので、実装の前に見てもらう。下の「見てほしい点」の 4 つに返答をもらってから、実装の issue を起票する。</p>
 
 <h2>型定義 (Swift)</h2>
-<p>新しく定義するのは <code>ReadingMoment</code> と <code>ChatHeader</code> の 2 つ。<code>LatestReading</code> (キーボードに渡す読み取り結果)・<code>TranslatedMessage</code>・<code>ReplySuggestion</code> は今ある型をそのまま使う。</p>
-<pre>/// 読み取った時点。画面を 1 回読んだ時の、画面の画像と、その時の読み取り結果の組。
+<p>新しく定義するのは <code>ReadingMoment</code>・<code>ChatHeader</code>・<code>ReadingMomentSource</code> の 3 つ。<code>LatestReading</code> (キーボードに渡す読み取り結果) と <code>ReplySuggestion</code> は今ある型をそのまま使う。<code>LatestReading</code> は名前が「最新」だが、読んだ時刻・発言・返信案という中身が同じなので、同じ項目の型を 2 つ作らずに過去の時点にも使う。<code>TranslatedMessage</code> には項目を 1 つ足す (下)。</p>
+<pre>/// 読み取った時点。画面を 1 回読んだ時の、画面の画像と、その時に読んだ発言・翻訳・返信案の組。
 /// 本体アプリの中 (端末) に置き、読んでから 14 日が過ぎたものは消す。キーボードからは読まない
 struct ReadingMoment: Codable, Identifiable {
     /// 読み取った時点ごとに振る識別子。画面の画像のファイル名にも使う
@@ -51,8 +51,9 @@ struct ReadingMoment: Codable, Identifiable {
     let source: ReadingMomentSource
 }
 
-/// 画面の上部から読んだ、チャットの見出し。一覧の行と、会話の画面のまとまりを決める
-struct ChatHeader: Codable, Hashable {
+/// 画面の上部から読んだ、チャットの見出し。一覧の行と、会話の画面のまとまりを決める。
+/// まとめる時の比べ方は「見てほしい点 3」(保存するのは読んだままの文字で、比べる時に空白と大文字小文字をそろえる)
+struct ChatHeader: Codable {
     /// アプリの名前 (「Slack」「Discord」など)。分からなかった時は nil
     let appName: String?
     /// 画面の上部から読んだままの、チャンネル名か相手の名前 (「#release-team」「Alex」など)
@@ -66,7 +67,7 @@ enum ReadingMomentSource: Codable {
     /// 利用者が自分で撮って本体アプリで選んだスクリーンショット
     case screenshot
 }</pre>
-<p>今ある型に足す項目 (新しい型ではない):</p>
+<p>今ある型に足す項目 (新しい型ではない)。<code>TranslatedMessage</code> は <code>LatestReading</code> の中に入っているので、キーボードに渡す読み取り結果にも発言した人の名前が入る:</p>
 <pre>struct TranslatedMessage: Codable {
     let originalText: String
     let translatedText: String
@@ -84,9 +85,9 @@ enum ReadingMomentSource: Codable {
 <tr><td>キーボードを Poppo に切り替える</td><td>直前の翻訳と返信案が出る (今と同じ)</td><td><code>LatestReading</code> を読む。<code>ReadingMoment</code> は読まない</td></tr>
 <tr><td>取り込みを止める</td><td>キーボードに渡す読み取り結果は消える (今と同じ)。読み取った時点は残る</td><td><code>LatestReading</code> を消す。<code>ReadingMoment</code> は変えない</td></tr>
 <tr><td>スクリーンショットを選んで読む</td><td>翻訳と返信案が出る (今と同じ)。読み取った時点を 1 つ足す (見てほしい点 2)</td><td><code>ReadingMoment</code> を 1 つ書く (source = screenshot)</td></tr>
-<tr><td>本体アプリを開く</td><td>一覧が出る。アプリごとにチャットが並び、行に読み取りの回数と最後に読んだ時が出る</td><td>すべての <code>ReadingMoment</code> を読み、<code>chatHeader</code> が同じものを 1 行にまとめる</td></tr>
-<tr><td>一覧の行を押す</td><td>会話の画面が開く。読み取った時点ごとに 1 ページで、画面の画像と翻訳と返信案が出る。横に送ると前の時点に移る</td><td>その <code>chatHeader</code> の <code>ReadingMoment</code> を <code>capturedAt</code> の順に読み、<code>&lt;id&gt;.jpg</code> を出す</td></tr>
-<tr><td>(操作なし) 読んでから 14 日が過ぎる</td><td>その読み取った時点が消え、一覧と会話の画面から無くなる</td><td>本体アプリを開いた時と取り込みを始めた時に、14 日を過ぎた <code>ReadingMoment</code> と画像を消す</td></tr>
+<tr><td>本体アプリを開く</td><td>一覧が出る。アプリごとにチャットが並び、行に読み取りの回数と最後に読んだ時が出る</td><td>すべての <code>ReadingMoment</code> を読み、<code>appName</code> が同じで、<code>chatTitle</code> が空白と大文字小文字をそろえると同じになるものを 1 行にまとめる</td></tr>
+<tr><td>一覧の行を押す</td><td>会話の画面が開く。読み取った時点ごとに 1 ページで、画面の画像と翻訳と返信案が出る。横に送ると前の時点に移る</td><td>その行にまとめた <code>ReadingMoment</code> を <code>capturedAt</code> の順に読み、<code>&lt;id&gt;.jpg</code> を出す</td></tr>
+<tr><td>(操作なし) 読んでから 14 日が過ぎる</td><td>その読み取った時点が消え、一覧と会話の画面から無くなる</td><td>本体アプリを開いた時と取り込みを始めた時に、14 日を過ぎた <code>ReadingMoment</code> と画像を消す。本体アプリを開かない間は、14 日を過ぎても端末に残る (プライバシーポリシーにはこの形で書く)</td></tr>
 <tr><td>設定で「読み取った内容をすべて消す」を押す</td><td>すべての読み取った時点と、キーボードに渡す読み取り結果が消える</td><td><code>ReadingMoments/</code> の中身と <code>LatestReading</code> を消す</td></tr>
 </tbody>
 </table>
@@ -106,9 +107,9 @@ enum ReadingMomentSource: Codable {
 
 <div class="ask">
 <h3>2. 無料の利用者のスクリーンショットからの読み取りも残して、一覧に出すか</h3>
-<p>一覧が本体アプリの入口で、同意をもらった範囲では「一覧と会話の画面」は有料。このままだと、無料の利用者には入口の一覧が空になる。</p>
+<p>一覧が本体アプリの入口で、agent の読みでは「一覧と会話の画面」は有料 (有料の範囲は、中身を 1 文で言い直してもらうのを待っている)。このままだと、無料の利用者には入口の一覧が空になる。</p>
 <ul>
-<li>案 A (勧め): スクリーンショットから読んだ時点も残し、無料の利用者も一覧と会話の画面で見られる。有料との違いは、取り込みとキーボード (と動画) で付ける。有料の範囲の表の「一覧と会話の画面 = 有料」を外すことになる</li>
+<li>案 A (勧め): スクリーンショットから読んだ時点も残し、無料の利用者も一覧と会話の画面で見られる。有料との違いは、取り込みとキーボード (と動画) で付ける。agent が聞き直した有料の範囲の表から「一覧と会話の画面 = 有料」を外すことになる</li>
 <li>案 B: 無料の利用者は残さない (今と同じで、読んだその場で見るだけ)。一覧には「取り込みを始める」と「スクリーンショットから読む」だけが出る</li>
 </ul>
 </div>
@@ -118,6 +119,7 @@ enum ReadingMomentSource: Codable {
 <p>iOS は、取り込みの間に前面のアプリが何かを教えてくれない (ScreenCaptureKit の該当の API が iOS で使えない)。そのため、チャットの名前は画面の上部の文字から読み、同じ文字なら同じチャットとして 1 行にまとめる。</p>
 <ul>
 <li>空白と大文字小文字だけが違う時 (「#release-team」と「# Release-Team」) は同じチャットとみなす。文字そのものを読み違えた時 (「#release-team」と「#re1ease-team」) は別の行になる。似た名前をまとめる寄せ方はしない</li>
+<li>同じチャットでも、アプリの名前を判定できた回とできなかった回は別の行になる (判定できなかった回は「アプリを判定できなかったチャット」の見出しの下に出る)</li>
 <li>アプリの名前 (<code>appName</code>) は、画面の見た目から決められた時だけ入れる。決められない時は nil で、一覧では「アプリを判定できなかったチャット」の見出しの下に並べる。利用者に選んでもらう操作は最初は作らない</li>
 <li>発言した人の名前も画面の文字から読むので、読めない画面では人物ごとに分かれない</li>
 </ul>
