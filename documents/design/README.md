@@ -5,6 +5,6 @@
 | ディレクトリ | 中身 |
 | --- | --- |
 | `data-structure/` | 新しいデータ構造を owner に見せた時の資料 (型定義と、操作ごとに読み書きするデータの表) |
-| `mock-<日付>/` | agent が Claude Design の canvas に作ったモック。`project/canvas.json` と `project/*.dc.html` は canvas に公開したファイルそのもので、canvas の実行環境 (`./support.js`) が無いと単体では表示できない。`index.html` は同じ画面を 1 枚に並べた、ブラウザで単独で開ける写し |
+| `mock-<日付>/` | agent が Claude Design の canvas に作ったモック。`project/canvas.json` と `project/*.dc.html` は canvas に公開したファイルそのもので、canvas の実行環境 (`./support.js`) が無いと単体では表示できない。`index.html` は同じ画面を 1 枚に並べた、ブラウザで単独で開ける写し。canvas を使わずに作った回 (`mock-2026-11-18/`) は `index.html` だけを置く |
 
 canvas の URL (claude.ai/artifact) は、アカウントの切り替えや削除で開けなくなる。判断の材料を残すため、モックはここに保存してから issue にパスを書く。
