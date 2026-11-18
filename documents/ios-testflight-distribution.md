@@ -87,7 +87,7 @@ bash ~/.agents/skills/ios-deploy-actions/scripts/register-secrets.sh --repo bann
    - `application-identifier` が、頼んだ bundle ID で終わっている
    - `com.apple.security.application-groups` に `group.com.bannzai.poppo` が入っている
 
-   2026-11-18 の時点では、`create-profile` の出力 (`entitlements-check=ok`) だけでは、この 2 つを確かめられない。`com.bannzai.poppo` の profile を頼んだ時に `com.bannzai.poppo.keyboard` の profile が発行され、App Group が空でも `ok` が出た ( https://github.com/bannzai/castle/issues/3132 )。この issue が閉じるまでは、本体アプリの profile は中身を必ず開いて確かめ、違っていたら App Store Connect API の `POST /v1/profiles` を bundle ID のリソース id (`com.bannzai.poppo` は `XZPY677UXL`、`com.bannzai.poppo.keyboard` は `CQ789C575K`) を指定して直接呼ぶ
+   中身を開いて確かめるのは、2026-11-18 に `create-profile` の出力 (`entitlements-check=ok`) と中身が食い違ったため。`com.bannzai.poppo` の profile を頼んだ時に `com.bannzai.poppo.keyboard` の profile が発行され、App Group が空でも `ok` が出た ( https://github.com/bannzai/castle/issues/3132 。同じ日に修正がマージされた: https://github.com/bannzai/castle/pull/3135 。修正後のスクリプトでの発行は、この文書を書いた時点では試していない)。食い違った時は、App Store Connect API の `POST /v1/profiles` を bundle ID のリソース id (`com.bannzai.poppo` は `XZPY677UXL`、`com.bannzai.poppo.keyboard` は `CQ789C575K`) を指定して直接呼ぶ
 
 3. 2 つの Secret を登録し直す
 
