@@ -59,7 +59,8 @@ claude --resume 3db98dd6-8515-4c4d-82ff-c0b3dedc6503</pre>
     <h2 class="board-name">読み取り結果 (チャットの見出しと人物ごとのまとまり)</h2>
     <p class="board-note">1 回の読み取りの中で分ける読み方。読み取った内容は今と同じく残さない</p>
     <div class="board-scroll">
-      <div class="screen" style="padding: 56px 20px 24px; gap: 16px">
+      <!-- 発言 3 件と返信案 3 つは 844 の高さに収まらないため、この画面だけ高さを中身に合わせる (実機では縦にスクロールする) -->
+      <div class="screen" style="height: auto; min-height: 844px; padding: 56px 20px 24px; gap: 16px">
         <div style="display: flex; align-items: center; gap: 8px">
           <span style="display: flex; align-items: center; gap: 2px; min-height: 44px; font-size: 16px; color: #2450D8">
             <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
@@ -111,6 +112,13 @@ claude --resume 3db98dd6-8515-4c4d-82ff-c0b3dedc6503</pre>
           </div>
           <div class="reply">
             <div class="reply-body">
+              <p lang="en" style="font-size: 16px; line-height: 1.5; font-weight: 500">Mornings are fine. Let’s keep the original time.</p>
+              <p class="muted" style="font-size: 13px; line-height: 1.5">午前で大丈夫です。元の時間のままにしましょう</p>
+            </div>
+            <button class="copy" aria-label="「午前で大丈夫です。元の時間のままにしましょう」の返信案をコピー"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg>コピー</button>
+          </div>
+          <div class="reply">
+            <div class="reply-body">
               <p lang="en" style="font-size: 16px; line-height: 1.5; font-weight: 500">Could we push it to Thursday instead?</p>
               <p class="muted" style="font-size: 13px; line-height: 1.5">代わりに木曜に延ばせますか？</p>
             </div>
@@ -155,6 +163,10 @@ claude --resume 3db98dd6-8515-4c4d-82ff-c0b3dedc6503</pre>
           <button class="key-reply" aria-label="「はい、予定どおりで。15 時の方が助かります」の返信案を入力する">
             <span lang="en" style="font-size: 15px; line-height: 1.4; font-weight: 500; color: #2450D8">Yes, still on. 3pm works better for me.</span>
             <span class="muted" style="font-size: 12px; line-height: 1.5">はい、予定どおりで。15 時の方が助かります</span>
+          </button>
+          <button class="key-reply" aria-label="「午前で大丈夫です。元の時間のままにしましょう」の返信案を入力する">
+            <span lang="en" style="font-size: 15px; line-height: 1.4; font-weight: 500; color: #2450D8">Mornings are fine. Let’s keep the original time.</span>
+            <span class="muted" style="font-size: 12px; line-height: 1.5">午前で大丈夫です。元の時間のままにしましょう</span>
           </button>
           <button class="key-reply" aria-label="「代わりに木曜に延ばせますか？」の返信案を入力する">
             <span lang="en" style="font-size: 15px; line-height: 1.4; font-weight: 500; color: #2450D8">Could we push it to Thursday instead?</span>
