@@ -25,7 +25,7 @@ gh workflow run ios-deploy.yml --ref main
 
   `6836208900` は App Store Connect の Poppo のアプリの id。アップロードの直後は一覧にまだ出ない (最初の配布では、アップロードの成功の直後に読んだ時は 0 件だった)
 
-- 配ったビルドは、内部テスターのグループ `InternalTester` (すべてのビルドに届く設定) のテスターが TestFlight アプリで入れられる。テスターを足す時は、App Store Connect API の `POST /v1/betaTesters` を、グループ (id `685408f9-7ad0-4b3f-8f02-39f7c8abc649`) を `relationships.betaGroups` に指定して呼ぶ。2026-11-18 に、アカウントの所有者をこの方法で足した (グループのテスターは 1 人)。既にあるテスターの記録の id をグループに足す方法 (`POST /v1/betaGroups/<id>/relationships/betaTesters`) は使えなかった: 所有者のメールアドレスで見つかった記録 (ほかのアプリのグループに属する記録が 20 件) の 1 つを指定すると、`409 STATE_ERROR`「Tester(s) cannot be assigned」で拒否された
+- 配ったビルドは、内部テスターのグループ `InternalTester` (すべてのビルドに届く設定) のテスターが TestFlight アプリで入れられる。テスターを足す時は、App Store Connect API の `POST /v1/betaTesters` を、グループ (id `685408f9-7ad0-4b3f-8f02-39f7c8abc649`) を `relationships.betaGroups` に指定して呼ぶ。内部テスターにできるのは、App Store Connect のユーザーで、このアプリにアクセスできる人だけ (「Create a group and add up to 100 internal testers (App Store Connect users with access to your content)」「If you choose testers not part of your App Store Connect account, you won't be able to add them to an internal group.」 https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers )。ユーザーでない人を足す時は、先に App Store Connect のユーザーとして追加する (その人を足す要求がどう拒否されるかは試していない)。2026-11-18 に、アカウントの所有者をこの方法で足した (グループのテスターは 1 人)。既にあるテスターの記録の id をグループに足す方法 (`POST /v1/betaGroups/<id>/relationships/betaTesters`) は使えなかった: 所有者のメールアドレスで見つかった記録 (ほかのアプリのグループに属する記録が 20 件) の 1 つを指定すると、`409 STATE_ERROR`「Tester(s) cannot be assigned」で拒否された
 
 ### 開発者メニューを入れるビルド (`developer_menu`)
 
