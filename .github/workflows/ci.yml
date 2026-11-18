@@ -54,6 +54,16 @@ jobs:
       - name: 実機向けの SDK でのビルド (make build-ios-device)
         run: make build-ios-device
 
+      # TestFlight への配布 (.github/workflows/ios-deploy.yml) は Release 構成でアーカイブする。配布は手動でだけ起動するため、
+      # Release 構成でだけ出るコンパイルエラーを PR の時点で見つける
+      - name: 配布と同じ Release 構成での、実機向けの SDK でのビルド (make build-ios-device CONFIGURATION=Release)
+        run: make build-ios-device CONFIGURATION=Release
+
+      # 配布の workflow は、developer_menu を入れて起動すると Release 構成に DEBUG の条件を足してアーカイブする (ios-deploy.yml の Archive)。
+      # その組み合わせ (Release 構成の最適化 + #if DEBUG のコード) がコンパイルできることを、同じビルド設定で確かめる
+      - name: 開発者メニューを入れた Release 構成での、実機向けの SDK でのビルド
+        run: xcodebuild -project Poppo.xcodeproj -scheme Poppo -configuration Release -derivedDataPath tmp/DerivedData -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG' build
+
       # iPhone Duo は使わない (Xcode 27.1 の既知の問題で、iPhone Duo の simulator では大半の app extension を実行できない)
       - name: テスト (make test)
         run: make test DESTINATION='platform=iOS Simulator,name=iPhone 17,OS=latest'
