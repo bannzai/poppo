@@ -74,12 +74,19 @@ bash ~/.agents/skills/ios-deploy-actions/scripts/register-secrets.sh --repo bann
 
 発行し直すのは、profile の期限が切れる時、配布証明書を替えた時、App ID の Capability (App Group など) を変えた時。今の `.p12` の証明書は App Store Connect の証明書の id `68L9PY6PX2` で、期限は 2027-01-17。2026-11-18 にこの証明書で発行した今の 2 つの profile の期限も、同じ 2027-01-17。
 
-1. profile を発行する (同じ名前の profile がある時は `--recreate` で作り直す)
+1. 今ある同じ名前の profile を消してから、profile を発行する。消さずに発行すると、`create-profile` は同じ名前の profile を先に探し、条件が揃っていれば新しく作らずに今ある profile の中身を書き出すだけになる (`signing-assets.sh` のヘッダー「冪等性」)。App Store Connect API を直接呼ぶ方法も、同じ名前の profile が残っている時にどう応えるかは試していないため、先に消す。消すと、次の配布までに手順 3 の登録をやり直す必要がある
 
    ```sh
+   # 今ある profile の id を読む (Secrets の表にある id と同じはず)
+   bash ~/.agents/skills/ios-deploy-actions/scripts/asc-api.sh GET "/v1/profiles?filter[name]=Poppo&fields[profiles]=name,profileState,expirationDate"
+   bash ~/.agents/skills/ios-deploy-actions/scripts/asc-api.sh DELETE /v1/profiles/<本体アプリの profile の id>
+   bash ~/.agents/skills/ios-deploy-actions/scripts/asc-api.sh DELETE /v1/profiles/<キーボードの profile の id>
+
    bash ~/.agents/skills/ios-deploy-actions/scripts/signing-assets.sh create-profile --name "Poppo.AppStore" --bundle-id com.bannzai.poppo --certificate-id 68L9PY6PX2 --out tmp/signing --entitlements Config/Poppo.entitlements
    bash ~/.agents/skills/ios-deploy-actions/scripts/signing-assets.sh create-profile --name "Poppo.PoppoKeyboard.AppStore" --bundle-id com.bannzai.poppo.keyboard --certificate-id 68L9PY6PX2 --out tmp/signing --entitlements Config/PoppoKeyboard.entitlements
    ```
+
+   発行された profile は `tmp/signing/Poppo_AppStore.mobileprovision` と `tmp/signing/Poppo_PoppoKeyboard_AppStore.mobileprovision` に書き出される (本体アプリの分は 2026-11-18 にこの名前で書き出された。キーボードの分のファイル名は、同じ規則 (名前の `.` を `_` に替える) からの見込み)
 
 2. 発行された profile の中身を開き、次の 2 つを確かめる
 
@@ -91,7 +98,7 @@ bash ~/.agents/skills/ios-deploy-actions/scripts/register-secrets.sh --repo bann
    - `application-identifier` が、頼んだ bundle ID で終わっている
    - `com.apple.security.application-groups` に `group.com.bannzai.poppo` が入っている
 
-   中身を開いて確かめるのは、2026-11-18 に `create-profile` の出力 (`entitlements-check=ok`) と中身が食い違ったため。`com.bannzai.poppo` の profile を頼んだ時に `com.bannzai.poppo.keyboard` の profile が発行され、App Group が空でも `ok` が出た ( https://github.com/bannzai/castle/issues/3132 。同じ日に修正がマージされた: https://github.com/bannzai/castle/pull/3135 。修正後のスクリプトでの発行は試していない)。食い違った時は、App Store Connect API の `POST /v1/profiles` を bundle ID のリソース id (`com.bannzai.poppo` は `XZPY677UXL`、`com.bannzai.poppo.keyboard` は `CQ789C575K`) を指定して直接呼ぶ。今の 2 つの profile は、開発マシンのスクリプトに修正が届く前だったため、この方法で発行した (本文は `{"data":{"type":"profiles","attributes":{"name":"<profile の名前>","profileType":"IOS_APP_STORE"},"relationships":{"bundleId":{"data":{"type":"bundleIds","id":"<bundle ID のリソース id>"}},"certificates":{"data":[{"type":"certificates","id":"68L9PY6PX2"}]}}}}`。応答の `profileContent` を base64 で戻したものが `.mobileprovision`)
+   中身を開いて確かめるのは、2026-11-18 に `create-profile` の出力 (`entitlements-check=ok`) と中身が食い違ったため。`com.bannzai.poppo` の profile を頼んだ時に `com.bannzai.poppo.keyboard` の profile が発行され、App Group が空でも `ok` が出た ( https://github.com/bannzai/castle/issues/3132 。同じ日に修正がマージされた: https://github.com/bannzai/castle/pull/3135 。修正後のスクリプトでの発行は試していない)。食い違った時は、App Store Connect API の `POST /v1/profiles` を bundle ID のリソース id (`com.bannzai.poppo` は `XZPY677UXL`、`com.bannzai.poppo.keyboard` は `CQ789C575K`) を指定して直接呼ぶ。今の 2 つの profile は、開発マシンのスクリプトに修正が届く前だったため、この方法で発行した (本文は `{"data":{"type":"profiles","attributes":{"name":"<profile の名前>","profileType":"IOS_APP_STORE"},"relationships":{"bundleId":{"data":{"type":"bundleIds","id":"<bundle ID のリソース id>"}},"certificates":{"data":[{"type":"certificates","id":"68L9PY6PX2"}]}}}}`。応答の `profileContent` を base64 で戻したものが `.mobileprovision` で、`jq -r '.data.attributes.profileContent' <応答のファイル> | base64 --decode > tmp/signing/Poppo_AppStore.mobileprovision` のように、手順 3 が読むパスへ書き出す)
 
 3. 2 つの Secret を登録し直す
 
@@ -151,7 +158,7 @@ fastlane produce create -a com.bannzai.poppo --app_name "Poppo チャット翻�
 
 App Store Connect のアプリの名前は、仮の「Poppo チャット翻訳キーボード」で登録してある。`--app_name "Poppo"` での登録は、「The App Name you entered is already being used.」で失敗した (ほかのアカウントのアプリがこの名前を使っている)。
 
-- TestFlight と App Store に出るのはこの名前で、ホーム画面に出る名前 (`CFBundleDisplayName`) は `Poppo` のまま
+- ホーム画面に出る名前は、ビルドの `CFBundleDisplayName` の `Poppo` (`project.pbxproj` の `INFOPLIST_KEY_CFBundleDisplayName`)。TestFlight アプリの一覧にどちらの名前で出るかは、agent からは TestFlight の画面が見えないため確かめていない
 - App Store に出す名前は決まっていない。公開の前に owner が決め、App Store Connect で書き換える (`documents/DIRECTION.md`「決めたこと」)
 
 ## workflow を作り直す時
