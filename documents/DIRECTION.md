@@ -75,6 +75,10 @@ launched_at:
 | 2026-11-18 | 上の行の読み方 (https://github.com/bannzai/poppo/issues/1#issuecomment-6969190011 で bannzai に伝えた。違っていれば直す) | 月額と年額は自動更新のサブスクリプション、買い切りは 1 回の購入として作る。お試し期間は月額と年額に付け、買い切りには付けない (App Store Connect のお試しの設定は自動更新のサブスクリプションが対象: 「You can set up introductory offers for your apps on the App Store that contain auto-renewable subscriptions in App Store Connect.」 https://developer.apple.com/help/app-store-connect/manage-subscriptions/set-up-introductory-offers-for-auto-renewable-subscriptions 。1 回の購入に付けられないと明記した文は見つけていない) | agent |
 | 2026-11-18 | 作るかの判断 (同じ発言) | 値段は仮に月額 1,000 円・年額 10,000 円・買い切り 40,000 円。近いアプリの値段から大きく外れたら直す (発言: 「なんとなく、月額:1000,年額:10000,買い切り:40000 くらいかな。大きく外れたら修正しようか」)。調査の結果は `documents/research/pricing-2026-11-18.md` で、買い切りだけが外れている | bannzai |
 | 2026-11-18 | 見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10#issuecomment-6969023686 ) | 見た目は仕事で使う道具の方向で良い。読み取った内容はアプリ・チャット・人物ごとに分けて見せる (上の「デザインの方向」) | bannzai |
+| 2026-11-18 | TestFlight への配布の準備 (https://github.com/bannzai/poppo/issues/19 ) | TestFlight へ配るビルドには、配布を起動する時に指定した時だけ、開発者メニューと診断の記録を入れる (Release 構成に DEBUG の条件を足してビルドする)。指定しない時は入れず、審査に出すビルドには指定しない。判定基準の「実機で、背面の一連の処理が回った回数」は診断の記録を見て数えるため、実機での確認に使うビルドには要る。診断の記録をファイルに保存するのは DEBUG の条件が付いたビルドだけ、という 2026-11-17 の決定は変えない | agent |
+| 2026-11-18 | TestFlight への配布の準備 | 配布は手動で起動した時にだけ行い、main へのマージでは行わない (マージのたびにビルドが増えて内部テスターに通知が届くのを避ける)。手順は documents/ios-testflight-distribution.md | agent |
+| 2026-11-18 | TestFlight への配布の準備 | アプリアイコンは仮のもの (吹き出しの絵) を置く。App Store で配るアプリにはアイコンの画像が要るため (「If you distribute your app through the App Store, you must provide app icon imagery to use in the App Store.」 https://developer.apple.com/documentation/xcode/configuring-your-app-icon 。画像が無いビルドのアップロードが拒否されるかは試していない)。見た目は決まっておらず、デザインの方向が決まった時に差し替える | agent |
+| 2026-11-18 | TestFlight への配布の準備 | 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption`) は「申告が要る暗号を使っていない」(false) にする。アプリのコードは暗号も端末の外への通信も使っていないため。端末の外へ送る構成を足す時は、この申告を見直す | agent |
 
 ### bannzai の返答を待っていること
 
