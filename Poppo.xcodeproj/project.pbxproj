@@ -294,6 +294,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/Poppo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
+				"CODE_SIGN_STYLE[sdk=iphoneos*]" = Manual;
 				INFOPLIST_FILE = "Config/Poppo-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Poppo;
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Poppo lists your recent screenshots so you can pick one to translate. Screenshots are read only on this device.";
@@ -305,6 +307,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bannzai.poppo;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = Poppo.AppStore;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -346,6 +349,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Config/PoppoKeyboard.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
+				"CODE_SIGN_STYLE[sdk=iphoneos*]" = Manual;
 				INFOPLIST_FILE = "Config/PoppoKeyboard-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Poppo;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -354,6 +359,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bannzai.poppo.keyboard;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = Poppo.PoppoKeyboard.AppStore;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
