@@ -38,7 +38,7 @@ launched_at:
 ## デザインの方向
 
 - 仕事で使う道具の見た目にする。2026-11-17 のモック (`documents/design/mock-2026-11-17/index.html`) の色・角の丸さ・余白を使う (owner の発言 2026-11-18: 「UIのテーマ的には仕事で使われる感じがしてて良いと思う」。https://github.com/bannzai/poppo/issues/10#issuecomment-6969023686 )
-- 読み取った内容を、アプリ・チャット・人物ごとに分けて見せる (同じ発言: 「できればアプリのアイコンやチャットごと・人物ごとに分かれている感じがいいかな」)。どこまで分けるか (1 回の読み取りの中で分けるか、読み取った内容を残して一覧から開き直せるようにするか) は決まっていない。2 通りの案は `documents/design/mock-2026-11-18/index.html`
+- 読み取った内容を、アプリ・チャット・人物ごとに分けて見せる (同じ発言: 「できればアプリのアイコンやチャットごと・人物ごとに分かれている感じがいいかな」)。2 通りの案 (`documents/design/mock-2026-11-18/index.html`。左 = 読み取り結果、中央 = キーボード、右 = アプリとチャットごとの一覧) への返答は「全部かも」で、一覧を入口にして、アプリ × チャンネルごとの会話に入り、読み取った時点 (「2 分前の会話」) を横スクロールで送る形 (owner の発言 2026-11-18: 「分け方だけど全部かも。一番右が一覧画面。入ると一番左のようにアプリごとxチャンネルごとに会話がある。2分前の会話。みたいな項目あると嬉しい。2分前の会話。みたいな時系列を横スクロールでペラペラと移動できたら良いかも。画像やch UIがページ送りされる感じ」。https://github.com/bannzai/poppo/issues/10#issuecomment-6971214314 )。この形を描いたモックは `documents/design/mock-2026-11-18-history/index.html`。読み取った内容をいつまで残すか・画面の画像を残すかは決まっていない (下の「bannzai の返答を待っていること」)
 
 ## 決めたこと
 
@@ -79,6 +79,11 @@ launched_at:
 | 2026-11-18 | TestFlight への配布の準備 | 配布は手動で起動した時にだけ行い、main へのマージでは行わない (マージのたびにビルドが増えて内部テスターに通知が届くのを避ける)。手順は documents/ios-testflight-distribution.md | agent |
 | 2026-11-18 | TestFlight への配布の準備 | アプリアイコンは仮のもの (吹き出しの絵) を置く。App Store で配るアプリにはアイコンの画像が要るため (「If you distribute your app through the App Store, you must provide app icon imagery to use in the App Store.」 https://developer.apple.com/documentation/xcode/configuring-your-app-icon 。画像が無いビルドのアップロードが拒否されるかは試していない)。見た目は決まっておらず、デザインの方向が決まった時に差し替える | agent |
 | 2026-11-18 | TestFlight への配布の準備 | 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption`) は「申告が要る暗号を使っていない」(false) にする。アプリのコードは暗号も端末の外への通信も使っていないため。端末の外へ送る構成を足す時は、この申告を見直す | agent |
+| 2026-11-18 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1#issuecomment-6971212297 ) | 購入の管理に RevenueCat を使う。値段と有料にする範囲は agent が調べて提案する (発言: 「RCは使う。値段は市場調査して提案して。範囲も提案して」)。提案に bannzai が同意して issue に残るまで、課金は実装しない | bannzai |
+| 2026-11-18 | 上の行から見直しが要ること (見直すのは課金を実装する時) | RevenueCat を入れると、購入の情報が端末の外 (RevenueCat) へ送られる。次の 4 つを課金の実装と同じ変更で見直す: 端末の外へ通信しない前提の documents/adr/0002-process-on-device-without-backend.md、輸出コンプライアンスの申告 (この表の「端末の外へ送る構成を足す時は、この申告を見直す」の行)、プライバシーポリシーと App Privacy の回答、下の「費用」の表 (RevenueCat の料金は、月の売上が 2,500 ドルに届くまで無料で、届いた月は 1%: 「No charges apply on months when you don't hit the $2.5K threshold.」「Once you reach $2.5K MTR, you'll be charged 1%.」 https://www.revenuecat.com/pricing/ 2026-11-18 に読んだ)。画面から読んだ内容は今までどおり端末の外へ出さない | agent |
+| 2026-11-18 | 見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10#issuecomment-6971214314 ) | 分け方は、モックの 3 画面の全部を作る方向。一覧を入口にし、入るとアプリ × チャンネルごとの会話があり、読み取った時点 (「2 分前の会話」) を横スクロールで送る (発言は上の「デザインの方向」に引用した。「全部かも」「良いかも」という言い方で、下の行の読みで合っているかをモックで確かめている) | bannzai |
+| 2026-11-18 | 上の行の読み方 (https://github.com/bannzai/poppo/issues/10 でモックを見せて確かめている。違っていれば直す) | 読み取った内容を、読み取った時点ごとに端末に残すことになる。今の決定 (この表の「取り込みが止まった時にも削除する」の行と、スクリーンショットからの読み取りの結果を保存しない行)、`docs/PrivacyPolicy-ja.md`「保存期間と削除」、用語の「読み取り結果」(常に最新の 1 つだけを持つ) は、残す期間・消す操作・画面の画像を残すかを bannzai が決めるまで変えない。「画像や ch UI がページ送りされる」は 2 通りに読める (読み取った発言を組み直したページ / 読み取った時の画面の画像と翻訳のページ) ため、両方をモックに描いた | agent |
+| 2026-11-18 | 見た目と体験の方向 (一覧と会話の画面を作れるかの調べ) | どのアプリのどのチャットかは、画面の上部の文字 (チャンネル名・相手の名前) から読む。iOS の ScreenCaptureKit には、取り込み中に前面のアプリを受け取る API が無い (ほかのフレームワークは調べていない): iOS 27.1 の SDK の ScreenCaptureKit のヘッダー (SCShareableContent.h) で、`SCRunningApplication` (bundleIdentifier を持つ)・`SCWindow`・`SCShareableContent` はどれも `API_UNAVAILABLE(ios, visionos, tvos)`、映像に付く情報のキー (SCStream.h の `SCStreamFrameInfo`) にもアプリを示すものは無い。そのため、アプリの名前とアイコンは画面の見た目から決めることになり、決め方 (上部の文字や配色から推定するか、利用者が選ぶか) は実装の issue で決める。発言を人物ごとに分ける処理 (名前と時刻が同じ行にある見出し行から名前を取る) は実際の画面では試していない | agent |
 
 ### bannzai の返答を待っていること
 
@@ -87,8 +92,8 @@ launched_at:
 | 聞いていること | 返答までの進め方 (決定ではない) |
 | --- | --- |
 | 返信案を作るモデルの経路 (端末内だけ / Private Cloud Compute / Claude API) | 端末内だけで作る。端末外へ送る構成は実装しない (documents/adr/0002-process-on-device-without-backend.md。Status は Proposed) |
-| 課金の残り: 何を有料にするか (無料で使える範囲)、買い切りの値段 (調査では 40,000 円が外れている)、購入の管理に RevenueCat を使うか | 3 つが決まって issue に残るまで、課金を実装しない |
-| アプリ・チャット・人物ごとの分け方 (見た目と体験の方向 https://github.com/bannzai/poppo/issues/10 で聞いている。1 回の読み取りの中で分けるか、読み取った内容を残して一覧から開き直せるようにするか) | 画面の作りを変えない。読み取った内容は今のまま残さない |
+| 課金の残り: 値段 (月額・年額・買い切り) と、何を有料にするか (無料で使える範囲)。agent の提案 (`documents/research/pricing-2026-11-18.md`「提案」。https://github.com/bannzai/poppo/issues/1 にコメントした) への同意 | 同意が issue に残るまで、課金を実装しない (RevenueCat の project も作らない) |
+| 一覧から会話を開いて時点を送る形 (`documents/design/mock-2026-11-18-history/index.html`。https://github.com/bannzai/poppo/issues/10 で聞いている) で決まっていないこと: 会話の画面のページの中身 (発言を組み直したページか、読み取った時の画面の画像と翻訳か)、読み取った内容を残す期間と消す操作、画面の画像を残すか | 画面の作りを変えない。読み取った内容は今のまま残さない |
 | 作る順番 | スクリーンショットからの読み取りを最初に作る。前面だけで動き、読み取り → 翻訳 → 返信案の処理を取り込みより先に実機で確かめられるため。この処理は取り込みでもそのまま使う |
 
 ## agent に任せること
