@@ -71,13 +71,13 @@ launched_at:
 | 2026-11-18 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1#issuecomment-6968221141 ) | 配信先は App Store にする (発言: 「issue-1についてはAppStoreで、課金を入れる」) | bannzai |
 | 2026-11-18 | 作るかの判断 (同じ発言) | 課金を入れる | bannzai |
 | 2026-11-18 | 作るかの判断 (同じ発言) | 実機には TestFlight で入れる。準備は agent が進める (発言: 「TestFlightとかは勝手に用意できるでしょ」。https://github.com/bannzai/poppo/issues/19 ) | bannzai |
-| 2026-11-18 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1#issuecomment-6969021487 ) | 課金の形はサブスクリプションで、月額・年額・買い切りの 3 つを売る。月額と年額には 7 日間の無料のお試し期間を付ける (発言: 「課金の形態はサブスクリプション。月額・年額・買い切り」「お試し期間は7日間おこう」) | bannzai |
+| 2026-11-18 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1#issuecomment-6969021487 ) | 課金の形はサブスクリプションで、月額・年額・買い切りの 3 つを売る。7 日間の無料のお試し期間を付ける (発言: 「課金の形態はサブスクリプション。月額・年額・買い切り」「お試し期間は7日間おこう」)。お試し期間を月額と年額に付け、買い切りに付けないのは agent の読み (https://github.com/bannzai/poppo/issues/1#issuecomment-6969190011 で伝えた) | bannzai |
 | 2026-11-18 | 作るかの判断 (同じ発言) | 値段は仮に月額 1,000 円・年額 10,000 円・買い切り 40,000 円。近いアプリの値段から大きく外れたら直す (発言: 「なんとなく、月額:1000,年額:10000,買い切り:40000 くらいかな。大きく外れたら修正しようか」)。調査の結果は `documents/research/pricing-2026-11-18.md` で、買い切りだけが外れている | bannzai |
 | 2026-11-18 | 見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10#issuecomment-6969023686 ) | 見た目は仕事で使う道具の方向で良い。読み取った内容はアプリ・チャット・人物ごとに分けて見せる (上の「デザインの方向」) | bannzai |
 
 ### bannzai の返答を待っていること
 
-作るかの判断 (https://github.com/bannzai/poppo/issues/1 ) で聞いたうち、まだ返答が無い項目。決まるまでは「返答までの進め方」で進め、決まったら上の表に bannzai の行として書いてこの表から消す。
+作るかの判断 (https://github.com/bannzai/poppo/issues/1 ) と見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10 ) で聞いたうち、まだ返答が無い項目。決まるまでは「返答までの進め方」で進め、決まったら上の表に bannzai の行として書いてこの表から消す。
 
 | 聞いていること | 返答までの進め方 (決定ではない) |
 | --- | --- |

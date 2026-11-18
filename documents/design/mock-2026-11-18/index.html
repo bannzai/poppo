@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
 <style>
   /* 2026-11-17 のモック (../mock-2026-11-17/index.html) と同じ色・角の丸さ・余白で、
-     「アプリ・チャット・人物ごとに分ける」の読み方を 3 画面に描いたもの。各画面は 390×844 の固定サイズ */
+     「アプリ・チャット・人物ごとに分ける」の読み方を 3 画面に描いたもの。各画面は幅 390 で、高さは 844 (読み取り結果の画面だけ、中身に合わせて伸びる) */
   body { margin: 0; padding: 24px 16px 48px; background: #E9ECF1; color: #14171C; font-family: 'Noto Sans JP', 'Hiragino Sans', sans-serif; }
   .page-title { margin: 0 0 8px; font-size: 22px; line-height: 1.4; font-weight: 700; }
   .page-lead { margin: 0 0 16px; max-width: 46em; font-size: 14px; line-height: 1.7; color: #4A5361; }
@@ -138,6 +138,7 @@ claude --resume 3db98dd6-8515-4c4d-82ff-c0b3dedc6503</pre>
           <p class="muted" style="font-size: 12px; line-height: 1.4">他のチャットアプリの画面 (見本)</p>
           <div lang="en" style="display: flex; flex-direction: column; gap: 8px">
             <p class="bubble">Hey, are we still on for the release review tomorrow?</p>
+            <p class="bubble">I can move it to 3pm if mornings are tight for you.</p>
             <p class="bubble">Either works for me.</p>
           </div>
           <div class="muted" style="margin-top: auto; display: flex; align-items: center; height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 10px; border: 1px solid #DFE3EA; font-size: 15px">メッセージを入力</div>
@@ -153,7 +154,7 @@ claude --resume 3db98dd6-8515-4c4d-82ff-c0b3dedc6503</pre>
           <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; background: #FFFFFF">
             <div style="display: flex; gap: 8px; align-items: flex-start">
               <span class="avatar" style="width: 22px; height: 22px; border-radius: 11px; font-size: 11px; background: #1F7A5C" aria-hidden="true">A</span>
-              <p style="font-size: 14px; line-height: 1.6"><span style="font-weight: 700">Alex</span> 明日のリリースレビュー、予定どおりやる？</p>
+              <p style="font-size: 14px; line-height: 1.6"><span style="font-weight: 700">Alex</span> 明日のリリースレビュー、予定どおりやる？<br>午前が厳しければ 15 時に動かせるよ</p>
             </div>
             <div style="display: flex; gap: 8px; align-items: flex-start">
               <span class="avatar" style="width: 22px; height: 22px; border-radius: 11px; font-size: 11px; background: #B5651D" aria-hidden="true">M</span>
