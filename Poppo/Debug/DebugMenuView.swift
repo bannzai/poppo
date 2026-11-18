@@ -253,7 +253,9 @@ struct DebugMenuView: View {
             return
         }
         do {
-            try await PHPhotoLibrary.shared().performChanges {
+            // @Sendable: このブロックは写真ライブラリの側のキューで呼ばれる。付けないと MainActor に属するブロックと見なされ、
+            // MainActor の外で呼ばれた時に止まる (simulator で、この操作の直後にアプリが落ちた。原因がこれであることは落ちた記録では確かめていない)
+            try await PHPhotoLibrary.shared().performChanges { @Sendable in
                 PHAssetCreationRequest.forAsset().addResource(with: .photo, data: sampleScreenshotData, options: nil)
             }
             sampleScreenshotOperationError = nil
