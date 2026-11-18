@@ -61,33 +61,41 @@ private let textAndBackgroundPairs: [(name: String, text: UIColor, background: U
 private let userInterfaceStyles: [UIUserInterfaceStyle] = [.light, .dark]
 
 struct PoppoThemeTests {
-    @Test(arguments: textAndBackgroundPairs.indices, userInterfaceStyles)
-    func textHasEnoughContrastWithItsBackground(pairIndex: Int, userInterfaceStyle: UIUserInterfaceStyle) {
-        let traitCollection = UITraitCollection(userInterfaceStyle: userInterfaceStyle)
-        // 4.5: WCAG 2 の達成基準 1.4.3 (AA) が、通常の大きさの文字に求めるコントラスト比
-        #expect(
-            contrastRatio(
-                foreground: textAndBackgroundPairs[pairIndex].text.resolvedColor(with: traitCollection),
-                background: textAndBackgroundPairs[pairIndex].background.resolvedColor(with: traitCollection)
-            ) >= 4.5,
-            "\(textAndBackgroundPairs[pairIndex].name)"
-        )
+    // 引数で組ごとのテストに分けない。テストの引数の式は MainActor の外で評価され、MainActor に属する色の定義を読めないため
+    @Test
+    func textHasEnoughContrastWithItsBackground() {
+        for userInterfaceStyle in userInterfaceStyles {
+            let traitCollection = UITraitCollection(userInterfaceStyle: userInterfaceStyle)
+            for pair in textAndBackgroundPairs {
+                // 4.5: WCAG 2 の達成基準 1.4.3 (AA) が、通常の大きさの文字に求めるコントラスト比
+                #expect(
+                    contrastRatio(
+                        foreground: pair.text.resolvedColor(with: traitCollection),
+                        background: pair.background.resolvedColor(with: traitCollection)
+                    ) >= 4.5,
+                    "\(pair.name) (\(userInterfaceStyle == .dark ? "ダーク" : "ライト"))"
+                )
+            }
+        }
     }
 
-    @Test(arguments: userInterfaceStyles)
-    func tintedButtonLabelHasEnoughContrastWithItsFill(userInterfaceStyle: UIUserInterfaceStyle) {
-        let traitCollection = UITraitCollection(userInterfaceStyle: userInterfaceStyle)
-        // 薄く塗ったボタンは、画面の地の上に置く (取り込みを始める入口)
-        #expect(
-            contrastRatio(
-                foreground: UIColor.poppoAccent.resolvedColor(with: traitCollection),
-                background: blended(
-                    overlay: UIColor.poppoAccent.resolvedColor(with: traitCollection),
-                    opacity: poppoTintedFillOpacity,
-                    background: UIColor.poppoBackground.resolvedColor(with: traitCollection)
-                )
-            ) >= 4.5
-        )
+    @Test
+    func tintedButtonLabelHasEnoughContrastWithItsFill() {
+        for userInterfaceStyle in userInterfaceStyles {
+            let traitCollection = UITraitCollection(userInterfaceStyle: userInterfaceStyle)
+            // 薄く塗ったボタンは、画面の地の上に置く (取り込みを始める入口)
+            #expect(
+                contrastRatio(
+                    foreground: UIColor.poppoAccent.resolvedColor(with: traitCollection),
+                    background: blended(
+                        overlay: UIColor.poppoAccent.resolvedColor(with: traitCollection),
+                        opacity: poppoTintedFillOpacity,
+                        background: UIColor.poppoBackground.resolvedColor(with: traitCollection)
+                    )
+                ) >= 4.5,
+                "\(userInterfaceStyle == .dark ? "ダーク" : "ライト")"
+            )
+        }
     }
 
     @Test
