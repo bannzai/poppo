@@ -56,7 +56,7 @@ struct RecentScreenshotsView: View {
                         Text("Take a screenshot of a chat and open this app again")
                     }
                 } else {
-                    screenshotGrid
+                    ScreenshotGridView(screenshots: screenshots)
                 }
             case .limited:
                 VStack(spacing: 0) {
@@ -75,7 +75,7 @@ struct RecentScreenshotsView: View {
                     if screenshots.isEmpty {
                         Spacer()
                     } else {
-                        screenshotGrid
+                        ScreenshotGridView(screenshots: screenshots)
                     }
                 }
             }
@@ -104,8 +104,28 @@ struct RecentScreenshotsView: View {
         }
     }
 
-    /// 取れたスクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
-    private var screenshotGrid: some View {
+    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近のスクリーンショットを取り直す。
+    /// 許可を選ぶ前には取らない。許可が要る操作を初めて行うとシステムが許可の確認を出すため、利用者が許可の導線を押す前に確認を出さない
+    /// (Apple の文書: 「The first time your app performs an operation that requires authorization, the system automatically and
+    /// asynchronously prompts the user for it.」
+    /// https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app )
+    private func loadScreenshots() {
+        switch screenshotAccess(authorizationStatus: authorizationStatus) {
+        case .allowed, .limited:
+            // 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
+            screenshots = fetchRecentScreenshots(limit: 30)
+        case .notRequested, .denied:
+            return
+        }
+    }
+}
+
+/// スクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
+struct ScreenshotGridView: View {
+    /// 並べるスクリーンショット。新しい順
+    let screenshots: [PHAsset]
+
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 // ja: 直近のスクリーンショット
@@ -130,21 +150,6 @@ struct RecentScreenshotsView: View {
                 }
             }
             .padding()
-        }
-    }
-
-    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近のスクリーンショットを取り直す。
-    /// 許可を選ぶ前には取らない。許可が要る操作を初めて行うとシステムが許可の確認を出すため、利用者が許可の導線を押す前に確認を出さない
-    /// (Apple の文書: 「The first time your app performs an operation that requires authorization, the system automatically and
-    /// asynchronously prompts the user for it.」
-    /// https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app )
-    private func loadScreenshots() {
-        switch screenshotAccess(authorizationStatus: authorizationStatus) {
-        case .allowed, .limited:
-            // 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
-            screenshots = fetchRecentScreenshots(limit: 30)
-        case .notRequested, .denied:
-            return
         }
     }
 }

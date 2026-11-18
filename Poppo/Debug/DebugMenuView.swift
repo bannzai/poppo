@@ -1,5 +1,8 @@
 #if DEBUG
+import ImageIO
+import Photos
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 開発者メニュー。simulator では動かない処理 (翻訳・返信案の生成・言語のダウンロード・画面の取り込み) を通さずに、その先の画面を確かめるための入口。
 /// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除) だけ
@@ -10,6 +13,10 @@ struct DebugMenuView: View {
     @State private var savedLatestReading: LatestReading?
     /// 直前の読み取り結果の保存・削除が失敗した時のエラーの説明。成功した時と、まだ操作していない時は nil
     @State private var latestReadingOperationError: String?
+    /// 写真ライブラリの中で、スクリーンショットとして並ぶ写真の数 (30 枚まで数える)。見本を保存する操作をするまでは nil
+    @State private var recentScreenshotCount: Int?
+    /// 直前の見本のスクリーンショットの保存が失敗した時のエラーの説明。成功した時と、まだ操作していない時は nil
+    @State private var sampleScreenshotOperationError: String?
 
     var body: some View {
         List {
@@ -41,6 +48,37 @@ struct DebugMenuView: View {
                 .accessibilityIdentifier("debug_open_language_download")
             } header: {
                 Text(verbatim: "スクリーンショットからの読み取り")
+            }
+            Section {
+                Button {
+                    Task {
+                        await saveSampleScreenshot()
+                    }
+                } label: {
+                    Text(verbatim: "見本のスクリーンショットを写真に保存")
+                }
+                .accessibilityIdentifier("debug_save_sample_screenshot")
+                LabeledContent {
+                    Text(verbatim: recentScreenshotCount.map { String($0) } ?? "未取得")
+                } label: {
+                    Text(verbatim: "スクリーンショットとして並ぶ写真の数")
+                }
+                .accessibilityIdentifier("debug_screenshot_count")
+                if let sampleScreenshotOperationError {
+                    Text(verbatim: sampleScreenshotOperationError)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("debug_screenshot_error")
+                }
+                NavigationLink {
+                    DebugRecentPhotosGridView()
+                } label: {
+                    Text(verbatim: "写真全体を一覧の形で開く")
+                }
+                .accessibilityIdentifier("debug_open_photos_grid")
+            } header: {
+                Text(verbatim: "スクリーンショットの一覧")
+            } footer: {
+                Text(verbatim: "simulator ではスクリーンショットを撮って写真に入れられないため、見本の画像を保存して一覧の表示を確かめる。スクリーンショットとして並ぶ写真が 1 枚以上ある時は足さない。保存した画像がスクリーンショットとして扱われない時は、写真全体を一覧の形で開いて表示を確かめる")
             }
             Section {
                 Button {
@@ -197,6 +235,85 @@ struct DebugMenuView: View {
     private func reloadSavedLatestReading() {
         savedLatestReading = latestReadingFileURL().flatMap { loadLatestReading(fileURL: $0) }
     }
+
+    /// 見本のチャットの画像を、写真ライブラリに保存する。写真へのアクセスの許可が無い時は許可を求める。
+    /// スクリーンショットとして並ぶ写真が既に 1 枚以上ある時は足さないため、何度実行しても見本は 1 枚しか増えない
+    private func saveSampleScreenshot() async {
+        guard await PHPhotoLibrary.requestAuthorization(for: .readWrite) == .authorized else {
+            sampleScreenshotOperationError = "写真へのアクセスがすべての写真に許可されていない"
+            return
+        }
+        guard fetchRecentScreenshots(limit: 1).isEmpty else {
+            sampleScreenshotOperationError = nil
+            recentScreenshotCount = fetchRecentScreenshots(limit: 30).count
+            return
+        }
+        guard let sampleScreenshotData = debugSampleScreenshotData() else {
+            sampleScreenshotOperationError = "見本の画像を作れなかった"
+            return
+        }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetCreationRequest.forAsset().addResource(with: .photo, data: sampleScreenshotData, options: nil)
+            }
+            sampleScreenshotOperationError = nil
+        } catch {
+            sampleScreenshotOperationError = error.localizedDescription
+        }
+        recentScreenshotCount = fetchRecentScreenshots(limit: 30).count
+    }
+}
+
+/// 写真ライブラリの直近の写真 (スクリーンショットに限らない) を、スクリーンショットの一覧と同じ形で並べる画面。
+/// simulator で、保存した見本の画像がスクリーンショットとして扱われない時に、一覧の表示を確かめるために使う
+struct DebugRecentPhotosGridView: View {
+    /// 並べる写真。新しい順。画面を開いた時に読む
+    @State private var photos: [PHAsset] = []
+
+    var body: some View {
+        ScreenshotGridView(screenshots: photos)
+            .onAppear {
+                let options = PHFetchOptions()
+                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                // 30: スクリーンショットの一覧 (RecentScreenshotsView) が並べる枚数と同じにして、同じ見え方を確かめるため
+                options.fetchLimit = 30
+                let fetchResult = PHAsset.fetchAssets(with: .image, options: options)
+                photos = fetchResult.objects(at: IndexSet(integersIn: 0..<fetchResult.count))
+            }
+    }
+}
+
+/// 見本のチャットの画面の絵を、iOS のスクリーンショットと同じ印 (Exif の UserComment が「Screenshot」) を付けた PNG にして返す。
+/// 作れない時は nil を返す。この印で写真ライブラリがスクリーンショットとして扱うかは、simulator で確かめる
+private func debugSampleScreenshotData() -> Data? {
+    // 393 × 852: iPhone 17 の画面のポイント数。一覧の枠 (9:19.5) とほぼ同じ縦横比にするため
+    let data = NSMutableData()
+    guard
+        let cgImage = UIGraphicsImageRenderer(size: CGSize(width: 393, height: 852)).image(actions: { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 393, height: 852))
+            for (index, message) in debugSampleMessages.enumerated() {
+                UIColor(white: 0.92, alpha: 1).setFill()
+                UIBezierPath(roundedRect: CGRect(x: 16, y: 120 + index * 110, width: 300, height: 90), cornerRadius: 18).fill()
+                (message.originalText as NSString).draw(
+                    in: CGRect(x: 30, y: 134 + index * 110, width: 272, height: 62),
+                    withAttributes: [.font: UIFont.systemFont(ofSize: 17), .foregroundColor: UIColor.black]
+                )
+            }
+        }).cgImage,
+        let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+    else {
+        return nil
+    }
+    CGImageDestinationAddImage(
+        destination,
+        cgImage,
+        [kCGImagePropertyExifDictionary: [kCGImagePropertyExifUserComment: "Screenshot"]] as CFDictionary
+    )
+    guard CGImageDestinationFinalize(destination) else {
+        return nil
+    }
+    return data as Data
 }
 
 /// 診断の記録 1 つの中身を、開発者メニューの行として並べる。List か Section の中に置く
