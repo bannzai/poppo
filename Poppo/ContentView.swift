@@ -11,6 +11,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             RecentScreenshotsView()
+                .poppoScreenBackground()
                 .navigationTitle(Text(verbatim: "Poppo"))
                 .safeAreaInset(edge: .bottom) {
                     if screenCaptureController.status != .capturing {

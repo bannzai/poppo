@@ -27,6 +27,8 @@ struct KeyboardView: View {
         // simulator (iPhone 17) で見本の読み取り結果を出して測った: 返信案 3 つ (うち 1 つは 2 行) が約 200pt を使い、
         // 280 では直前の発言が 30pt ほどしか見えなかった。実機での見え方を確かめて決め直す (documents/DIRECTION.md「決めたこと」)
         .frame(height: 340)
+        .poppoThemed()
+        .background(.poppoBackground)
     }
 }
 
@@ -50,7 +52,7 @@ struct KeyboardContentView: View {
                     Button(action: onSwitchKeyboard) {
                         Image(systemName: "globe")
                             .frame(width: 44, height: 32)
-                            .background(Color(uiColor: .systemGray3), in: .rect(cornerRadius: 8))
+                            .background(.poppoSurface, in: .rect(cornerRadius: poppoSmallCornerRadius))
                     }
                     .buttonStyle(.plain)
                     // ja: 次のキーボード
@@ -68,7 +70,7 @@ struct KeyboardContentView: View {
                         }
                     }
                     .font(.caption)
-                    .foregroundStyle(isStale(capturedAt: latestReading.capturedAt, now: now) ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(isStale(capturedAt: latestReading.capturedAt, now: now) ? Color.poppoStale : Color.poppoSecondaryText)
                     .accessibilityIdentifier("keyboard_reading_age")
                 }
             }
@@ -82,18 +84,18 @@ struct KeyboardContentView: View {
                                         .font(.subheadline)
                                     Text(verbatim: latestReading.messages[index].originalText)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(.poppoSecondaryText)
                                 }
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
-                        .background(Color(uiColor: .systemBackground), in: .rect(cornerRadius: 10))
+                        .poppoCard()
                         if latestReading.replySuggestions.isEmpty {
                             // ja: 今この端末では返信案を作れません
                             Text("Reply suggestions aren't available on this device right now")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.poppoSecondaryText)
                         } else {
                             ForEach(latestReading.replySuggestions.indices, id: \.self) { index in
                                 Button {
@@ -101,15 +103,15 @@ struct KeyboardContentView: View {
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(verbatim: latestReading.replySuggestions[index].text)
-                                            .font(.subheadline.weight(.medium))
-                                            .foregroundStyle(.tint)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.poppoAccent)
                                         Text(verbatim: latestReading.replySuggestions[index].meaning)
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(.poppoSecondaryText)
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(10)
-                                    .background(Color(uiColor: .systemBackground), in: .rect(cornerRadius: 10))
+                                    .poppoCard()
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("keyboard_reply_\(index)")
@@ -130,7 +132,7 @@ struct KeyboardContentView: View {
                 // ja: 「Poppo」を開いてチャットの読み取りを始めると翻訳と返信案がここに出ます
                 Text("Open '\(Text("Poppo"))' and start reading a chat to see translations and reply suggestions here")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.poppoSecondaryText)
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier("keyboard_no_reading")
                 Spacer()

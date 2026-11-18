@@ -133,49 +133,59 @@ struct ChatReadingPhaseView: View {
     let retry: () -> Void
 
     var body: some View {
-        switch phase {
-        case .reading:
-            // ja: スクリーンショットを読み取っています
-            ProgressView("Reading the screenshot")
-        case .loaded(let messages, let replySuggestions):
-            ChatReadingResultView(messages: messages, replySuggestions: replySuggestions)
-        case .needsLanguageDownload(let source, let target):
-            ContentUnavailableView {
-                // ja: 翻訳用の言語が必要です
-                Label("Translation language needed", systemImage: "arrow.down.circle")
-            } description: {
-                // ja: この端末で翻訳するには言語のダウンロードが必要です
-                Text("Download the language to translate this screenshot on your device")
-            } actions: {
-                Button {
-                    downloadLanguage(source, target)
-                } label: {
-                    // ja: 言語をダウンロード
-                    Text("Download language")
+        Group {
+            switch phase {
+            case .reading:
+                // ja: スクリーンショットを読み取っています
+                ProgressView("Reading the screenshot")
+            case .loaded(let messages, let replySuggestions):
+                ChatReadingResultView(messages: messages, replySuggestions: replySuggestions)
+            case .needsLanguageDownload(let source, let target):
+                PoppoEmptyStateView(
+                    // ja: 翻訳用の言語が必要です
+                    title: Text("Translation language needed"),
+                    // ja: この端末で翻訳するには言語のダウンロードが必要です
+                    description: Text("Download the language to translate this screenshot on your device")
+                ) {
+                    Button {
+                        downloadLanguage(source, target)
+                    } label: {
+                        // ja: 言語をダウンロード
+                        Text("Download language")
+                    }
+                    .buttonStyle(PoppoFilledButtonStyle(fill: .poppoAccent, label: .poppoOnAccent))
+                    .accessibilityIdentifier("language_download_button")
                 }
-                .buttonStyle(.borderedProminent)
-                .accessibilityIdentifier("language_download_button")
-            }
-        case .noMessages:
-            // ja: チャットの文字が見つかりませんでした
-            ContentUnavailableView("No chat text found", systemImage: "text.magnifyingglass")
-        case .untranslatableLanguage:
-            // ja: この言語はあなたの言語に翻訳できません
-            ContentUnavailableView("This language can't be translated into your language", systemImage: "character.bubble")
-        case .failed:
-            ContentUnavailableView {
-                // ja: このスクリーンショットを読み取れませんでした
-                Label("Couldn't read this screenshot", systemImage: "exclamationmark.triangle")
-            } actions: {
-                Button {
-                    retry()
-                } label: {
-                    // ja: もう一度試す
-                    Text("Try again")
+            case .noMessages:
+                // ja: チャットの文字が見つかりませんでした
+                Text("No chat text found")
+                    .font(.title3.bold())
+                    .multilineTextAlignment(.center)
+                    .padding(24)
+            case .untranslatableLanguage:
+                // ja: この言語はあなたの言語に翻訳できません
+                Text("This language can't be translated into your language")
+                    .font(.title3.bold())
+                    .multilineTextAlignment(.center)
+                    .padding(24)
+            case .failed:
+                VStack(spacing: 16) {
+                    // ja: このスクリーンショットを読み取れませんでした
+                    Text("Couldn't read this screenshot")
+                        .font(.title3.bold())
+                        .multilineTextAlignment(.center)
+                    Button {
+                        retry()
+                    } label: {
+                        // ja: もう一度試す
+                        Text("Try again")
+                    }
+                    .buttonStyle(PoppoFilledButtonStyle(fill: .poppoAccent, label: .poppoOnAccent))
+                    .accessibilityIdentifier("chat_reading_retry_button")
                 }
-                .buttonStyle(.borderedProminent)
-                .accessibilityIdentifier("chat_reading_retry_button")
+                .padding(24)
             }
         }
+        .poppoScreenBackground()
     }
 }

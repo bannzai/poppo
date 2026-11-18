@@ -14,6 +14,7 @@ struct PoppoApp: App {
         WindowGroup {
             ContentView()
                 .environment(screenCaptureController)
+                .poppoThemed()
         }
     }
 }

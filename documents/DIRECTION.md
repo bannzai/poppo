@@ -37,7 +37,7 @@ launched_at:
 
 ## デザインの方向
 
-- 仕事で使う道具の見た目にする。2026-11-17 のモック (`documents/design/mock-2026-11-17/index.html`) の色・角の丸さ・余白を使う (owner の発言 2026-11-18: 「UIのテーマ的には仕事で使われる感じがしてて良いと思う」。https://github.com/bannzai/poppo/issues/10#issuecomment-6969023686 )
+- 少し可愛くて明るい見た目にする。可愛すぎない線は、仕事のチャットの返信に使う道具として、発言の翻訳と返信案の読みやすさを下げず、意味を持つ色 (エラーの赤、時間が経った読み取り結果の色) の区別を残すこと。アイコンは鳥 (ぽっぽ) の絵で、同じ鳥を本体アプリの中身がまだ無い場面の案内に置く。キーボードには絵を置かない (owner の発言 2026-11-18: 「アイコンをぽっぽ(鳥)っぽい可愛いやつにしようか。UIのテーマもちょっと可愛くPOPでチャーミングな感じに整えよう。可愛すぎない感じでよい。キャラクターがいても良さそう」。https://github.com/bannzai/poppo/issues/26 )。色・角の丸さ・ボタンの形の定義は `Shared/PoppoTheme.swift` の 1 か所で、本体アプリとキーボードの両方が使う。鳥の絵は `Poppo/Assets.xcassets/PoppoBird.imageset/poppo-bird.svg`、アイコンはこの絵から `scripts/render-app-icon.sh` で作る
 - 読み取った内容を、アプリ・チャット・人物ごとに分けて見せる (同じ発言: 「できればアプリのアイコンやチャットごと・人物ごとに分かれている感じがいいかな」)。2 通りの案 (`documents/design/mock-2026-11-18/index.html`。左 = 読み取り結果、中央 = キーボード、右 = アプリとチャットごとの一覧) への返答は「全部かも」で、一覧を入口にして、アプリ × チャンネルごとの会話に入り、読み取った時点 (「2 分前の会話」) を横スクロールで送る形 (owner の発言 2026-11-18: 「分け方だけど全部かも。一番右が一覧画面。入ると一番左のようにアプリごとxチャンネルごとに会話がある。2分前の会話。みたいな項目あると嬉しい。2分前の会話。みたいな時系列を横スクロールでペラペラと移動できたら良いかも。画像やch UIがページ送りされる感じ」。https://github.com/bannzai/poppo/issues/10#issuecomment-6971214314 )。この形を描いたモックは `documents/design/mock-2026-11-18-history/index.html`。読み取った内容をいつまで残すか・画面の画像を残すかは決まっていない (下の「bannzai の返答を待っていること」)
 
 ## 決めたこと
@@ -77,7 +77,7 @@ launched_at:
 | 2026-11-18 | 見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10#issuecomment-6969023686 ) | 見た目は仕事で使う道具の方向で良い。読み取った内容はアプリ・チャット・人物ごとに分けて見せる (上の「デザインの方向」) | bannzai |
 | 2026-11-18 | TestFlight への配布の準備 (https://github.com/bannzai/poppo/issues/19 ) | TestFlight へ配るビルドには、配布を起動する時に指定した時だけ、開発者メニューと診断の記録を入れる (Release 構成に DEBUG の条件を足してビルドする)。指定しない時は入れず、審査に出すビルドには指定しない。判定基準の「実機で、背面の一連の処理が回った回数」は診断の記録を見て数えるため、実機での確認に使うビルドには要る。診断の記録をファイルに保存するのは DEBUG の条件が付いたビルドだけ、という 2026-11-17 の決定は変えない | agent |
 | 2026-11-18 | TestFlight への配布の準備 | 配布は手動で起動した時にだけ行い、main へのマージでは行わない (マージのたびにビルドが増えて内部テスターに通知が届くのを避ける)。手順は documents/ios-testflight-distribution.md | agent |
-| 2026-11-18 | TestFlight への配布の準備 | アプリアイコンは仮のもの (吹き出しの絵) を置く。App Store で配るアプリにはアイコンの画像が要るため (「If you distribute your app through the App Store, you must provide app icon imagery to use in the App Store.」 https://developer.apple.com/documentation/xcode/configuring-your-app-icon 。画像が無いビルドのアップロードが拒否されるかは試していない)。見た目は決まっておらず、デザインの方向が決まった時に差し替える | agent |
+| 2026-11-18 | TestFlight への配布の準備 | アプリアイコンは仮のもの (吹き出しの絵) を置く。App Store で配るアプリにはアイコンの画像が要るため (「If you distribute your app through the App Store, you must provide app icon imagery to use in the App Store.」 https://developer.apple.com/documentation/xcode/configuring-your-app-icon 。画像が無いビルドのアップロードが拒否されるかは試していない)。見た目は決まっておらず、デザインの方向が決まった時に差し替える (https://github.com/bannzai/poppo/issues/26 で鳥の絵に差し替えた。下の「見た目の方向の置き換え」の行) | agent |
 | 2026-11-18 | TestFlight への配布の準備 | 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption`) は「申告が要る暗号を使っていない」(false) にする。アプリのコードは暗号も端末の外への通信も使っていないため。端末の外へ送る構成を足す時は、この申告を見直す | agent |
 | 2026-11-18 | TestFlight への配布の準備 | App Store Connect のアプリの名前は、仮の「Poppo チャット翻訳キーボード」で登録する。「Poppo」はほかのアカウントのアプリが使っていて登録できなかったため (「The App Name you entered is already being used.」)。ホーム画面に出る名前は Poppo のまま。App Store に出す名前は決めておらず、公開の前に bannzai が決めて App Store Connect で書き換える | agent |
 | 2026-11-18 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1#issuecomment-6971212297 ) | 購入の管理に RevenueCat を使う。値段と有料にする範囲は agent が調べて提案する (発言: 「RCは使う。値段は市場調査して提案して。範囲も提案して」)。提案に bannzai が同意して issue に残るまで、課金は実装しない | bannzai |
@@ -85,6 +85,8 @@ launched_at:
 | 2026-11-18 | 見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10#issuecomment-6971214314 ) | 分け方は、モックの 3 画面の全部を作る方向。一覧を入口にし、入るとアプリ × チャンネルごとの会話があり、読み取った時点 (「2 分前の会話」) を横スクロールで送る (発言は上の「デザインの方向」に引用した。「全部かも」「良いかも」という言い方で、下の行の読みで合っているかをモックで確かめている) | bannzai |
 | 2026-11-18 | 上の行の読み方 (https://github.com/bannzai/poppo/issues/10 でモックを見せて確かめている。違っていれば直す) | 読み取った内容を、読み取った時点ごとに端末に残すことになる。今の決定 (この表の「取り込みが止まった時にも削除する」の行と、スクリーンショットからの読み取りの結果を保存しない行)、`docs/PrivacyPolicy-ja.md`「保存期間と削除」、用語の「読み取り結果」(常に最新の 1 つだけを持つ) は、残す期間・消す操作・画面の画像を残すかを bannzai が決めるまで変えない。「画像や ch UI がページ送りされる」は 2 通りに読める (読み取った発言を組み直したページ / 読み取った時の画面の画像と翻訳のページ) ため、両方をモックに描いた | agent |
 | 2026-11-18 | 見た目と体験の方向 (一覧と会話の画面を作れるかの調べ) | どのアプリのどのチャットかは、画面の上部の文字 (チャンネル名・相手の名前) から読む。iOS の ScreenCaptureKit には、取り込み中に前面のアプリを受け取る API が無い (ほかのフレームワークは調べていない): iOS 27.1 の SDK の ScreenCaptureKit のヘッダー (SCShareableContent.h) で、`SCRunningApplication` (bundleIdentifier を持つ)・`SCWindow`・`SCShareableContent` はどれも `API_UNAVAILABLE(ios, visionos, tvos)`、映像に付く情報のキー (SCStream.h の `SCStreamFrameInfo`) にもアプリを示すものは無い。そのため、アプリの名前とアイコンは画面の見た目から決めることになり、決め方 (上部の文字や配色から推定するか、利用者が選ぶか) は実装の issue で決める。発言を人物ごとに分ける処理 (名前と時刻が同じ行にある見出し行から名前を取る) は実際の画面では試していない | agent |
+| 2026-11-18 | 見た目の方向の置き換え (https://github.com/bannzai/poppo/issues/26 ) | 見た目は、少し可愛くて明るい方向にする。アイコンは鳥 (ぽっぽ) の絵にし、キャラクターを置いてよい。可愛すぎない感じにする (発言は上の「デザインの方向」に引用した)。この表の同じ日の「見た目は仕事で使う道具の方向で良い」の行より後の発言で、見た目の方向はこの行で置き換える。読み取った内容をアプリ・チャット・人物ごとに分けて見せる方向は変えない | bannzai |
+| 2026-11-18 | 見た目の方向の置き換え (色と絵の細部) | 色は青緑を押せるものの色、少し黄みのある白を地の色にする。文字と地の組はライトとダークの両方でコントラスト比 4.5 以上にする (`PoppoTests/PoppoThemeTests.swift` が確かめる)。鳥は白い体・橙のくちばしの丸い小鳥を、このアプリのために SVG で描いた。値は `Shared/PoppoTheme.swift` が正 | agent |
 
 ### bannzai の返答を待っていること
 

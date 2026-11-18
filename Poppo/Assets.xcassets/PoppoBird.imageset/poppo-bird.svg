@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 尾羽 -->
+  <ellipse cx="112" cy="352" rx="74" ry="30" transform="rotate(28 112 352)" fill="#CFEAE4"/>
+  <ellipse cx="104" cy="318" rx="70" ry="28" transform="rotate(8 104 318)" fill="#E4F4F0"/>
+  <!-- 足 -->
+  <path d="M232 440 v36 m-20 0 h40 M306 440 v36 m-20 0 h40" stroke="#FFB238" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <!-- 体と頭 -->
+  <ellipse cx="258" cy="306" rx="172" ry="148" fill="#FFFFFF"/>
+  <circle cx="328" cy="196" r="108" fill="#FFFFFF"/>
+  <!-- 首の色 -->
+  <path d="M250 276 Q330 318 426 264" stroke="#9ADBCF" stroke-width="22" stroke-linecap="round" fill="none"/>
+  <!-- 翼 -->
+  <ellipse cx="206" cy="336" rx="98" ry="66" transform="rotate(-14 206 336)" fill="#CFEAE4"/>
+  <path d="M150 356 Q200 376 262 346" stroke="#9ADBCF" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <!-- くちばし -->
+  <path d="M430 186 L476 206 L432 226 Z" fill="#FFB238" stroke="#FFB238" stroke-width="14" stroke-linejoin="round"/>
+  <!-- ほお -->
+  <circle cx="388" cy="232" r="21" fill="#FF9FB0"/>
+  <!-- 目 -->
+  <circle cx="360" cy="180" r="18" fill="#2B2B33"/>
+  <circle cx="366" cy="173" r="6" fill="#FFFFFF"/>
+</svg>

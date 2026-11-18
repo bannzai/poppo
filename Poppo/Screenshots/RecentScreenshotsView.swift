@@ -17,13 +17,12 @@ struct RecentScreenshotsView: View {
         Group {
             switch screenshotAccess(authorizationStatus: authorizationStatus) {
             case .notRequested:
-                ContentUnavailableView {
+                PoppoEmptyStateView(
                     // ja: スクリーンショットを選んで翻訳
-                    Label("Pick a screenshot to translate", systemImage: "photo.on.rectangle")
-                } description: {
+                    title: Text("Pick a screenshot to translate"),
                     // ja: 写真へのアクセスを許可すると直近のスクリーンショットがここに並びます
-                    Text("Allow photo access to see your recent screenshots here")
-                } actions: {
+                    description: Text("Allow photo access to see your recent screenshots here")
+                ) {
                     Button {
                         Task {
                             authorizationStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
@@ -33,27 +32,27 @@ struct RecentScreenshotsView: View {
                         // ja: 写真へのアクセスを許可
                         Text("Allow photo access")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PoppoFilledButtonStyle(fill: .poppoAccent, label: .poppoOnAccent))
                     .accessibilityIdentifier("photo_access_request_button")
                 }
             case .denied:
-                ContentUnavailableView {
+                PoppoEmptyStateView(
                     // ja: 写真へのアクセスがオフになっています
-                    Label("Photo access is turned off", systemImage: "photo.on.rectangle")
-                } description: {
+                    title: Text("Photo access is turned off"),
                     // ja: 設定で写真へのアクセスをオンにすると直近のスクリーンショットがここに並びます
-                    Text("Turn on photo access in Settings to see your recent screenshots here")
-                } actions: {
+                    description: Text("Turn on photo access in Settings to see your recent screenshots here")
+                ) {
                     openSettingsButton
                 }
             case .allowed:
                 if screenshots.isEmpty {
-                    ContentUnavailableView {
+                    PoppoEmptyStateView(
                         // ja: スクリーンショットがまだありません
-                        Label("No screenshots yet", systemImage: "photo.on.rectangle")
-                    } description: {
+                        title: Text("No screenshots yet"),
                         // ja: チャットのスクリーンショットを撮ってからこのアプリを開き直してください
-                        Text("Take a screenshot of a chat and open this app again")
+                        description: Text("Take a screenshot of a chat and open this app again")
+                    ) {
+                        EmptyView()
                     }
                 } else {
                     ScreenshotGridView(screenshots: screenshots)
@@ -67,11 +66,14 @@ struct RecentScreenshotsView: View {
                         // ja: 新しく撮ったスクリーンショットを並べるには設定ですべての写真へのアクセスを許可してください
                         Text("Allow access to all photos in Settings to see new screenshots")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.poppoSecondaryText)
                             .multilineTextAlignment(.center)
                         openSettingsButton
                     }
                     .padding()
+                    .frame(maxWidth: .infinity)
+                    .poppoCard()
+                    .padding([.horizontal, .top])
                     if screenshots.isEmpty {
                         Spacer()
                     } else {
@@ -99,7 +101,7 @@ struct RecentScreenshotsView: View {
                 // ja: 設定を開く
                 Text("Open Settings")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(PoppoFilledButtonStyle(fill: .poppoAccent, label: .poppoOnAccent))
             .accessibilityIdentifier("photo_access_open_settings_button")
         }
     }
@@ -162,7 +164,7 @@ struct ScreenshotThumbnail: View {
     @State private var image: UIImage?
 
     var body: some View {
-        Color(uiColor: .secondarySystemBackground)
+        Color.poppoSurface
             // 9:19.5 はホームボタンの無い iPhone の画面の縦横比。iPhone 専用で作るため (documents/DIRECTION.md「決めたこと」)、枠をこの比で取る
             .aspectRatio(9 / 19.5, contentMode: .fit)
             .overlay {
@@ -172,7 +174,7 @@ struct ScreenshotThumbnail: View {
                         .scaledToFill()
                 }
             }
-            .clipShape(.rect(cornerRadius: 8))
+            .clipShape(.rect(cornerRadius: poppoSmallCornerRadius))
             .task(id: screenshot.localIdentifier) {
                 // 幅 440・高さ 960: 3 列の一覧の 1 枚は画面の幅の約 1/3 で、幅 440pt・3 倍の解像度の機種で約 440px になるため
                 image = await loadScreenshotImage(

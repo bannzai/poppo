@@ -18,7 +18,7 @@ struct ScreenCaptureEntryView: View {
                 // ja: キーボードに出す翻訳を消せませんでした
                 Text("Couldn't clear the translations shown on the keyboard")
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.poppoError)
                     .accessibilityIdentifier("screen_capture_delete_failed")
             }
             Button(action: openConsent) {
@@ -26,11 +26,11 @@ struct ScreenCaptureEntryView: View {
                 Label("Start screen capture", systemImage: "record.circle")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(PoppoTintedButtonStyle())
             .accessibilityIdentifier("screen_capture_start_link")
         }
         .padding()
-        .background(.bar)
+        .background(.poppoBackground)
     }
 }
 
@@ -55,12 +55,16 @@ struct ScreenCaptureConsentView: View {
                 // ja: 始める前に
                 Text("Before you start")
             }
+            .listRowBackground(Color.poppoSurface)
             Section {
                 Button(action: start) {
                     // ja: 同意して始める
                     Text("Agree and start")
                         .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(PoppoFilledButtonStyle(fill: .poppoAccent, label: .poppoOnAccent))
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
                 .accessibilityIdentifier("screen_capture_consent_button")
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
@@ -72,6 +76,7 @@ struct ScreenCaptureConsentView: View {
                 }
             }
         }
+        .poppoScreenBackground()
         // ja: 画面の取り込み
         .navigationTitle(Text("Screen capture"))
     }
@@ -91,7 +96,7 @@ struct ScreenCaptureCapturingBar: View {
                 // ja: 画面の取り込みを止められませんでした
                 Text("Couldn't stop screen capture")
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.poppoError)
                     .accessibilityIdentifier("screen_capture_stop_failed")
             }
             HStack {
@@ -100,7 +105,7 @@ struct ScreenCaptureCapturingBar: View {
                     Text("Capturing your screen")
                 } icon: {
                     Image(systemName: "record.circle")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.poppoError)
                 }
                 .accessibilityIdentifier("screen_capture_capturing_label")
                 Spacer()
@@ -108,12 +113,12 @@ struct ScreenCaptureCapturingBar: View {
                     // ja: 停止
                     Text("Stop")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PoppoFilledButtonStyle(fill: .poppoError, label: .poppoOnError))
                 .accessibilityIdentifier("screen_capture_stop_button")
             }
         }
         .padding()
-        .background(.bar)
+        .background(.poppoSurface)
     }
 }
 
@@ -123,7 +128,7 @@ private struct ScreenCaptureFailedText: View {
         // ja: エラーで画面の取り込みが止まりました
         Text("Screen capture stopped because of an error")
             .font(.footnote)
-            .foregroundStyle(.red)
+            .foregroundStyle(.poppoError)
             .accessibilityIdentifier("screen_capture_failed")
     }
 }

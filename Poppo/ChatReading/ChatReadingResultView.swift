@@ -17,9 +17,10 @@ struct ChatReadingResultView: View {
                         Text(verbatim: messages[index].translatedText)
                         Text(verbatim: messages[index].originalText)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.poppoSecondaryText)
                     }
                 }
+                .listRowBackground(Color.poppoSurface)
             } header: {
                 // ja: 翻訳
                 Text("Translation")
@@ -28,7 +29,8 @@ struct ChatReadingResultView: View {
                 if replySuggestions.isEmpty {
                     // ja: 今この端末では返信案を作れません
                     Text("Reply suggestions aren't available on this device right now")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.poppoSecondaryText)
+                        .listRowBackground(Color.poppoSurface)
                 } else {
                     ForEach(replySuggestions.indices, id: \.self) { index in
                         HStack {
@@ -36,7 +38,7 @@ struct ChatReadingResultView: View {
                                 Text(verbatim: replySuggestions[index].text)
                                 Text(verbatim: replySuggestions[index].meaning)
                                     .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.poppoSecondaryText)
                             }
                             Spacer()
                             Button {
@@ -55,11 +57,13 @@ struct ChatReadingResultView: View {
                             .accessibilityIdentifier("reply_copy_button_\(index)")
                         }
                     }
+                    .listRowBackground(Color.poppoSurface)
                 }
             } header: {
                 // ja: 返信案
                 Text("Reply suggestions")
             }
         }
+        .poppoScreenBackground()
     }
 }
