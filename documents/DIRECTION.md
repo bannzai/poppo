@@ -79,6 +79,7 @@ launched_at:
 | 2026-11-18 | TestFlight への配布の準備 | 配布は手動で起動した時にだけ行い、main へのマージでは行わない (マージのたびにビルドが増えて内部テスターに通知が届くのを避ける)。手順は documents/ios-testflight-distribution.md | agent |
 | 2026-11-18 | TestFlight への配布の準備 | アプリアイコンは仮のもの (吹き出しの絵) を置く。App Store で配るアプリにはアイコンの画像が要るため (「If you distribute your app through the App Store, you must provide app icon imagery to use in the App Store.」 https://developer.apple.com/documentation/xcode/configuring-your-app-icon 。画像が無いビルドのアップロードが拒否されるかは試していない)。見た目は決まっておらず、デザインの方向が決まった時に差し替える | agent |
 | 2026-11-18 | TestFlight への配布の準備 | 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption`) は「申告が要る暗号を使っていない」(false) にする。アプリのコードは暗号も端末の外への通信も使っていないため。端末の外へ送る構成を足す時は、この申告を見直す | agent |
+| 2026-11-18 | TestFlight への配布の準備 | App Store Connect のアプリの名前は、仮の「Poppo チャット翻訳キーボード」で登録する。「Poppo」はほかのアカウントのアプリが使っていて登録できなかったため (「The App Name you entered is already being used.」)。ホーム画面に出る名前は Poppo のまま。App Store に出す名前は決めておらず、公開の前に bannzai が決めて App Store Connect で書き換える | agent |
 
 ### bannzai の返答を待っていること
 
