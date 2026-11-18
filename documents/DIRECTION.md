@@ -70,6 +70,10 @@ launched_at:
 | 2026-11-18 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1#issuecomment-6968221141 ) | 配信先は App Store にする (発言: 「issue-1についてはAppStoreで、課金を入れる」) | bannzai |
 | 2026-11-18 | 作るかの判断 (同じ発言) | 課金を入れる。売る物・形 (買い切り / 月額)・値段・トライアルの有無は決まっていない (下の「bannzai の返答を待っていること」) | bannzai |
 | 2026-11-18 | 作るかの判断 (同じ発言) | 実機には TestFlight で入れる。準備は agent が進める (発言: 「TestFlightとかは勝手に用意できるでしょ」。https://github.com/bannzai/poppo/issues/19 ) | bannzai |
+| 2026-11-18 | TestFlight への配布の準備 (https://github.com/bannzai/poppo/issues/19 ) | TestFlight へ配るビルドには、配布を起動する時に指定した時だけ、開発者メニューと診断の記録を入れる (Release 構成に DEBUG の条件を足してビルドする)。指定しない時は入れず、審査に出すビルドには指定しない。判定基準の「実機で、背面の一連の処理が回った回数」は診断の記録を見て数えるため、実機での確認に使うビルドには要る。診断の記録をファイルに保存するのは DEBUG の条件が付いたビルドだけ、という 2026-11-17 の決定は変えない | agent |
+| 2026-11-18 | TestFlight への配布の準備 | 配布は手動で起動した時にだけ行い、main へのマージでは行わない (マージのたびにビルドが増えて内部テスターに通知が届くのを避ける)。手順は documents/ios-testflight-distribution.md | agent |
+| 2026-11-18 | TestFlight への配布の準備 | アプリアイコンは仮のもの (吹き出しの絵) を置く。App Store で配るアプリにはアイコンの画像が要るため (「If you distribute your app through the App Store, you must provide app icon imagery to use in the App Store.」 https://developer.apple.com/documentation/xcode/configuring-your-app-icon 。画像が無いビルドのアップロードが拒否されるかは試していない)。見た目は決まっておらず、デザインの方向が決まった時に差し替える | agent |
+| 2026-11-18 | TestFlight への配布の準備 | 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption`) は「申告が要る暗号を使っていない」(false) にする。アプリのコードは暗号も端末の外への通信も使っていないため。端末の外へ送る構成を足す時は、この申告を見直す | agent |
 
 ### bannzai の返答を待っていること
 
