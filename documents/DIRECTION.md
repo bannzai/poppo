@@ -85,6 +85,11 @@ launched_at:
 | 2026-11-18 | 見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10#issuecomment-6971214314 ) | 分け方は、モックの 3 画面の全部を作る方向。一覧を入口にし、入るとアプリ × チャンネルごとの会話があり、読み取った時点 (「2 分前の会話」) を横スクロールで送る (発言は上の「デザインの方向」に引用した。「全部かも」「良いかも」という言い方で、下の行の読みで合っているかをモックで確かめている) | bannzai |
 | 2026-11-18 | 上の行の読み方 (https://github.com/bannzai/poppo/issues/10 でモックを見せて確かめている。違っていれば直す) | 読み取った内容を、読み取った時点ごとに端末に残すことになる。今の決定 (この表の「取り込みが止まった時にも削除する」の行と、スクリーンショットからの読み取りの結果を保存しない行)、`docs/PrivacyPolicy-ja.md`「保存期間と削除」、用語の「読み取り結果」(常に最新の 1 つだけを持つ) は、残す期間・消す操作・画面の画像を残すかを bannzai が決めるまで変えない。「画像や ch UI がページ送りされる」は 2 通りに読める (読み取った発言を組み直したページ / 読み取った時の画面の画像と翻訳のページ) ため、両方をモックに描いた | agent |
 | 2026-11-18 | 見た目と体験の方向 (一覧と会話の画面を作れるかの調べ) | どのアプリのどのチャットかは、画面の上部の文字 (チャンネル名・相手の名前) から読む。iOS の ScreenCaptureKit には、取り込み中に前面のアプリを受け取る API が無い (ほかのフレームワークは調べていない): iOS 27.1 の SDK の ScreenCaptureKit のヘッダー (SCShareableContent.h) で、`SCRunningApplication` (bundleIdentifier を持つ)・`SCWindow`・`SCShareableContent` はどれも `API_UNAVAILABLE(ios, visionos, tvos)`、映像に付く情報のキー (SCStream.h の `SCStreamFrameInfo`) にもアプリを示すものは無い。そのため、アプリの名前とアイコンは画面の見た目から決めることになり、決め方 (上部の文字や配色から推定するか、利用者が選ぶか) は実装の issue で決める。発言を人物ごとに分ける処理 (名前と時刻が同じ行にある見出し行から名前を取る) は実際の画面では試していない | agent |
+| 2026-11-18 | 作るかの判断 (https://github.com/bannzai/poppo/issues/1#issuecomment-6977383971 ) | 値段は月額 1,000 円・年額 10,000 円・買い切り 30,000 円にする (agent の提案への発言: 「値段は良い」)。この表の仮の値段の行の買い切り 40,000 円を置き換える | bannzai |
+| 2026-11-18 | 上の行の読み方 | 同意は値段だけと読む。同じ発言が「これってScreenCaptureKitのこともスクショって言ってる？」と聞いていて、無料と有料の分け方 (無料 = スクリーンショットからの読み取り、有料 = 取り込みとキーボード。用語は下の「用語」) が伝わっていなかったため。分け方は言い直して聞いている (下の「bannzai の返答を待っていること」) | agent |
+| 2026-11-18 | 見た目と体験の方向 (https://github.com/bannzai/poppo/issues/10#issuecomment-6977394937 ) | 読み取った時の画面の画像を残す (発言: 「残す」)。会話の画面のページは「一番右の画面」にする (発言: 「ページ送りは一番右の画面かな」) | bannzai |
+| 2026-11-18 | 上の行の読み方 (https://github.com/bannzai/poppo/issues/10 で確かめている。違っていれば直す) | 「一番右の画面」は、`documents/design/mock-2026-11-18-history/index.html` の右の画面 (読み取った時の画面の画像と翻訳のページ) と読む。画像を残す答えと合うため (`documents/design/mock-2026-11-18/index.html` の右の画面は一覧で、ページ送りの画面ではない)。画像を置く場所と残す期間は決まっていない: 同じ発言の「Photosの参照からいけるならそれでも良さそう」「動画もユーザーのPhotosを使ってフォルダを作っていけないかな。とか思っている」は案、「仮にサーバーにおくなら…14日くらいで」は条件付きで agent の意見を求めているため、決定として扱わない。置く場所が決まるまで、今の決定 (読み取った内容を残さない) と `docs/PrivacyPolicy-ja.md` は変えない | agent |
+| 2026-11-18 | 見た目と体験の方向 (画像を Photos に置く案の調べ) | 写真ライブラリへのアクセスが「選んだ写真だけ」の時は、アプリはアルバムを作れない (「You can’t create or fetch user albums.」 https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app 2026-11-18 に読んだ)。アルバムに分けて置くには、利用者が写真ライブラリの全体へのアクセスを許可する必要がある。追加だけの許可でアルバムを作れるか、アプリが置いた画像を期限で消す時に利用者への確認が出るか、取り込みの間 (本体アプリが背面) に写真ライブラリへ書けるかは確かめていない。スクリーンショットからの読み取りは、今も写真ライブラリの読み書きの許可を求めて直近のスクリーンショットを並べている (`Poppo/Screenshots/RecentScreenshotsView.swift` の `PHPhotoLibrary.requestAuthorization(for: .readWrite)`) ため、この使い方では画像を写さずに、写真ライブラリにある元のスクリーンショットを指して残す作りにできる見込み (試していない。利用者が元のスクリーンショットを消すと画像は見られなくなる)。取り込みで読んだ画面は写真ライブラリに元の画像が無く、残すにはアプリが書き込むことになる | agent |
 
 ### bannzai の返答を待っていること
 
@@ -93,8 +98,8 @@ launched_at:
 | 聞いていること | 返答までの進め方 (決定ではない) |
 | --- | --- |
 | 返信案を作るモデルの経路 (端末内だけ / Private Cloud Compute / Claude API) | 端末内だけで作る。端末外へ送る構成は実装しない (documents/adr/0002-process-on-device-without-backend.md。Status は Proposed) |
-| 課金の残り: 値段 (月額・年額・買い切り) と、何を有料にするか (無料で使える範囲)。agent の提案 (`documents/research/pricing-2026-11-18.md`「提案」。https://github.com/bannzai/poppo/issues/1 にコメントした) への同意 | 同意が issue に残るまで、課金を実装しない (RevenueCat の project も作らない) |
-| 一覧から会話を開いて時点を送る形 (`documents/design/mock-2026-11-18-history/index.html`。https://github.com/bannzai/poppo/issues/10 で聞いている) で決まっていないこと: 会話の画面のページの中身 (発言を組み直したページか、読み取った時の画面の画像と翻訳か)、読み取った内容を残す期間と消す操作、画面の画像を残すか | 画面の作りを変えない。読み取った内容は今のまま残さない |
+| 課金の残り: 何を有料にするか (無料で使える範囲)。agent の提案は、無料 = スクリーンショットからの読み取り (利用者が自分で撮ったスクリーンショットを本体アプリで選ぶ使い方)、有料 = 取り込みとキーボード (ScreenCaptureKit で画面を読み続け、キーボードに出す使い方)。`documents/research/pricing-2026-11-18.md`「提案」。https://github.com/bannzai/poppo/issues/1 で聞いている | 同意が issue に残るまで、課金を実装しない (RevenueCat の project も作らない) |
+| 一覧から会話を開いて時点を送る形 (`documents/design/mock-2026-11-18-history/index.html`。https://github.com/bannzai/poppo/issues/10 で聞いている) で決まっていないこと: 読み取った時の画面の画像と翻訳を置く場所 (本体アプリの中 / 利用者の写真ライブラリ / サーバー)、残す期間 (14 日の案が出ている) と消す操作、動画も残すか | 画面の作りを変えない。読み取った内容は今のまま残さない。サーバーへ送る構成は実装しない |
 | 作る順番 | スクリーンショットからの読み取りを最初に作る。前面だけで動き、読み取り → 翻訳 → 返信案の処理を取り込みより先に実機で確かめられるため。この処理は取り込みでもそのまま使う |
 
 ## agent に任せること
