@@ -28,7 +28,11 @@ struct KeyboardView: View {
         // 280 では直前の発言が 30pt ほどしか見えなかった。実機での見え方を確かめて決め直す (documents/DIRECTION.md「決めたこと」)
         .frame(height: 340)
         .poppoThemed()
-        .background(.poppoBackground)
+        // 地は角を丸めた板にして、左右を少し空ける。システムが敷くキーボードの地は上の角が丸く、
+        // 四角い地を端まで敷くと角からはみ出して帯に見えた (simulator の画面で確かめた)。
+        // 24: 中のカードの角 (poppoCardCornerRadius) に、カードまでの余白のぶんを足して、内と外の丸みをそろえる
+        .background(.poppoBackground, in: .rect(cornerRadius: 24))
+        .padding(.horizontal, 4)
     }
 }
 
