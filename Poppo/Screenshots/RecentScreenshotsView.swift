@@ -123,8 +123,8 @@ struct RecentScreenshotsView: View {
                             screenshot.creationDate.map {
                                 Text($0, format: Date.FormatStyle(date: .abbreviated, time: .shortened))
                             }
-                            // ja: スクリーンショット
-                            ?? Text("Screenshot")
+                                // ja: スクリーンショット
+                                ?? Text("Screenshot")
                         )
                     }
                 }

@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import Testing
+
 @testable import Poppo
 
 /// テスト用の取り込みの実体。start と stop が呼ばれた回数を数えるだけで、画面は取り込まない。
@@ -119,13 +120,14 @@ func makeScreenCaptureController(
 
     #expect(controller.status == .capturing)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 1000),
-            stoppedAt: nil,
-            stopReason: nil,
-            lastFrameReceivedAt: nil,
-            receivedFrameCount: 0
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 1000),
+                stoppedAt: nil,
+                stopReason: nil,
+                lastFrameReceivedAt: nil,
+                receivedFrameCount: 0
+            )
     )
     #expect(loadScreenCaptureDiagnostics(fileURL: diagnosticsFileURL) == controller.diagnostics)
 }
@@ -213,13 +215,14 @@ func makeScreenCaptureController(
     #expect(controller.status == .stopped)
     #expect(source.stopCallCount == 1)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 1000),
-            stoppedAt: Date(timeIntervalSinceReferenceDate: 1060),
-            stopReason: .stoppedInApp,
-            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 1001),
-            receivedFrameCount: 1
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 1000),
+                stoppedAt: Date(timeIntervalSinceReferenceDate: 1060),
+                stopReason: .stoppedInApp,
+                lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 1001),
+                receivedFrameCount: 1
+            )
     )
     #expect(loadScreenCaptureDiagnostics(fileURL: diagnosticsFileURL) == controller.diagnostics)
     #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
@@ -284,13 +287,14 @@ func makeScreenCaptureController(
 
     #expect(controller.status == .failed)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 1000),
-            stoppedAt: Date(timeIntervalSinceReferenceDate: 1045),
-            stopReason: .error("com.apple.ScreenCaptureKit.SCStreamErrorDomain -3824: missing background mode"),
-            lastFrameReceivedAt: nil,
-            receivedFrameCount: 0
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 1000),
+                stoppedAt: Date(timeIntervalSinceReferenceDate: 1045),
+                stopReason: .error("com.apple.ScreenCaptureKit.SCStreamErrorDomain -3824: missing background mode"),
+                lastFrameReceivedAt: nil,
+                receivedFrameCount: 0
+            )
     )
     #expect(loadScreenCaptureDiagnostics(fileURL: diagnosticsFileURL) == controller.diagnostics)
     #expect(loadLatestReading(fileURL: latestReadingFileURL) == nil)
@@ -314,13 +318,14 @@ func makeScreenCaptureController(
 
     #expect(controller.status == .failed)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: nil,
-            stoppedAt: Date(timeIntervalSinceReferenceDate: 1000),
-            stopReason: .error("picker failed"),
-            lastFrameReceivedAt: nil,
-            receivedFrameCount: 0
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: nil,
+                stoppedAt: Date(timeIntervalSinceReferenceDate: 1000),
+                stopReason: .error("picker failed"),
+                lastFrameReceivedAt: nil,
+                receivedFrameCount: 0
+            )
     )
     #expect(loadLatestReading(fileURL: latestReadingFileURL) != nil)
 }
@@ -356,13 +361,14 @@ func makeScreenCaptureController(
     #expect(source.startCallCount == 2)
     #expect(controller.status == .capturing)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 2000),
-            stoppedAt: nil,
-            stopReason: nil,
-            lastFrameReceivedAt: nil,
-            receivedFrameCount: 0
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 2000),
+                stoppedAt: nil,
+                stopReason: nil,
+                lastFrameReceivedAt: nil,
+                receivedFrameCount: 0
+            )
     )
 }
 
@@ -390,13 +396,14 @@ func makeScreenCaptureController(
 
     #expect(controller.status == .notStarted)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 500),
-            stoppedAt: nil,
-            stopReason: nil,
-            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 620),
-            receivedFrameCount: 42
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 500),
+                stoppedAt: nil,
+                stopReason: nil,
+                lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 620),
+                receivedFrameCount: 42
+            )
     )
 }
 
@@ -509,13 +516,14 @@ func makeScreenCaptureController(
 
     #expect(controller.status == .capturing)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 1000),
-            stoppedAt: nil,
-            stopReason: nil,
-            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 1001),
-            receivedFrameCount: 1
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 1000),
+                stoppedAt: nil,
+                stopReason: nil,
+                lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 1001),
+                receivedFrameCount: 1
+            )
     )
 }
 
@@ -555,13 +563,14 @@ func makeScreenCaptureController(
 
     #expect(controller.status == .failed)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: nil,
-            stoppedAt: Date(timeIntervalSinceReferenceDate: 2000),
-            stopReason: .error("picker failed"),
-            lastFrameReceivedAt: nil,
-            receivedFrameCount: 0
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: nil,
+                stoppedAt: Date(timeIntervalSinceReferenceDate: 2000),
+                stopReason: .error("picker failed"),
+                lastFrameReceivedAt: nil,
+                receivedFrameCount: 0
+            )
     )
 }
 
@@ -580,13 +589,14 @@ func makeScreenCaptureController(
     #expect(source.startCallCount == 2)
     #expect(controller.status == .capturing)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 2000),
-            stoppedAt: nil,
-            stopReason: nil,
-            lastFrameReceivedAt: nil,
-            receivedFrameCount: 0
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 2000),
+                stoppedAt: nil,
+                stopReason: nil,
+                lastFrameReceivedAt: nil,
+                receivedFrameCount: 0
+            )
     )
 }
 
@@ -621,13 +631,14 @@ func makeScreenCaptureController(
     )
 
     #expect(
-        loadScreenCaptureDiagnostics(fileURL: fileURL) == ScreenCaptureDiagnostics(
-            startedAt: Date(timeIntervalSinceReferenceDate: 500),
-            stoppedAt: Date(timeIntervalSinceReferenceDate: 560),
-            stopReason: .error("stream failed"),
-            lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 559),
-            receivedFrameCount: 7
-        )
+        loadScreenCaptureDiagnostics(fileURL: fileURL)
+            == ScreenCaptureDiagnostics(
+                startedAt: Date(timeIntervalSinceReferenceDate: 500),
+                stoppedAt: Date(timeIntervalSinceReferenceDate: 560),
+                stopReason: .error("stream failed"),
+                lastFrameReceivedAt: Date(timeIntervalSinceReferenceDate: 559),
+                receivedFrameCount: 7
+            )
     )
 }
 
@@ -814,13 +825,14 @@ func makeScreenCaptureController(
 
     #expect(controller.status == .failed)
     #expect(
-        controller.diagnostics == ScreenCaptureDiagnostics(
-            startedAt: nil,
-            stoppedAt: Date(timeIntervalSinceReferenceDate: 1000),
-            stopReason: .error("ScreenCaptureKit is not available in this environment (iOS Simulator)"),
-            lastFrameReceivedAt: nil,
-            receivedFrameCount: 0
-        )
+        controller.diagnostics
+            == ScreenCaptureDiagnostics(
+                startedAt: nil,
+                stoppedAt: Date(timeIntervalSinceReferenceDate: 1000),
+                stopReason: .error("ScreenCaptureKit is not available in this environment (iOS Simulator)"),
+                lastFrameReceivedAt: nil,
+                receivedFrameCount: 0
+            )
     )
 }
 #endif

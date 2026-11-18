@@ -20,12 +20,12 @@ nonisolated func replyPrompt(messages: [ExtractedMessage]) -> String {
 func generateReplyTexts(messages: [ExtractedMessage]) async throws -> [String] {
     try await LanguageModelSession(
         instructions: """
-        You help a person reply in a chat. The chat is listed from oldest to newest. \
-        Lines starting with "Me:" were written by the person you help. \
-        Lines starting with "Them:" were written by other people. \
-        Write replies that the person could send next in response to the latest "Them:" lines. \
-        Write every reply in the same language as the "Them:" lines.
-        """
+            You help a person reply in a chat. The chat is listed from oldest to newest. \
+            Lines starting with "Me:" were written by the person you help. \
+            Lines starting with "Them:" were written by other people. \
+            Write replies that the person could send next in response to the latest "Them:" lines. \
+            Write every reply in the same language as the "Them:" lines.
+            """
     )
     .respond(to: replyPrompt(messages: messages), generating: GeneratedReplyTexts.self)
     .content

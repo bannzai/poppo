@@ -32,16 +32,16 @@ struct ContentView: View {
                     }
                 }
                 #if DEBUG
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink {
-                            DebugMenuView()
-                        } label: {
-                            Image(systemName: "ladybug")
-                        }
-                        .accessibilityIdentifier("debug_menu_button")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        DebugMenuView()
+                    } label: {
+                        Image(systemName: "ladybug")
                     }
+                    .accessibilityIdentifier("debug_menu_button")
                 }
+            }
                 #endif
         }
         .safeAreaInset(edge: .bottom) {

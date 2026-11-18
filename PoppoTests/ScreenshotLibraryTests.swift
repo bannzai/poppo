@@ -1,5 +1,6 @@
 import Photos
 import Testing
+
 @testable import Poppo
 
 /// 写真ライブラリへの問い合わせが、スクリーンショットの種別を持つ写真だけを選ぶこと。
@@ -10,7 +11,7 @@ import Testing
     #expect(predicate.evaluate(with: ["mediaSubtypes": PHAssetMediaSubtype.photoScreenshot.rawValue]))
     #expect(
         predicate.evaluate(with: [
-            "mediaSubtypes": PHAssetMediaSubtype.photoScreenshot.union(.photoHDR).rawValue,
+            "mediaSubtypes": PHAssetMediaSubtype.photoScreenshot.union(.photoHDR).rawValue
         ])
     )
     #expect(!predicate.evaluate(with: ["mediaSubtypes": PHAssetMediaSubtype.photoLive.rawValue]))
