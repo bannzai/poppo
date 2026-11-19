@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poppo 読み取った時点を残す型の案 (2026-11-19)</title>
+<style>
+  /* 保存する型の案を、型定義・利用者の操作の表・見てほしい点の順に 1 ページで見せる。色は 2026-11-17 のモックと同じ */
+  body { margin: 0; padding: 24px 16px 64px; background: #E9ECF1; color: #14171C; font: 15px/1.8 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
+  main { max-width: 60em; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 22px; line-height: 1.4; }
+  h2 { margin: 40px 0 8px; font-size: 18px; line-height: 1.4; }
+  p, ul, ol { margin: 0 0 12px; }
+  .lead { color: #4A5361; }
+  pre { margin: 0 0 12px; padding: 14px 16px; border-radius: 10px; background: #1F2430; color: #E9ECF1; font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; }
+  code { font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .table-scroll { overflow-x: auto; margin: 0 0 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; background: #FFFFFF; font-size: 14px; line-height: 1.7; }
+  th, td { padding: 8px 12px; border: 1px solid #DFE3EA; text-align: left; vertical-align: top; }
+  th { background: #F3F5F8; white-space: nowrap; }
+  .ask { padding: 12px 16px; border-radius: 10px; border: 1px solid #C9D0DB; background: #FFFFFF; margin: 0 0 12px; }
+  .ask h3 { margin: 0 0 4px; font-size: 15px; line-height: 1.5; }
+  .ask p:last-child, .ask ul:last-child { margin-bottom: 0; }
+  .session-origin { background: #FFFFFF; color: #4A5361; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<main>
+<h1>Poppo 読み取った時点を残す型の案 (2026-11-19)</h1>
+<aside class="session-origin" style="font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid #d0d7de;border-radius:6px;padding:8px 12px;margin:0 0 16px">
+<div>tmux window: 2.1.327 (poppo:0)</div>
+<div>セッション再開:</div>
+<pre style="margin:4px 0 0;white-space:pre-wrap;background:none;color:inherit;padding:0">cd /Users/bannzai/ghq/github.com/bannzai/poppo
+claude --resume 71380c24-41f9-4422-8999-303bc71ea3d7</pre>
+</aside>
+<p class="lead">決まったこと (読み取った時の画面の画像と翻訳を、本体アプリの中に置いて 14 日で自動で消す。一覧 → アプリ × チャンネルごとの会話 → 読み取った時点のページ送り) を保存するための型の案。公開した後は保存済みのデータがあって変えにくくなるので、実装の前に見てもらう。下の「見てほしい点」の 4 つに返答をもらってから、実装の issue を起票する。</p>
+
+<h2>型定義 (Swift)</h2>
+<p>新しく定義するのは <code>ReadingMoment</code>・<code>ChatHeader</code>・<code>ReadingMomentSource</code> の 3 つ。<code>LatestReading</code> (キーボードに渡す読み取り結果) と <code>ReplySuggestion</code> は今ある型をそのまま使う。<code>LatestReading</code> は名前が「最新」だが、読んだ時刻・発言・返信案という中身が同じなので、同じ項目の型を 2 つ作らずに過去の時点にも使う。<code>TranslatedMessage</code> には項目を 1 つ足す (下)。</p>
+<pre>/// 読み取った時点。画面を 1 回読んだ時の、画面の画像と、その時に読んだ発言・翻訳・返信案の組。
+/// 本体アプリの中 (端末) に置き、読んでから 14 日が過ぎたものは消す。キーボードからは読まない
+struct ReadingMoment: Codable, Identifiable {
+    /// 読み取った時点ごとに振る識別子。画面の画像のファイル名にも使う
+    let id: UUID
+    /// その時に画面から読んだ発言と、その翻訳と、返信案。画面を読んだ時刻 (capturedAt) もこの中にある
+    let reading: LatestReading
+    /// どのアプリのどのチャットの画面だったか。画面の上部からチャットの名前を読めなかった時は nil で、
+    /// 一覧では「チャットを読み取れなかった画面」の 1 行にまとめる
+    let chatHeader: ChatHeader?
+    /// 読んだ画面の出どころ
+    let source: ReadingMomentSource
+}
+
+/// 画面の上部から読んだ、チャットの見出し。一覧の行と、会話の画面のまとまりを決める。
+/// まとめる時の比べ方は「見てほしい点 3」(保存するのは読んだままの文字で、比べる時に空白と大文字小文字をそろえる)
+struct ChatHeader: Codable {
+    /// アプリの名前 (「Slack」「Discord」など)。分からなかった時は nil
+    let appName: String?
+    /// 画面の上部から読んだままの、チャンネル名か相手の名前 (「#release-team」「Alex」など)
+    let chatTitle: String
+}
+
+/// 読み取った時点の画面が、どこから来たか
+enum ReadingMomentSource: Codable {
+    /// 取り込みの間に本体アプリが読んだ画面
+    case capture
+    /// 利用者が自分で撮って本体アプリで選んだスクリーンショット
+    case screenshot
+}</pre>
+<p>今ある型に足す項目 (新しい型ではない)。<code>TranslatedMessage</code> は <code>LatestReading</code> の中に入っているので、キーボードに渡す読み取り結果にも発言した人の名前が入る:</p>
+<pre>struct TranslatedMessage: Codable {
+    let originalText: String
+    let translatedText: String
+    /// 発言した人の名前。画面から読めなかった時は nil
+    let speakerName: String?   // ← 足す。「人物ごとに分かれている感じ」のため
+}</pre>
+<p>置く場所: 本体アプリのコンテナの <code>Application Support/ReadingMoments/</code>。読み取った時点ごとに <code>&lt;id&gt;.json</code> (<code>ReadingMoment</code>) と <code>&lt;id&gt;.jpg</code> (画面の画像) の 2 つのファイルを置く。キーボードと共有する場所 (App Group) には置かない。</p>
+
+<h2>利用者の操作と、読み書きするデータ</h2>
+<div class="table-scroll">
+<table>
+<thead><tr><th>利用者の操作</th><th>起きること</th><th>読み書きするデータ</th></tr></thead>
+<tbody>
+<tr><td>取り込みを始めて、チャットアプリを開く</td><td>本体アプリが画面を読むたびに、読み取った時点を 1 つ足す</td><td><code>ReadingMoment</code> を 1 つ書く (source = capture)。キーボードに渡す <code>LatestReading</code> は今までどおり上書きする</td></tr>
+<tr><td>キーボードを Poppo に切り替える</td><td>直前の翻訳と返信案が出る (今と同じ)</td><td><code>LatestReading</code> を読む。<code>ReadingMoment</code> は読まない</td></tr>
+<tr><td>取り込みを止める</td><td>キーボードに渡す読み取り結果は消える (今と同じ)。読み取った時点は残る</td><td><code>LatestReading</code> を消す。<code>ReadingMoment</code> は変えない</td></tr>
+<tr><td>スクリーンショットを選んで読む</td><td>翻訳と返信案が出る (今と同じ)。読み取った時点を 1 つ足す (見てほしい点 2)</td><td><code>ReadingMoment</code> を 1 つ書く (source = screenshot)</td></tr>
+<tr><td>本体アプリを開く</td><td>一覧が出る。アプリごとにチャットが並び、行に読み取りの回数と最後に読んだ時が出る</td><td>すべての <code>ReadingMoment</code> を読み、<code>appName</code> が同じで、<code>chatTitle</code> が空白と大文字小文字をそろえると同じになるものを 1 行にまとめる</td></tr>
+<tr><td>一覧の行を押す</td><td>会話の画面が開く。読み取った時点ごとに 1 ページで、画面の画像と翻訳と返信案が出る。横に送ると前の時点に移る</td><td>その行にまとめた <code>ReadingMoment</code> を <code>capturedAt</code> の順に読み、<code>&lt;id&gt;.jpg</code> を出す</td></tr>
+<tr><td>(操作なし) 読んでから 14 日が過ぎる</td><td>その読み取った時点が消え、一覧と会話の画面から無くなる</td><td>本体アプリを開いた時と取り込みを始めた時に、14 日を過ぎた <code>ReadingMoment</code> と画像を消す。本体アプリを開かない間は、14 日を過ぎても端末に残る (プライバシーポリシーにはこの形で書く)</td></tr>
+<tr><td>設定で「読み取った内容をすべて消す」を押す</td><td>すべての読み取った時点と、キーボードに渡す読み取り結果が消える</td><td><code>ReadingMoments/</code> の中身と <code>LatestReading</code> を消す</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>見てほしい点</h2>
+
+<div class="ask">
+<h3>1. 動画を、何の単位で残して、どこで見せるか</h3>
+<p>「動画も含めて」を、取り込みの間の画面の動画も残す、と読んだ。上の型には動画をまだ入れていない。何を残すかで型が変わるため。</p>
+<ul>
+<li>案 A (勧め): 取り込みを始めてから止めるまでを 1 本の動画にして残し、会話の画面のページから「この時点の前後の動画を見る」で開く。型は、取り込み 1 回ごとの <code>CaptureRecording</code> (始めた時刻・止めた時刻・動画のファイル名) を足し、<code>ReadingMoment</code> が取り込みの中の何秒目かを持つ</li>
+<li>案 B: 動画は残さず、読み取った時点の画像を増やす (画面が変わるたびに読む)</li>
+</ul>
+<p>分かっていること: iOS 27 の SDK に、取り込みを動画のファイルに書き出す API がある。分かっていないこと: 本体アプリが背面にいる間も書き出せるか、14 日分の大きさ、電池への影響 (どれも実機で測る)。動画は、チャット以外の画面 (ホーム画面・ほかのアプリ・通知) も取り込みの間はすべて残る。</p>
+</div>
+
+<div class="ask">
+<h3>2. 無料の利用者のスクリーンショットからの読み取りも残して、一覧に出すか</h3>
+<p>一覧が本体アプリの入口で、agent の読みでは「一覧と会話の画面」は有料 (有料の範囲は、中身を 1 文で言い直してもらうのを待っている)。このままだと、無料の利用者には入口の一覧が空になる。</p>
+<ul>
+<li>案 A (勧め): スクリーンショットから読んだ時点も残し、無料の利用者も一覧と会話の画面で見られる。有料との違いは、取り込みとキーボード (と動画) で付ける。agent が聞き直した有料の範囲の表から「一覧と会話の画面 = 有料」を外すことになる</li>
+<li>案 B: 無料の利用者は残さない (今と同じで、読んだその場で見るだけ)。一覧には「取り込みを始める」と「スクリーンショットから読む」だけが出る</li>
+</ul>
+</div>
+
+<div class="ask">
+<h3>3. アプリとチャットの分け方</h3>
+<p>iOS は、取り込みの間に前面のアプリが何かを教えてくれない (ScreenCaptureKit の該当の API が iOS で使えない)。そのため、チャットの名前は画面の上部の文字から読み、同じ文字なら同じチャットとして 1 行にまとめる。</p>
+<ul>
+<li>空白と大文字小文字だけが違う時 (「#release-team」と「# Release-Team」) は同じチャットとみなす。文字そのものを読み違えた時 (「#release-team」と「#re1ease-team」) は別の行になる。似た名前をまとめる寄せ方はしない</li>
+<li>同じチャットでも、アプリの名前を判定できた回とできなかった回は別の行になる (判定できなかった回は「アプリを判定できなかったチャット」の見出しの下に出る)</li>
+<li>アプリの名前 (<code>appName</code>) は、画面の見た目から決められた時だけ入れる。決められない時は nil で、一覧では「アプリを判定できなかったチャット」の見出しの下に並べる。利用者に選んでもらう操作は最初は作らない</li>
+<li>発言した人の名前も画面の文字から読むので、読めない画面では人物ごとに分かれない</li>
+</ul>
+</div>
+
+<div class="ask">
+<h3>4. 型に入れなかったもの</h3>
+<ul>
+<li>写真ライブラリの元の画像への参照: スクリーンショットから読んだ時点も、画像を本体アプリの中に写して置く。置く場所を 1 つにして、14 日で消す・全部消すを同じ仕組みにするため</li>
+<li>お気に入り・メモ・検索: 頼まれていないので入れていない</li>
+<li>端末をまたぐ同期: 端末の外へ出さない方針のため入れていない</li>
+</ul>
+</div>
+</main>
+</body>
+</html>
