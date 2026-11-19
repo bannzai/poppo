@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Poppo 読み取った時点を残す型の案 (2026-11-19)</title>
 <style>
-  /* 保存する型の案を、型定義・利用者の操作の表・見てほしい点の順に 1 ページで見せる。色は 2026-11-17 のモックと同じ */
+  /* 保存する型の案を、型定義・利用者の操作の表・agent が決めたこと・確かめていないこと・最初の案から変えた所の順に 1 ページで見せる。色は 2026-11-17 のモックと同じ */
   body { margin: 0; padding: 24px 16px 64px; background: #E9ECF1; color: #14171C; font: 15px/1.8 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
   main { max-width: 60em; margin: 0 auto; }
   h1 { margin: 0 0 8px; font-size: 22px; line-height: 1.4; }
@@ -18,9 +18,6 @@
   table { border-collapse: collapse; width: 100%; min-width: 640px; background: #FFFFFF; font-size: 14px; line-height: 1.7; }
   th, td { padding: 8px 12px; border: 1px solid #DFE3EA; text-align: left; vertical-align: top; }
   th { background: #F3F5F8; white-space: nowrap; }
-  .ask { padding: 12px 16px; border-radius: 10px; border: 1px solid #C9D0DB; background: #FFFFFF; margin: 0 0 12px; }
-  .ask h3 { margin: 0 0 4px; font-size: 15px; line-height: 1.5; }
-  .ask p:last-child, .ask ul:last-child { margin-bottom: 0; }
   .session-origin { background: #FFFFFF; color: #4A5361; box-sizing: border-box; }
 </style>
 </head>
@@ -33,7 +30,7 @@
 <pre style="margin:4px 0 0;white-space:pre-wrap;background:none;color:inherit;padding:0">cd /Users/bannzai/ghq/github.com/bannzai/poppo
 claude --resume 71380c24-41f9-4422-8999-303bc71ea3d7</pre>
 </aside>
-<p class="lead">決まったこと (読み取った時の画面の画像と翻訳を本体アプリの中に置いて 14 日で自動で消す。一覧 → チャットごとの会話 → 読み取った時点のページ送り。動画・メモ・検索・写真ライブラリへの参照を入れる。同期は入れない) を保存するための型。2026-11-19 の返答を受けて、最初の案から作り直した。変えた所は末尾の「最初の案から変えた所」にある。動画の単位・無料の利用者の分も残すこと・検索とメモは、貼り付けた文として届いた返答を agent が読んだもので、確認の 1 文をもらってから実装の issue を起票する。</p>
+<p class="lead">決まったこと (読み取った時の画面の画像と翻訳を本体アプリの中に置いて 14 日で自動で消す。一覧 → チャットごとの会話 → 読み取った時点のページ送り。写真ライブラリへの参照を入れる。同期は入れない) と、確認待ちの返答 (動画・メモ・検索・無料の利用者の分も残す) を保存するための型。2026-11-19 の返答を受けて、最初の案から作り直した。変えた所は末尾の「最初の案から変えた所」にある。動画の単位・無料の利用者の分も残すこと・検索とメモは、貼り付けた文として届いた返答を agent が読んだもので、確認の 1 文をもらってから実装の issue を起票する。</p>
 
 <h2>型定義 (Swift)</h2>
 <p>新しく定義するのは <code>ReadingMoment</code>・<code>ScreenImage</code>・<code>RecordingPosition</code>・<code>Chat</code>・<code>ChatSection</code>・<code>CaptureRecording</code> の 6 つ。<code>LatestReading</code> (キーボードに渡す読み取り結果) と <code>ReplySuggestion</code> は今ある型をそのまま使う。<code>LatestReading</code> は名前が「最新」だが、読んだ時刻・発言・返信案という中身が同じなので、同じ項目の型を 2 つ作らずに過去の時点にも使う。<code>TranslatedMessage</code> には項目を 1 つ足す (下)。</p>
@@ -122,11 +119,12 @@ struct CaptureRecording: Codable, Identifiable {
 <tr><td>チャットアプリを開いたままにする</td><td>本体アプリが画面を読むたびに、キーボードに渡す読み取り結果を上書きする (今と同じ)。会話が大きく変わった時だけ、読み取った時点を 1 つ足す</td><td><code>LatestReading</code> を上書きする。会話が大きく変わった時に <code>ReadingMoment</code> を 1 つ書く (screenImage = appContainerFile、recordingPosition あり)。チャットの名前が初めてのものなら <code>Chat</code> を 1 つ書く</td></tr>
 <tr><td>キーボードを Poppo に切り替える</td><td>直前の翻訳と返信案が出る (今と同じ)</td><td><code>LatestReading</code> を読む。ほかの型は読まない</td></tr>
 <tr><td>取り込みを止める</td><td>キーボードに渡す読み取り結果は消える (今と同じ)。読み取った時点と動画は残る</td><td><code>LatestReading</code> を消す。動画の書き出しを終える (<code>CaptureRecording</code> は変えない)</td></tr>
-<tr><td>(操作なし) 取り込みがエラーで止まる・アプリの外で止められる</td><td>キーボードに渡す読み取り結果は、今と同じく止まった時に消える。動画は、書き出せた所までが残る</td><td><code>LatestReading</code> を消す。<code>CaptureRecording</code> は変えない</td></tr>
-<tr><td>(操作なし) 取り込みの途中で本体アプリが終了する</td><td>動画は、書き出せた所までが残る。キーボードに渡す読み取り結果は、その時には消せないため、今と同じく次に本体アプリを開いた時に消える</td><td><code>CaptureRecording</code> は変えない (終わった時刻を持たないので、止める操作を通らなくても、途中のままの記録にならない)。再生できない動画のファイルは、次に本体アプリを開いた時に <code>CaptureRecording</code> と一緒に消す</td></tr>
-<tr><td>スクリーンショットを選んで読む</td><td>翻訳と返信案が出る (今と同じ)。読み取った時点を 1 つ足す。無料の利用者でも残る</td><td><code>ReadingMoment</code> を 1 つ書く (screenImage = photoLibraryAsset、recordingPosition = nil)。画像は写さない</td></tr>
+<tr><td>(操作なし) 取り込みがエラーで止まる・アプリの外で止められる</td><td>キーボードに渡す読み取り結果は、今と同じく止まった時に消える。動画のファイルが再生できる形で残るかは、実機で確かめる</td><td><code>LatestReading</code> を消す。<code>CaptureRecording</code> は変えない</td></tr>
+<tr><td>(操作なし) 取り込みの途中で本体アプリが終了する</td><td>動画のファイルが再生できる形で残るかは、実機で確かめる。キーボードに渡す読み取り結果は、その時には消せないため、今と同じく次に本体アプリを開いた時に消える</td><td><code>CaptureRecording</code> は変えない (終わった時刻を持たないので、止める操作を通らなくても、途中のままの記録にならない)。再生できない動画のファイルは、次に本体アプリを開いた時に <code>CaptureRecording</code> と一緒に消す</td></tr>
+<tr><td>スクリーンショットを選んで読む</td><td>翻訳と返信案が出る (今と同じ)。読み取った時点を 1 つ足す。無料の利用者でも残る</td><td><code>ReadingMoment</code> を 1 つ書く (screenImage = photoLibraryAsset、recordingPosition = nil)。画像は写さない。取り込みと同じく、画面の上部の名前で <code>Chat</code> を探して chatID に入れ、初めての名前なら <code>Chat</code> を 1 つ書く</td></tr>
 <tr><td>本体アプリを開く</td><td>一覧が出る。利用者が作ったセクションごとにチャットが並び、行に読み取りの回数と最後に読んだ時が出る</td><td><code>ChatSection</code>・<code>Chat</code>・<code>ReadingMoment</code> を読む</td></tr>
 <tr><td>一覧でセクションを作る・名前を変える・チャットを移す</td><td>一覧の分け方が変わる</td><td><code>ChatSection</code> を書く。<code>Chat</code> の sectionID を書き換える</td></tr>
+<tr><td>一覧でセクションを消す</td><td>セクションが無くなり、中にあったチャットは一覧の先頭 (セクションに置いていないチャット) に戻る。チャットと読み取った時点は消えない</td><td>その <code>ChatSection</code> を消し、それを指していた <code>Chat</code> の sectionID を nil に書き換える</td></tr>
 <tr><td>チャットの名前を書き換える</td><td>一覧と会話の画面の名前が変わる。その後に読んだ同じチャットの画面も、同じ行に入る</td><td><code>Chat</code> の title を書き換える (titleReadFromScreen は変えない)</td></tr>
 <tr><td>一覧の行を押す</td><td>会話の画面が開く。読み取った時点ごとに 1 ページで、画面の画像と翻訳と返信案とメモが出る。横に送ると前の時点に移る</td><td>その <code>chatID</code> の <code>ReadingMoment</code> を <code>capturedAt</code> の順に読み、<code>screenImage</code> の画像を出す</td></tr>
 <tr><td>ページで「この時点の動画を見る」を押す</td><td>取り込みの動画が、その時点の位置から再生される</td><td><code>recordingPosition</code> の <code>CaptureRecording</code> の動画を読む。その <code>CaptureRecording</code> か動画のファイルが無い時 (14 日で先に消えた・再生できずに消した) は、この操作をページに出さない。画像・翻訳・返信案・メモは今までどおり出る</td></tr>
@@ -150,6 +148,7 @@ struct CaptureRecording: Codable, Identifiable {
 <h2>確かめていないこと (実機で測る)</h2>
 <ul>
 <li>本体アプリが背面にいる間も、取り込みの動画を書き出せるか。iOS 27 の SDK に書き出す API があることだけ確かめた</li>
+<li>取り込みがエラーや本体アプリの終了で途中で終わった時、動画のファイルが再生できるか</li>
 <li>動画と画像の 14 日分の大きさと、電池への影響。大きすぎる時は、動画だけ期間を短くする案を出す</li>
 <li>写真ライブラリの元の画像を、後から読み直せるか (スクリーンショットからの読み取りは、今も写真ライブラリの読み書きの許可を求めている)</li>
 <li>動画は、チャット以外の画面 (ホーム画面・ほかのアプリ・通知) も取り込みの間はすべて残る</li>
@@ -160,10 +159,10 @@ struct CaptureRecording: Codable, Identifiable {
 <table>
 <thead><tr><th>返答</th><th>変えた所</th></tr></thead>
 <tbody>
-<tr><td>動画は取り込み 1 回で 1 本。会話が大きく変わった所で 1 ページ</td><td><code>CaptureRecording</code> と <code>RecordingPosition</code> を足した。読み取った時点を作るのを、画面を読むたびではなく、会話が大きく変わった時にした</td></tr>
-<tr><td>無料の利用者の分も残す</td><td>スクリーンショットから読んだ時点を、無料の利用者でも残す</td></tr>
+<tr><td>動画は取り込み 1 回で 1 本。会話が大きく変わった所で 1 ページ (貼り付けた文として届いた返答。確認待ち)</td><td><code>CaptureRecording</code> と <code>RecordingPosition</code> を足した。読み取った時点を作るのを、画面を読むたびではなく、会話が大きく変わった時にした</td></tr>
+<tr><td>無料の利用者の分も残す (貼り付けた文として届いた返答。確認待ち)</td><td>スクリーンショットから読んだ時点を、無料の利用者でも残す</td></tr>
 <tr><td>チャンネル名や相手の名前は個別に設定できる。一覧は「どのアプリか」などを自由にセクション分けできる。会話の画面は画像を載せる</td><td><code>ChatHeader</code> (アプリの名前を画面から判定する) をやめ、<code>Chat</code> (名前を書き換えられる) と <code>ChatSection</code> (利用者が作る) にした。画面の形 (吹き出し・スレッド・SNS) ごとの作り分けは、画像を載せるので入れていない</td></tr>
-<tr><td>写真ライブラリへの参照・検索・メモが欲しい。同期は入れない</td><td><code>ScreenImage</code> (写真ライブラリの元の画像を指す) と memo を足した。出どころを表していた <code>ReadingMomentSource</code> は、<code>ScreenImage</code> から分かるのでやめた。検索は型を足さない。同期は入れていない</td></tr>
+<tr><td>写真ライブラリへの参照は元の画像を指す。同期は入れない。検索・メモが欲しい (検索とメモは、貼り付けた文として届いた返答。確認待ち)</td><td><code>ScreenImage</code> (写真ライブラリの元の画像を指す) と memo を足した。出どころを表していた <code>ReadingMomentSource</code> は、<code>ScreenImage</code> から分かるのでやめた。検索は型を足さない。同期は入れていない</td></tr>
 </tbody>
 </table>
 </div>
