@@ -23,7 +23,7 @@
 3. 入力欄でキーボードを Poppo に切り替えると、直前の翻訳と返信案が出る
 4. 返信案をタップすると、その文が入力欄に入る
 
-翻訳と返信案の生成は端末内で行う構成で作り始める。返信案を作る場所 (端末内だけか、端末の外のモデルも使うか) は owner の返答待ちで、決まるまでの進め方は [documents/DIRECTION.md](documents/DIRECTION.md) の「bannzai の返答を待っていること」に書いてある。
+翻訳と返信案の生成は端末内で行う構成で作り始める。端末の外のモデル (Private Cloud Compute・Claude・Gemini など) も使えるようにすると決まったが、まだ実装しておらず、今の版は端末内だけで作る。費用の許容など owner の返答待ちの点と、決まるまでの進め方は [documents/DIRECTION.md](documents/DIRECTION.md) の「bannzai の返答を待っていること」に書いてある。
 
 ## 使う技術
 
