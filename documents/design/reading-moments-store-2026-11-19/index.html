@@ -49,7 +49,9 @@ struct ReadingMoment: Codable, Identifiable {
     let chatID: UUID?
     /// 読み取った時の画面の画像がどこにあるか
     let screenImage: ScreenImage
-    /// 取り込みの動画の中の位置。スクリーンショットから読んだ時点は nil
+    /// 取り込みの動画の中の位置。スクリーンショットから読んだ時点は nil。
+    /// 指している動画が先に消えた時 (動画は取り込みを始めてから 14 日で消える) も、この値は書き換えない。
+    /// 動画が無い時は「この時点の動画を見る」を出さない
     let recordingPosition: RecordingPosition?
     /// 利用者がこの時点に付けたメモ。付けていない時は nil
     var memo: String?
@@ -126,7 +128,7 @@ struct CaptureRecording: Codable, Identifiable {
 <tr><td>一覧でセクションを作る・名前を変える・チャットを移す</td><td>一覧の分け方が変わる</td><td><code>ChatSection</code> を書く。<code>Chat</code> の sectionID を書き換える</td></tr>
 <tr><td>チャットの名前を書き換える</td><td>一覧と会話の画面の名前が変わる。その後に読んだ同じチャットの画面も、同じ行に入る</td><td><code>Chat</code> の title を書き換える (titleReadFromScreen は変えない)</td></tr>
 <tr><td>一覧の行を押す</td><td>会話の画面が開く。読み取った時点ごとに 1 ページで、画面の画像と翻訳と返信案とメモが出る。横に送ると前の時点に移る</td><td>その <code>chatID</code> の <code>ReadingMoment</code> を <code>capturedAt</code> の順に読み、<code>screenImage</code> の画像を出す</td></tr>
-<tr><td>ページで「この時点の動画を見る」を押す</td><td>取り込みの動画が、その時点の位置から再生される</td><td><code>recordingPosition</code> の <code>CaptureRecording</code> の動画を読む</td></tr>
+<tr><td>ページで「この時点の動画を見る」を押す</td><td>取り込みの動画が、その時点の位置から再生される</td><td><code>recordingPosition</code> の <code>CaptureRecording</code> の動画を読む。その <code>CaptureRecording</code> か動画のファイルが無い時 (14 日で先に消えた・再生できずに消した) は、この操作をページに出さない。画像・翻訳・返信案・メモは今までどおり出る</td></tr>
 <tr><td>ページにメモを書く</td><td>メモがその時点に残る</td><td><code>ReadingMoment</code> の memo を書き換える</td></tr>
 <tr><td>一覧で検索する</td><td>発言・翻訳・メモ・チャットの名前に文字を含む読み取った時点が出る</td><td><code>ReadingMoment</code> と <code>Chat</code> を読む (検索のための型は足さない)</td></tr>
 <tr><td>(操作なし) 読んでから 14 日が過ぎる</td><td>その読み取った時点とメモが消える。取り込みを始めてから 14 日が過ぎた動画も消える。読み取った時点が 1 つも無くなったチャットは一覧から消える</td><td>本体アプリを開いた時と取り込みを始めた時に、14 日を過ぎた <code>ReadingMoment</code>・画像・<code>CaptureRecording</code>・動画と、読み取った時点の無い <code>Chat</code> を消す。写真ライブラリの元のスクリーンショットは消さない。本体アプリを開かない間は、14 日を過ぎても端末に残る (プライバシーポリシーにはこの形で書く)</td></tr>
