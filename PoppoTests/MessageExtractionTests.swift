@@ -1,5 +1,6 @@
 import CoreGraphics
 import Testing
+
 @testable import Poppo
 
 /// テスト用に、文字と位置 (左上が原点。画像の幅と高さを 1 とした値) から、読み取った 1 行を作る
@@ -18,11 +19,12 @@ private func textLine(text: String, minX: Double, minY: Double, width: Double) -
         textLine(text: "Thanks!", minX: 0.08, minY: 0.34, width: 0.2),
     ])
 
-    #expect(messages.map(\.text) == [
-        "Are you free today?\nI need help with the report",
-        "Sure, what do you need?",
-        "Thanks!",
-    ])
+    #expect(
+        messages.map(\.text) == [
+            "Are you free today?\nI need help with the report",
+            "Sure, what do you need?",
+            "Thanks!",
+        ])
     #expect(messages.map(\.isFromUser) == [false, true, false])
 }
 
@@ -112,10 +114,11 @@ private func textLine(text: String, minX: Double, minY: Double, width: Double) -
         textLine(text: "Sure, I'll take a look", minX: 0.15, minY: 0.334, width: 0.4),
     ])
 
-    #expect(messages.map(\.text) == [
-        "Alice 10:42 AM\nCan you review my PR?\nIt changes the login screen and the settings screen",
-        "Bob 10:45 AM\nSure, I'll take a look",
-    ])
+    #expect(
+        messages.map(\.text) == [
+            "Alice 10:42 AM\nCan you review my PR?\nIt changes the login screen and the settings screen",
+            "Bob 10:45 AM\nSure, I'll take a look",
+        ])
     #expect(messages.map(\.isFromUser) == [false, false])
 }
 

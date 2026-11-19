@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreVideo
 import Foundation
 import Testing
+
 @testable import Poppo
 
 /// テスト用の、取り込んだ画面を読む処理の偽物。文字の読み取り・翻訳・返信の文の生成が呼ばれた回数を数え、
@@ -139,7 +140,7 @@ private let chatLines = [
 
 /// chatLines とは別の発言が写った画面の行
 private let otherChatLines = [
-    RecognizedTextLine(text: "See you tomorrow", boundingBox: CGRect(x: 0.08, y: 0.3, width: 0.5, height: 0.02)),
+    RecognizedTextLine(text: "See you tomorrow", boundingBox: CGRect(x: 0.08, y: 0.3, width: 0.5, height: 0.02))
 ]
 
 /// 取り込み中に受け取った映像から、発言の原文と訳文・返信案・映像を受け取った時刻を持つ読み取り結果を保存し、
@@ -1330,12 +1331,13 @@ private func screenLines(texts: [String]) -> [RecognizedTextLine] {
     stage.recordSuccess(date: Date(timeIntervalSinceReferenceDate: 4))
 
     #expect(
-        stage == ScreenReadingStageDiagnostics(
-            successCount: 2,
-            lastSucceededAt: Date(timeIntervalSinceReferenceDate: 4),
-            failureCount: 2,
-            lastFailedAt: Date(timeIntervalSinceReferenceDate: 3),
-            lastFailureDescription: "second"
-        )
+        stage
+            == ScreenReadingStageDiagnostics(
+                successCount: 2,
+                lastSucceededAt: Date(timeIntervalSinceReferenceDate: 4),
+                failureCount: 2,
+                lastFailedAt: Date(timeIntervalSinceReferenceDate: 3),
+                lastFailureDescription: "second"
+            )
     )
 }
