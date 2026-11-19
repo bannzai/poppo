@@ -122,7 +122,8 @@ struct CaptureRecording: Codable, Identifiable {
 <tr><td>チャットアプリを開いたままにする</td><td>本体アプリが画面を読むたびに、キーボードに渡す読み取り結果を上書きする (今と同じ)。会話が大きく変わった時だけ、読み取った時点を 1 つ足す</td><td><code>LatestReading</code> を上書きする。会話が大きく変わった時に <code>ReadingMoment</code> を 1 つ書く (screenImage = appContainerFile、recordingPosition あり)。チャットの名前が初めてのものなら <code>Chat</code> を 1 つ書く</td></tr>
 <tr><td>キーボードを Poppo に切り替える</td><td>直前の翻訳と返信案が出る (今と同じ)</td><td><code>LatestReading</code> を読む。ほかの型は読まない</td></tr>
 <tr><td>取り込みを止める</td><td>キーボードに渡す読み取り結果は消える (今と同じ)。読み取った時点と動画は残る</td><td><code>LatestReading</code> を消す。動画の書き出しを終える (<code>CaptureRecording</code> は変えない)</td></tr>
-<tr><td>(操作なし) 取り込みがエラーで止まる・取り込みの途中で本体アプリが終了する</td><td>動画は、書き出せた所までが残る。キーボードに渡す読み取り結果は、今と同じく次に本体アプリを開いた時に消える</td><td><code>CaptureRecording</code> は変えない (終わった時刻を持たないので、止める操作を通らなくても、途中のままの記録にならない)。再生できない動画のファイルは、次に本体アプリを開いた時に <code>CaptureRecording</code> と一緒に消す</td></tr>
+<tr><td>(操作なし) 取り込みがエラーで止まる・アプリの外で止められる</td><td>キーボードに渡す読み取り結果は、今と同じく止まった時に消える。動画は、書き出せた所までが残る</td><td><code>LatestReading</code> を消す。<code>CaptureRecording</code> は変えない</td></tr>
+<tr><td>(操作なし) 取り込みの途中で本体アプリが終了する</td><td>動画は、書き出せた所までが残る。キーボードに渡す読み取り結果は、その時には消せないため、今と同じく次に本体アプリを開いた時に消える</td><td><code>CaptureRecording</code> は変えない (終わった時刻を持たないので、止める操作を通らなくても、途中のままの記録にならない)。再生できない動画のファイルは、次に本体アプリを開いた時に <code>CaptureRecording</code> と一緒に消す</td></tr>
 <tr><td>スクリーンショットを選んで読む</td><td>翻訳と返信案が出る (今と同じ)。読み取った時点を 1 つ足す。無料の利用者でも残る</td><td><code>ReadingMoment</code> を 1 つ書く (screenImage = photoLibraryAsset、recordingPosition = nil)。画像は写さない</td></tr>
 <tr><td>本体アプリを開く</td><td>一覧が出る。利用者が作ったセクションごとにチャットが並び、行に読み取りの回数と最後に読んだ時が出る</td><td><code>ChatSection</code>・<code>Chat</code>・<code>ReadingMoment</code> を読む</td></tr>
 <tr><td>一覧でセクションを作る・名前を変える・チャットを移す</td><td>一覧の分け方が変わる</td><td><code>ChatSection</code> を書く。<code>Chat</code> の sectionID を書き換える</td></tr>
@@ -132,7 +133,7 @@ struct CaptureRecording: Codable, Identifiable {
 <tr><td>ページにメモを書く</td><td>メモがその時点に残る</td><td><code>ReadingMoment</code> の memo を書き換える</td></tr>
 <tr><td>一覧で検索する</td><td>発言・翻訳・メモ・チャットの名前に文字を含む読み取った時点が出る</td><td><code>ReadingMoment</code> と <code>Chat</code> を読む (検索のための型は足さない)</td></tr>
 <tr><td>(操作なし) 読んでから 14 日が過ぎる</td><td>その読み取った時点とメモが消える。取り込みを始めてから 14 日が過ぎた動画も消える。読み取った時点が 1 つも無くなったチャットは一覧から消える</td><td>本体アプリを開いた時と取り込みを始めた時に、14 日を過ぎた <code>ReadingMoment</code>・画像・<code>CaptureRecording</code>・動画と、読み取った時点の無い <code>Chat</code> を消す。写真ライブラリの元のスクリーンショットは消さない。本体アプリを開かない間は、14 日を過ぎても端末に残る (プライバシーポリシーにはこの形で書く)</td></tr>
-<tr><td>設定で「読み取った内容をすべて消す」を押す</td><td>すべての読み取った時点・動画・チャット・セクションと、キーボードに渡す読み取り結果が消える</td><td>上の 4 つのディレクトリの中身と <code>LatestReading</code> を消す。写真ライブラリの元のスクリーンショットは消さない</td></tr>
+<tr><td>設定で「読み取った内容をすべて消す」を押す</td><td>すべての読み取った時点・動画・チャット・セクションと、キーボードに渡す読み取り結果が消える</td><td>上の 4 つのディレクトリの中身と <code>LatestReading</code> を消す。写真ライブラリの元のスクリーンショットは消さない。取り込みの途中なら、取り込みを止めてから消す。消す操作より前に始まっていた読み取り (画面の読み取り・スクリーンショットからの読み取り) が後から終わっても、その結果は書かない (消したものが戻らない)</td></tr>
 </tbody>
 </table>
 </div>
@@ -143,6 +144,7 @@ struct CaptureRecording: Codable, Identifiable {
 <li>メモを付けた時点も 14 日で消える。残したい時点を 14 日より長く残す仕組み (お気に入り) は入れていない</li>
 <li>チャットの名前を書き換えた後も、新しく読んだ画面は、画面から読んだままの名前 (<code>titleReadFromScreen</code>) で同じチャットかを比べる。2 つのチャットを 1 つにまとめる操作は入れていない</li>
 <li>発言した人の名前は画面の文字から読むので、読めない画面では人物ごとに分かれない</li>
+<li>画面の上部の名前が同じ別のチャット (Slack の「general」と Discord の「general」) は、同じチャットとして 1 行に入る。前面のアプリが何かを iOS が教えてくれず、アプリの名前を画面から判定するのもやめたため、見分ける値が無い。読み取った時点を別のチャットへ移す操作は入れていない。困る場面が多ければ、その操作を足す (<code>ReadingMoment</code> の chatID を書き換えられるようにするだけで、型は変えずに足せる)</li>
 </ul>
 
 <h2>確かめていないこと (実機で測る)</h2>
