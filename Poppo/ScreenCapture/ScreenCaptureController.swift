@@ -62,6 +62,9 @@ final class ScreenCaptureController {
     private var lastScreenFingerprint: [UInt8]?
     /// 今の取り込みで、最後に翻訳を試した発言の原文。成功したか失敗したかを問わない。まだ試していない時は nil
     private var lastTriedMessageTexts: [String]?
+    /// 今の取り込みで、最後に翻訳を試した時に、返信案を作るモデルとして選ばれていたモデル。まだ試していない時は nil。
+    /// lastTriedMessageTexts と同時に書き換える
+    private var lastTriedReplyModel: ReplyModel?
     /// 指定した秒数だけ待つ処理
     private let wait: @MainActor (TimeInterval) async -> Void
     /// 今の取り込みで、読まずに見送った映像のうち最後の 1 枚 (受け取った時刻と、その映像を画像にする処理)。見送った映像が無い時は nil。
@@ -206,6 +209,7 @@ final class ScreenCaptureController {
         lastImageMadeAt = nil
         lastScreenFingerprint = nil
         lastTriedMessageTexts = nil
+        lastTriedReplyModel = nil
         skippedFrame = nil
     }
 
@@ -288,7 +292,7 @@ final class ScreenCaptureController {
     /// capturedAt は画面を受け取った時刻、captureCount は読み取りを始めた時の取り込みの回。
     /// 各段 (文字の読み取り・翻訳・返信案の生成・保存) の成功と失敗を診断の記録に残す。
     /// 次の時は翻訳へ進まず、保存してある読み取り結果をそのまま残す: 画面に Poppo のキーボードが出している読み取り結果が映っている、
-    /// 発言が 1 つも無い、発言が前に翻訳を試した時と同じ。
+    /// 発言が 1 つも無い、発言と返信案を作るモデルの両方が前に翻訳を試した時と同じ。
     /// 読み取りの途中で取り込みが終わっていた時は、保存も記録もしない (止めた後に読み取り結果を残さない)
     private func readScreen(image: CGImage, capturedAt: Date, captureCount: Int) async {
         let lines: [RecognizedTextLine]
@@ -325,7 +329,11 @@ final class ScreenCaptureController {
             }
             return
         }
-        guard extractedMessages.map(\.text) != lastTriedMessageTexts else {
+        // 使えるかの判定・生成・診断の記録が同じモデルを指すよう、この読み取りで使うモデルをここで 1 回だけ決める
+        // (読み取りの途中で開発者メニューから選び直されても、この読み取りには効かせない)
+        let replyModel = selectedReplyModel()
+        // 発言が同じでも、返信案を作るモデルを選び直した後は読み直す (選び直したモデルで返信案を作るため)
+        guard extractedMessages.map(\.text) != lastTriedMessageTexts || replyModel != lastTriedReplyModel else {
             recordReading(captureCount: captureCount) {
                 $0.recognition.recordSuccess(date: now())
                 $0.unchangedMessagesCount += 1
@@ -334,14 +342,12 @@ final class ScreenCaptureController {
         }
         // 翻訳に失敗した発言も「試した」として覚える。同じ画面が映っている間、失敗する翻訳を 2 秒ごとに繰り返さないため
         lastTriedMessageTexts = extractedMessages.map(\.text)
+        lastTriedReplyModel = replyModel
         recordReading(captureCount: captureCount) { $0.recognition.recordSuccess(date: now()) }
 
         // readChat は返信案を作れなかった理由を返さない (翻訳だけを返す) ため、渡す処理の中で理由を覚える
         var didTranslateMessages = false
         var replyGenerationFailureDescription: String?
-        // 使えるかの判定・生成・診断の記録が同じモデルを指すよう、この読み取りで使うモデルをここで 1 回だけ決める
-        // (読み取りの途中で開発者メニューから選び直されても、この読み取りには効かせない)
-        let replyModel = selectedReplyModel()
         let isReplyGenerationAvailable = self.canGenerateReplies(replyModel)
         let reading: (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
         do {

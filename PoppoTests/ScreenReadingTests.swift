@@ -248,6 +248,44 @@ private let otherChatLines = [
     #expect(loadLatestReading(fileURL: latestReadingFileURL)?.capturedAt == Date(timeIntervalSinceReferenceDate: 1001))
 }
 
+/// 写っている発言が前に翻訳を試した時と同じでも、返信案を作るモデルを選び直した後に届いた画面は読み直し、
+/// 選び直したモデルで返信案を作って、保存してある読み取り結果を書き換えること。
+/// 前のモデルが使えず翻訳だけを保存していた時に、使えるモデルへ選び直すと返信案が付くことで確かめる。
+/// 選び直した後に同じ発言の画面がもう 1 回届いても、3 回目は読み直さない
+@Test func screenReadingReadsSameMessagesAgainAfterReplyModelIsReselected() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    reader.selectedReplyModel = .privateCloudCompute
+    reader.availableReplyModels = [.onDevice]
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+    #expect(loadLatestReading(fileURL: latestReadingFileURL)?.replySuggestions.isEmpty == true)
+
+    reader.selectedReplyModel = .onDevice
+    await receiveFrame(source: source, controller: controller, receivedAt: 1004, image: try makeScreenImage(gray: 0.8))
+
+    #expect(reader.replyGeneratedModels == [.onDevice])
+    #expect(loadLatestReading(fileURL: latestReadingFileURL)?.replySuggestions.map(\.text) == ["Sounds good"])
+    #expect(loadLatestReading(fileURL: latestReadingFileURL)?.capturedAt == Date(timeIntervalSinceReferenceDate: 1004))
+    #expect(controller.diagnostics?.reading.replyGenerationModel == .onDevice)
+    #expect(controller.diagnostics?.reading.unchangedMessagesCount == 0)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1007, image: try makeScreenImage(gray: 0.5))
+
+    #expect(reader.replyGeneratedModels == [.onDevice])
+    #expect(controller.diagnostics?.reading.unchangedMessagesCount == 1)
+}
+
 /// 画面の発言が変わったら読み直し、前の読み取り結果を残さず新しい内容で上書きすること
 @Test func screenReadingOverwritesLatestReadingWhenMessagesChange() async throws {
     let source = FakeScreenCaptureSource()
