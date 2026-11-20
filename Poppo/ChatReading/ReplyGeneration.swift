@@ -15,13 +15,27 @@ nonisolated func replyPrompt(messages: [ExtractedMessage]) -> String {
     messages.map { ($0.isFromUser ? "Me: " : "Them: ") + $0.text }.joined(separator: "\n\n")
 }
 
-/// replyModel のモデルで、今返信案を作れるか (モデルが使える端末・状態か) を返す
-func canGenerateReplies(replyModel: ReplyModel) -> Bool {
+/// replyModel が指す Foundation Models のモデルを返す。モデルの種類と Foundation Models の型の対応は、この関数だけに置く
+func languageModel(replyModel: ReplyModel) -> any LanguageModel {
     switch replyModel {
     case .onDevice:
-        SystemLanguageModel.default.isAvailable
+        SystemLanguageModel.default
     case .privateCloudCompute:
-        PrivateCloudComputeLanguageModel().isAvailable
+        PrivateCloudComputeLanguageModel()
+    }
+}
+
+/// replyModel のモデルで、今返信案を作れるか (モデルが使える端末・状態か) を返す
+func canGenerateReplies(replyModel: ReplyModel) -> Bool {
+    // 使えるか (isAvailable) は LanguageModel プロトコルの要件に無く、型ごとに持つため、型で分けて聞く
+    switch languageModel(replyModel: replyModel) {
+    case let systemLanguageModel as SystemLanguageModel:
+        systemLanguageModel.isAvailable
+    case let privateCloudComputeLanguageModel as PrivateCloudComputeLanguageModel:
+        privateCloudComputeLanguageModel.isAvailable
+    default:
+        // 使えるかを聞けない型のモデルでは作らない: 使えるか分からないモデルで生成を試して、失敗の理由が診断の記録に残らなくなるのを避けるため
+        false
     }
 }
 
@@ -29,12 +43,7 @@ func canGenerateReplies(replyModel: ReplyModel) -> Bool {
 /// モデルが使えない端末・状態では失敗するため、呼ぶ前に canGenerateReplies(replyModel:) を確かめる。
 /// Private Cloud Compute では、messages の発言が Apple のサーバーへ送られる
 func generateReplyTexts(messages: [ExtractedMessage], replyModel: ReplyModel) async throws -> [String] {
-    switch replyModel {
-    case .onDevice:
-        try await generateReplyTexts(messages: messages, languageModel: SystemLanguageModel.default)
-    case .privateCloudCompute:
-        try await generateReplyTexts(messages: messages, languageModel: PrivateCloudComputeLanguageModel())
-    }
+    try await generateReplyTexts(messages: messages, languageModel: languageModel(replyModel: replyModel))
 }
 
 /// languageModel (Foundation Models の LanguageModel に準拠したモデル) で、会話に続けて利用者が送れる返信の文を、相手の言語で作る。

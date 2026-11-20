@@ -34,7 +34,7 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     save(selectedReplyModel: replyModel, userDefaults: try #require(UserDefaults(suiteName: suiteName)))
 
     #expect(selectedReplyModel(userDefaults: try #require(UserDefaults(suiteName: suiteName)), hasDeveloperMenu: true) == replyModel)
-    UserDefaults.standard.removePersistentDomain(forName: suiteName)
+    try #require(UserDefaults(suiteName: suiteName)).removePersistentDomain(forName: suiteName)
 }
 
 /// 選び直すと、後から選んだモデルだけが選ばれていること
