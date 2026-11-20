@@ -23,11 +23,9 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     #expect(sendsMessagesOutsideDevice(replyModel: .privateCloudCompute) == true)
 }
 
-// 選んだモデルに従うのは、開発者メニューのあるビルド (DEBUG の条件があるビルド) だけ。テストを走らせた構成の側だけを確かめる
-#if DEBUG
 /// 何も選んでいない時は、端末内のモデルが選ばれていること (モデルを選べるようにする前の動きを変えない)
 @Test func selectedReplyModelIsOnDeviceWhenNothingIsSelected() throws {
-    #expect(selectedReplyModel(userDefaults: try makeEmptyUserDefaults()) == .onDevice)
+    #expect(selectedReplyModel(userDefaults: try makeEmptyUserDefaults(), hasDeveloperMenu: true) == .onDevice)
 }
 
 /// 選んだモデルは、同じ保存先を読み直しても選ばれたままであること (アプリを起動し直した後も残る)。選べるモデルのそれぞれで確かめる
@@ -35,7 +33,7 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     let suiteName = "ReplyModelTests-\(UUID().uuidString)"
     save(selectedReplyModel: replyModel, userDefaults: try #require(UserDefaults(suiteName: suiteName)))
 
-    #expect(selectedReplyModel(userDefaults: try #require(UserDefaults(suiteName: suiteName))) == replyModel)
+    #expect(selectedReplyModel(userDefaults: try #require(UserDefaults(suiteName: suiteName)), hasDeveloperMenu: true) == replyModel)
     UserDefaults.standard.removePersistentDomain(forName: suiteName)
 }
 
@@ -45,7 +43,7 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     save(selectedReplyModel: .privateCloudCompute, userDefaults: userDefaults)
     save(selectedReplyModel: .onDevice, userDefaults: userDefaults)
 
-    #expect(selectedReplyModel(userDefaults: userDefaults) == .onDevice)
+    #expect(selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: true) == .onDevice)
 }
 
 /// 保存してある値が選べるモデルの一覧に無い時 (空文字・知らない名前・文字列でない値) は、端末内のモデルが選ばれていること
@@ -53,18 +51,29 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     let userDefaults = try makeEmptyUserDefaults()
 
     userDefaults.set("", forKey: selectedReplyModelUserDefaultsKey)
-    #expect(selectedReplyModel(userDefaults: userDefaults) == .onDevice)
+    #expect(selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: true) == .onDevice)
     userDefaults.set("removedModel", forKey: selectedReplyModelUserDefaultsKey)
-    #expect(selectedReplyModel(userDefaults: userDefaults) == .onDevice)
+    #expect(selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: true) == .onDevice)
     userDefaults.set(["privateCloudCompute"], forKey: selectedReplyModelUserDefaultsKey)
-    #expect(selectedReplyModel(userDefaults: userDefaults) == .onDevice)
+    #expect(selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: true) == .onDevice)
 }
-#else
-/// 開発者メニューの無いビルドでは、Private Cloud Compute が保存してあっても、端末内のモデルが選ばれていること
+
+/// 開発者メニューの無いビルドでは、Private Cloud Compute が保存してあっても、端末内のモデルが選ばれていること。
+/// 同じ保存先を開発者メニューのあるビルドで読むと Private Cloud Compute になることも確かめる (保存してある値ではなく、
+/// 開発者メニューの有無で結果が分かれていることを見るため)
 @Test func selectedReplyModelIsOnDeviceWithoutDeveloperMenu() throws {
     let userDefaults = try makeEmptyUserDefaults()
     save(selectedReplyModel: .privateCloudCompute, userDefaults: userDefaults)
 
-    #expect(selectedReplyModel(userDefaults: userDefaults) == .onDevice)
+    #expect(selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: false) == .onDevice)
+    #expect(selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: true) == .privateCloudCompute)
 }
-#endif
+
+/// 発言を端末の外へ送ることの確認が要るのは、端末内から Private Cloud Compute へ切り替える操作だけであること。
+/// 既に選んでいる Private Cloud Compute を選び直す操作と、端末内を選ぶ操作 (選び直し・Private Cloud Compute からの切り替え) では要らない
+@Test func sendingConfirmationIsNeededOnlyWhenSwitchingToModelSendingMessagesOutsideDevice() {
+    #expect(needsSendingConfirmation(selectingReplyModel: .privateCloudCompute, currentReplyModel: .onDevice) == true)
+    #expect(needsSendingConfirmation(selectingReplyModel: .privateCloudCompute, currentReplyModel: .privateCloudCompute) == false)
+    #expect(needsSendingConfirmation(selectingReplyModel: .onDevice, currentReplyModel: .privateCloudCompute) == false)
+    #expect(needsSendingConfirmation(selectingReplyModel: .onDevice, currentReplyModel: .onDevice) == false)
+}

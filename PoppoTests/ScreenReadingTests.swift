@@ -981,6 +981,37 @@ func screenReadingSavesTranslationOnlyWhenSelectedModelIsUnavailable(replyModel:
     #expect(controller.diagnostics?.reading.replyGeneration.successCount == 2)
 }
 
+/// 1 回の読み取りの途中 (発言の翻訳の間・返信の文の生成の間) で選び直しても、その読み取りは始めた時のモデルで、
+/// 使えるかの判定・生成・診断の記録を済ませること。選び直す時点のそれぞれで確かめる
+@Test(arguments: [true, false]) func screenReadingKeepsModelSelectedAtStartOfReading(reselectsDuringTranslation: Bool) async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    reader.selectedReplyModel = .privateCloudCompute
+    if reselectsDuringTranslation {
+        reader.onTranslate = { reader.selectedReplyModel = .onDevice }
+    } else {
+        reader.onGenerateReplies = { reader.selectedReplyModel = .onDevice }
+    }
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: temporaryFileURL(),
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(reader.selectedReplyModel == .onDevice)
+    #expect(reader.availabilityCheckedReplyModels == [.privateCloudCompute])
+    #expect(reader.replyGeneratedModels == [.privateCloudCompute])
+    #expect(controller.diagnostics?.reading.replyGenerationModel == .privateCloudCompute)
+    #expect(controller.diagnostics?.reading.replyGeneration.successCount == 1)
+}
+
 /// 返信案の生成の段まで進まなかった読み取り (発言が無い画面) では、返信案を作るモデルを診断の記録に残さないこと
 @Test func screenReadingDoesNotRecordReplyModelWhenReplyGenerationIsNotReached() async throws {
     let source = FakeScreenCaptureSource()
@@ -1028,6 +1059,7 @@ func screenReadingSavesTranslationOnlyWhenSelectedModelIsUnavailable(replyModel:
     let reader = FakeScreenReader()
     reader.lines = chatLines
     reader.replyGenerationError = NSError(domain: "com.example.model", code: 4, userInfo: [NSLocalizedDescriptionKey: "model busy"])
+    reader.selectedReplyModel = .privateCloudCompute
     let latestReadingFileURL = temporaryFileURL()
     let controller = makeScreenReadingController(
         source: source,
@@ -1045,6 +1077,7 @@ func screenReadingSavesTranslationOnlyWhenSelectedModelIsUnavailable(replyModel:
     #expect(loadLatestReading(fileURL: latestReadingFileURL)?.messages.count == 2)
     #expect(controller.diagnostics?.reading.replyGeneration.failureCount == 1)
     #expect(controller.diagnostics?.reading.replyGeneration.lastFailureDescription == "com.example.model 4: model busy")
+    #expect(controller.diagnostics?.reading.replyGenerationModel == .privateCloudCompute)
     #expect(controller.diagnostics?.reading.translation.successCount == 1)
 }
 
@@ -1140,6 +1173,7 @@ func screenReadingSavesTranslationOnlyWhenSelectedModelIsUnavailable(replyModel:
     let reader = FakeScreenReader()
     reader.lines = chatLines
     reader.replyTexts = []
+    reader.selectedReplyModel = .privateCloudCompute
     let controller = makeScreenReadingController(
         source: source,
         reader: reader,
@@ -1154,6 +1188,7 @@ func screenReadingSavesTranslationOnlyWhenSelectedModelIsUnavailable(replyModel:
 
     #expect(controller.diagnostics?.reading.replyGeneration.failureCount == 1)
     #expect(controller.diagnostics?.reading.replyGeneration.lastFailureDescription == "返信案が 1 つも作られなかった")
+    #expect(controller.diagnostics?.reading.replyGenerationModel == .privateCloudCompute)
 }
 
 /// 読み取り結果を置く場所が無い時 (App Group を使えない) は、保存の失敗として記録すること

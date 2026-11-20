@@ -27,7 +27,7 @@ struct DebugMenuView: View {
             Section {
                 ForEach(ReplyModel.allCases, id: \.self) { selectableReplyModel in
                     Button {
-                        if sendsMessagesOutsideDevice(replyModel: selectableReplyModel), selectableReplyModel != replyModel {
+                        if needsSendingConfirmation(selectingReplyModel: selectableReplyModel, currentReplyModel: replyModel) {
                             replyModelWaitingForSendingConfirmation = selectableReplyModel
                         } else {
                             select(replyModel: selectableReplyModel)

@@ -21,21 +21,41 @@ func sendsMessagesOutsideDevice(replyModel: ReplyModel) -> Bool {
     }
 }
 
+/// 開発者メニューで selectingReplyModel を選ぶ操作の前に、発言を端末の外へ送ることの確認が要るかを返す。
+/// currentReplyModel は今選ばれているモデル。要るのは、発言を端末の外へ送るモデルへ、ほかのモデルから切り替える時だけ
+/// (既に選んでいるモデルを選び直す操作は送り先を変えず、端末の外へ送らないモデルを選ぶ操作は送るのをやめるため)
+func needsSendingConfirmation(selectingReplyModel: ReplyModel, currentReplyModel: ReplyModel) -> Bool {
+    sendsMessagesOutsideDevice(replyModel: selectingReplyModel) && selectingReplyModel != currentReplyModel
+}
+
 /// 選んだ返信案を作るモデル (ReplyModel の生の値) を保存する、UserDefaults のキー
 let selectedReplyModelUserDefaultsKey = "selectedReplyModel"
 
+/// このビルドに開発者メニュー (返信案を作るモデルを選ぶ唯一の場所) があるか
+var hasDeveloperMenu: Bool {
+    #if DEBUG
+    true
+    #else
+    false
+    #endif
+}
+
+/// 返信案を作るモデルとして選ばれているものを返す。userDefaults は選んだモデルを保存してある場所
+func selectedReplyModel(userDefaults: UserDefaults) -> ReplyModel {
+    selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: hasDeveloperMenu)
+}
+
 /// 返信案を作るモデルとして選ばれているものを返す。userDefaults は選んだモデルを保存してある場所。
-/// 選べるのは開発者メニューだけのため、開発者メニューの無いビルド (DEBUG の条件が無いビルド) では、保存してある値を見ずに端末内を返す
+/// hasDeveloperMenu が false の時 (開発者メニューの無いビルド) は、保存してある値を見ずに端末内を返す
 /// (開発者メニューのあるビルドで Private Cloud Compute を選んだ端末に、開発者メニューの無いビルドを上書きで入れた時に、
 /// 選び直す手段が無いまま発言を端末の外へ送り続けないようにする)
-func selectedReplyModel(userDefaults: UserDefaults) -> ReplyModel {
-    #if DEBUG
+func selectedReplyModel(userDefaults: UserDefaults, hasDeveloperMenu: Bool) -> ReplyModel {
+    guard hasDeveloperMenu else {
+        return .onDevice
+    }
     // 何も選んでいない時と、保存してある値が今の一覧に無い時は端末内: モデルを選べるようにする前の動き (端末内のモデルだけで作る) を
     // 変えず、発言を端末の外へ送らない側にするため
     return userDefaults.string(forKey: selectedReplyModelUserDefaultsKey).flatMap { ReplyModel(rawValue: $0) } ?? .onDevice
-    #else
-    return .onDevice
-    #endif
 }
 
 /// 返信案を作るモデルとして selectedReplyModel を選んだことを、userDefaults に保存する。前に選んだモデルは上書きされる
