@@ -21,11 +21,24 @@ owner の返答までは、翻訳・返信案の生成・保存をすべて端�
 | サーバー・データベース | 持たない |
 | 認証 | 持たない (アカウントなし) |
 | アクセス解析・クラッシュの収集 | 入れない。公開後の指標は App Store Connect の数値で見る |
-| 返信案の生成 | 端末内のモデル。使えない端末では翻訳だけを出す |
+| 返信案の生成 | 端末内のモデル。使えない端末では翻訳だけを出す。開発者メニューのあるビルドに限り、Private Cloud Compute でも作れる (下の「2026-11-20 の改め」) |
 | 課金 | 持たない |
 | 通知 | サービスからの通知は無い。開発の連絡は Slack の `#poppo-notification` |
 
 端末外へ送る構成 (Private Cloud Compute・外部の API)・アクセス解析・課金を足す時は、owner の決定を得てからこの ADR を改める。
+
+### 2026-11-20 の改め: 開発者メニューのあるビルドに限り、Private Cloud Compute で返信案を作れる
+
+owner (bannzai) は 2026-11-20 に次のように決めた ( https://github.com/bannzai/poppo/issues/1#issuecomment-7019893647 )。
+
+> PCCもClaude APIもどちらも使えるようにしようか。なんかそういうプロトコルあるよね。CodexやGeminiもつかえるようにしたい
+
+「PCC」は Private Cloud Compute (Apple のサーバーで動くモデル)。この決定のうち、登録も費用も要らない Private Cloud Compute だけを、次の範囲で足す (実装: https://github.com/bannzai/poppo/issues/34 )。
+
+- 開発者メニューのあるビルド (DEBUG の条件があるビルド) に限り、開発者メニューで返信案を作るモデルを「端末内」と「Private Cloud Compute」から選べる。Private Cloud Compute を選んでいる間は、画面から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために Apple のサーバーへ送る。翻訳と保存は端末内のまま
+- Private Cloud Compute を選ぶ時に、送る内容 (画面から読んだチャットの発言) と送信先 (Apple のサーバー) を画面で示して確かめる。確かめた時だけ選択を切り替え、取り消した時は選択を変えない
+- 利用者に配るビルド (開発者メニューの無いビルド) は、端末内だけのまま変えない。選んだモデルが端末に保存してあっても見ずに、端末内のモデルで作る。そのため `docs/PrivacyPolicy-ja.md`・App Privacy の回答・輸出コンプライアンスの申告は変えない。開発者メニューのあるビルドを配るのは TestFlight の内部テスト (2026-11-20 の時点で owner だけ) に限る
+- 利用者に配るビルドで端末の外へ送る構成と、外部の API (Claude・Gemini・OpenAI) は、この改めの範囲に入れない。足す時は、同意の画面と文書の直し (`documents/DIRECTION.md`「決めたこと」の 2026-11-20 の行) を済ませ、この ADR を改める
 
 ## Consequences
 

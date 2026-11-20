@@ -10,6 +10,17 @@ nonisolated enum ReplyModel: String, CaseIterable, Codable {
     case privateCloudCompute
 }
 
+/// replyModel のモデルで返信案を作る時に、画面から読んだ発言を端末の外へ送るかを返す。
+/// true のモデルは、選ぶ前に送る内容と送信先を画面で示して確かめる (documents/adr/0002-process-on-device-without-backend.md)
+func sendsMessagesOutsideDevice(replyModel: ReplyModel) -> Bool {
+    switch replyModel {
+    case .onDevice:
+        false
+    case .privateCloudCompute:
+        true
+    }
+}
+
 /// 選んだ返信案を作るモデル (ReplyModel の生の値) を保存する、UserDefaults のキー
 let selectedReplyModelUserDefaultsKey = "selectedReplyModel"
 

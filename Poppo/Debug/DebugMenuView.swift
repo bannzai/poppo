@@ -13,14 +13,25 @@ struct DebugMenuView: View {
 
     /// 返信案を作るモデルとして選ばれているもの。この画面で選んだ後と、画面を開いた時に読み直す
     @State private var replyModel = selectedReplyModel(userDefaults: .standard)
+    /// 発言を端末の外へ送るモデルのうち、選ぶ操作をして、送ることの確認の返事を待っているもの。確認を出していない時は nil
+    @State private var replyModelWaitingForSendingConfirmation: ReplyModel?
+
+    /// 返信案を作るモデルとして selectingReplyModel を選んだことを保存し、この画面の表示を保存した後の値にする
+    private func select(replyModel selectingReplyModel: ReplyModel) {
+        save(selectedReplyModel: selectingReplyModel, userDefaults: .standard)
+        replyModel = selectedReplyModel(userDefaults: .standard)
+    }
 
     var body: some View {
         List {
             Section {
                 ForEach(ReplyModel.allCases, id: \.self) { selectableReplyModel in
                     Button {
-                        save(selectedReplyModel: selectableReplyModel, userDefaults: .standard)
-                        replyModel = selectedReplyModel(userDefaults: .standard)
+                        if sendsMessagesOutsideDevice(replyModel: selectableReplyModel), selectableReplyModel != replyModel {
+                            replyModelWaitingForSendingConfirmation = selectableReplyModel
+                        } else {
+                            select(replyModel: selectableReplyModel)
+                        }
                     } label: {
                         HStack {
                             Text(verbatim: debugMenuText(replyModel: selectableReplyModel))
@@ -47,7 +58,7 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "返信案を作るモデル")
             } footer: {
-                Text(verbatim: "選んだ後に読む画面 (スクリーンショットからの読み取りと、取り込み) の返信案を、選んだモデルが作る。アプリを起動し直しても選んだままになる。選んだモデルが使えない時は、ほかのモデルに切り替えず、返信案なしで翻訳だけを出す。Private Cloud Compute を選ぶと、画面から読んだ発言が Apple のサーバーへ送られる")
+                Text(verbatim: "選んだ後に読む画面 (スクリーンショットからの読み取りと、取り込み) の返信案を、選んだモデルが作る。アプリを起動し直しても選んだままになる。選んだモデルが使えない時は、ほかのモデルに切り替えず、返信案なしで翻訳だけを出す。Private Cloud Compute を選ぶと、画面から読んだ発言が Apple のサーバーへ送られるため、選ぶ時に確認が出る (取り消すと選択は変わらない)")
             }
             Section {
                 NavigationLink {
@@ -193,6 +204,32 @@ struct DebugMenuView: View {
         .onAppear {
             reloadSavedLatestReading()
             replyModel = selectedReplyModel(userDefaults: .standard)
+        }
+        .alert(
+            Text(verbatim: "発言を Apple のサーバーへ送る"),
+            isPresented: Binding(
+                get: { replyModelWaitingForSendingConfirmation != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        replyModelWaitingForSendingConfirmation = nil
+                    }
+                }
+            ),
+            presenting: replyModelWaitingForSendingConfirmation
+        ) { confirmingReplyModel in
+            Button {
+                select(replyModel: confirmingReplyModel)
+            } label: {
+                Text(verbatim: "送ることを確かめて選ぶ")
+            }
+            .accessibilityIdentifier("debug_confirm_sending_messages_outside_device")
+            Button(role: .cancel) {
+            } label: {
+                Text(verbatim: "取り消す")
+            }
+            .accessibilityIdentifier("debug_cancel_sending_messages_outside_device")
+        } message: { confirmingReplyModel in
+            Text(verbatim: "\(debugMenuText(replyModel: confirmingReplyModel)) を選ぶと、この後に読む画面 (スクリーンショットからの読み取りと、取り込み) から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために Apple のサーバー (Private Cloud Compute) へ送る。「端末内」を選び直すまで送り続ける")
         }
     }
 

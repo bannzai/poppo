@@ -17,6 +17,12 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     #expect(ReplyModel.allCases.map(\.rawValue) == ["onDevice", "privateCloudCompute"])
 }
 
+/// 発言を端末の外へ送る (選ぶ前に確認が要る) のは Private Cloud Compute だけで、端末内は送らないこと
+@Test func onlyPrivateCloudComputeSendsMessagesOutsideDevice() {
+    #expect(sendsMessagesOutsideDevice(replyModel: .onDevice) == false)
+    #expect(sendsMessagesOutsideDevice(replyModel: .privateCloudCompute) == true)
+}
+
 // 選んだモデルに従うのは、開発者メニューのあるビルド (DEBUG の条件があるビルド) だけ。テストを走らせた構成の側だけを確かめる
 #if DEBUG
 /// 何も選んでいない時は、端末内のモデルが選ばれていること (モデルを選べるようにする前の動きを変えない)
