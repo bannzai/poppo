@@ -1,4 +1,3 @@
-import FoundationModels
 import Photos
 import SwiftUI
 import Translation
@@ -116,8 +115,9 @@ struct ChatReadingView: View {
                 translateTexts: {
                     try await translateOnDevice(texts: $0, targetLanguage: userLanguage(preferredLanguages: Locale.preferredLanguages))
                 },
-                canGenerateReplies: SystemLanguageModel.default.isAvailable,
-                generateReplyTexts: { try await generateReplyTexts(messages: $0) }
+                replyModel: selectedReplyModel(userDefaults: .standard),
+                canGenerateReplies: { canGenerateReplies(replyModel: $0) },
+                generateReplyTexts: { try await generateReplyTexts(messages: $0, replyModel: $1) }
             )
         }
     }

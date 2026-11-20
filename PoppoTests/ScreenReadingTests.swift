@@ -21,8 +21,14 @@ final class FakeScreenReader {
     var translationErrorCallNumber: Int?
     /// 翻訳が呼ばれた時に、訳文を返す前に実行する処理 (翻訳の途中で起きる出来事をテストが起こすのに使う)
     var onTranslate: (() -> Void)?
-    /// 返信案を作れるか
-    var canGenerateReplies = true
+    /// 返信案を作るモデルとして選ばれているもの
+    var selectedReplyModel = ReplyModel.onDevice
+    /// 使えるモデル。ここに無いモデルは、返信案を作れないと答える
+    var availableReplyModels = Set(ReplyModel.allCases)
+    /// 返信案を作れるかを聞かれたモデル。聞かれた順に並ぶ
+    private(set) var availabilityCheckedReplyModels: [ReplyModel] = []
+    /// 返信の文の生成に渡されたモデル。呼ばれた順に並ぶ
+    private(set) var replyGeneratedModels: [ReplyModel] = []
     /// 返信の文の生成が返す文
     var replyTexts = ["Sounds good"]
     /// 返信の文の生成が投げるエラー。nil の時は replyTexts を返す
@@ -60,9 +66,17 @@ final class FakeScreenReader {
         return texts.map { "訳: " + $0 }
     }
 
-    /// 呼ばれた回数を数え、onGenerateReplies を実行してから、replyGenerationError を投げるか replyTexts を返す
-    func generateReplyTexts() throws -> [String] {
+    /// 聞かれたモデル (replyModel) を availabilityCheckedReplyModels に足し、そのモデルが availableReplyModels にあるかを返す
+    func canGenerateReplies(replyModel: ReplyModel) -> Bool {
+        availabilityCheckedReplyModels.append(replyModel)
+        return availableReplyModels.contains(replyModel)
+    }
+
+    /// 呼ばれた回数を数え、渡されたモデル (replyModel) を replyGeneratedModels に足し、onGenerateReplies を実行してから、
+    /// replyGenerationError を投げるか replyTexts を返す
+    func generateReplyTexts(replyModel: ReplyModel) throws -> [String] {
         replyGenerationCallCount += 1
+        replyGeneratedModels.append(replyModel)
         onGenerateReplies?()
         if let replyGenerationError {
             throw replyGenerationError
@@ -93,8 +107,9 @@ private func makeScreenReadingController(
         now: { clock.now },
         recognizeTextLines: { _ in try reader.recognizeTextLines() },
         translateTexts: { try reader.translate(texts: $0) },
-        canGenerateReplies: { reader.canGenerateReplies },
-        generateReplyTexts: { _ in try reader.generateReplyTexts() },
+        selectedReplyModel: { reader.selectedReplyModel },
+        canGenerateReplies: { reader.canGenerateReplies(replyModel: $0) },
+        generateReplyTexts: { try reader.generateReplyTexts(replyModel: $1) },
         wait: { reader.wait(seconds: $0) }
     )
 }
@@ -170,7 +185,13 @@ private let otherChatLines = [
     let succeededOnce = ScreenReadingStageDiagnostics(successCount: 1, lastSucceededAt: Date(timeIntervalSinceReferenceDate: 1002))
     #expect(
         controller.diagnostics?.reading
-            == ScreenReadingDiagnostics(recognition: succeededOnce, translation: succeededOnce, replyGeneration: succeededOnce, saving: succeededOnce)
+            == ScreenReadingDiagnostics(
+                recognition: succeededOnce,
+                translation: succeededOnce,
+                replyGeneration: succeededOnce,
+                replyGenerationModel: .onDevice,
+                saving: succeededOnce
+            )
     )
     #expect(loadScreenCaptureDiagnostics(fileURL: diagnosticsFileURL) == controller.diagnostics)
 }
@@ -464,8 +485,9 @@ private let otherChatLines = [
         now: { Date(timeIntervalSinceReferenceDate: 1000) },
         recognizeTextLines: { _ in chatLines },
         translateTexts: { _ in ["訳が 1 つだけ"] },
-        canGenerateReplies: { false },
-        generateReplyTexts: { _ in [] },
+        selectedReplyModel: { .onDevice },
+        canGenerateReplies: { _ in false },
+        generateReplyTexts: { _, _ in [] },
         wait: { _ in }
     )
     controller.start()
@@ -888,12 +910,18 @@ private let otherChatLines = [
     #expect(loadLatestReading(fileURL: latestReadingFileURL)?.capturedAt == Date(timeIntervalSinceReferenceDate: 1001))
 }
 
-/// 端末内のモデルが使えない時は、返信案を空にして翻訳だけを保存し、返信案の生成の失敗として理由を記録すること
-@Test func screenReadingSavesTranslationOnlyWhenModelIsUnavailable() async throws {
+/// 選ばれているモデルが使えない時は、ほかのモデルが使えても切り替えず、返信案を空にして翻訳だけを保存し、
+/// 返信案の生成の失敗として、使えなかったモデルが分かる理由と、そのモデルを記録すること。選べるモデルのそれぞれで確かめる
+@Test(arguments: [
+    (ReplyModel.onDevice, "返信案を作るモデル (onDevice) が使えない"),
+    (ReplyModel.privateCloudCompute, "返信案を作るモデル (privateCloudCompute) が使えない"),
+])
+func screenReadingSavesTranslationOnlyWhenSelectedModelIsUnavailable(replyModel: ReplyModel, failureDescription: String) async throws {
     let source = FakeScreenCaptureSource()
     let reader = FakeScreenReader()
     reader.lines = chatLines
-    reader.canGenerateReplies = false
+    reader.selectedReplyModel = replyModel
+    reader.availableReplyModels = Set(ReplyModel.allCases).subtracting([replyModel])
     let latestReadingFileURL = temporaryFileURL()
     let controller = makeScreenReadingController(
         source: source,
@@ -912,8 +940,86 @@ private let otherChatLines = [
     #expect(latestReading.replySuggestions.isEmpty)
     #expect(reader.replyGenerationCallCount == 0)
     #expect(controller.diagnostics?.reading.replyGeneration.failureCount == 1)
-    #expect(controller.diagnostics?.reading.replyGeneration.lastFailureDescription == "端末内のモデルが使えない")
+    #expect(controller.diagnostics?.reading.replyGeneration.lastFailureDescription == failureDescription)
+    #expect(controller.diagnostics?.reading.replyGenerationModel == replyModel)
+    #expect(reader.availabilityCheckedReplyModels == [replyModel])
     #expect(controller.diagnostics?.reading.saving.successCount == 1)
+}
+
+/// 取り込んだ画面を読むたびに、その時に選ばれているモデルで使えるかを判定して返信案を作り、そのモデルを診断の記録に残すこと。
+/// 取り込みの途中で選び直した後に読んだ画面は、選び直したモデルで作る
+@Test func screenReadingGeneratesRepliesWithModelSelectedAtEachReading() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    reader.selectedReplyModel = .privateCloudCompute
+    let diagnosticsFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: temporaryFileURL(),
+        diagnosticsFileURL: diagnosticsFileURL
+    )
+    controller.start()
+    source.onEvent?(.started)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(reader.availabilityCheckedReplyModels == [.privateCloudCompute])
+    #expect(reader.replyGeneratedModels == [.privateCloudCompute])
+    #expect(controller.diagnostics?.reading.replyGenerationModel == .privateCloudCompute)
+    #expect(loadScreenCaptureDiagnostics(fileURL: diagnosticsFileURL)?.reading.replyGenerationModel == .privateCloudCompute)
+
+    reader.selectedReplyModel = .onDevice
+    reader.lines = otherChatLines
+    await receiveFrame(source: source, controller: controller, receivedAt: 1004, image: try makeScreenImage(gray: 0.8))
+
+    #expect(reader.availabilityCheckedReplyModels == [.privateCloudCompute, .onDevice])
+    #expect(reader.replyGeneratedModels == [.privateCloudCompute, .onDevice])
+    #expect(controller.diagnostics?.reading.replyGenerationModel == .onDevice)
+    #expect(controller.diagnostics?.reading.replyGeneration.successCount == 2)
+}
+
+/// 返信案の生成の段まで進まなかった読み取り (発言が無い画面) では、返信案を作るモデルを診断の記録に残さないこと
+@Test func screenReadingDoesNotRecordReplyModelWhenReplyGenerationIsNotReached() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = []
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: temporaryFileURL(),
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    #expect(controller.diagnostics?.reading.noMessagesCount == 1)
+    #expect(controller.diagnostics?.reading.replyGenerationModel == nil)
+}
+
+/// 返信案を作るモデルの項目 (replyGenerationModel) を足す前の版が保存した診断の記録を、その項目が無い記録として読めること
+/// (アプリを新しくした後も、前回の取り込みの記録を開発者メニューで見られるようにする)
+@Test func screenCaptureDiagnosticsLoadsRecordSavedWithoutReplyGenerationModel() throws {
+    let fileURL = temporaryFileURL()
+    let diagnostics = ScreenCaptureDiagnostics(
+        startedAt: Date(timeIntervalSinceReferenceDate: 500),
+        stoppedAt: nil,
+        stopReason: nil,
+        lastFrameReceivedAt: nil,
+        receivedFrameCount: 3,
+        reading: ScreenReadingDiagnostics(
+            replyGeneration: ScreenReadingStageDiagnostics(successCount: 2, lastSucceededAt: Date(timeIntervalSinceReferenceDate: 510))
+        )
+    )
+    try save(screenCaptureDiagnostics: diagnostics, fileURL: fileURL)
+    #expect(try String(contentsOf: fileURL, encoding: .utf8).contains("replyGenerationModel") == false)
+
+    #expect(loadScreenCaptureDiagnostics(fileURL: fileURL) == diagnostics)
 }
 
 /// 返信の文の生成が失敗した時は、翻訳だけを保存し、返信案の生成の失敗としてエラーの内容を記録すること

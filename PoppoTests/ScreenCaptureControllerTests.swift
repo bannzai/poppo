@@ -60,8 +60,9 @@ func makeScreenCaptureController(
         now: { clock.now },
         recognizeTextLines: { _ in [] },
         translateTexts: { $0 },
-        canGenerateReplies: { false },
-        generateReplyTexts: { _ in [] },
+        selectedReplyModel: { .onDevice },
+        canGenerateReplies: { _ in false },
+        generateReplyTexts: { _, _ in [] },
         wait: { _ in }
     )
 }
@@ -80,8 +81,9 @@ func makeScreenCaptureController(
         now: { Date(timeIntervalSinceReferenceDate: 1000) },
         recognizeTextLines: { _ in [] },
         translateTexts: { $0 },
-        canGenerateReplies: { false },
-        generateReplyTexts: { _ in [] },
+        selectedReplyModel: { .onDevice },
+        canGenerateReplies: { _ in false },
+        generateReplyTexts: { _, _ in [] },
         wait: { _ in }
     )
 
@@ -816,8 +818,9 @@ func makeScreenCaptureController(
         now: { Date(timeIntervalSinceReferenceDate: 1000) },
         recognizeTextLines: { _ in [] },
         translateTexts: { $0 },
-        canGenerateReplies: { false },
-        generateReplyTexts: { _ in [] },
+        selectedReplyModel: { .onDevice },
+        canGenerateReplies: { _ in false },
+        generateReplyTexts: { _, _ in [] },
         wait: { _ in }
     )
 

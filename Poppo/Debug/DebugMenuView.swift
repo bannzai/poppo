@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// 開発者メニュー。simulator では動かない処理 (翻訳・返信案の生成・言語のダウンロード・画面の取り込み) を通さずに、その先の画面を確かめるための入口。
-/// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除) だけ
+/// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除) と、返信案を作るモデルの選択だけ
 struct DebugMenuView: View {
     /// 取り込みの状態。診断の記録を出すのに使う
     @Environment(ScreenCaptureController.self) private var screenCaptureController
@@ -11,8 +11,44 @@ struct DebugMenuView: View {
     /// 直前の読み取り結果の保存・削除が失敗した時のエラーの説明。成功した時と、まだ操作していない時は nil
     @State private var latestReadingOperationError: String?
 
+    /// 返信案を作るモデルとして選ばれているもの。この画面で選んだ後と、画面を開いた時に読み直す
+    @State private var replyModel = selectedReplyModel(userDefaults: .standard)
+
     var body: some View {
         List {
+            Section {
+                ForEach(ReplyModel.allCases, id: \.self) { selectableReplyModel in
+                    Button {
+                        save(selectedReplyModel: selectableReplyModel, userDefaults: .standard)
+                        replyModel = selectedReplyModel(userDefaults: .standard)
+                    } label: {
+                        HStack {
+                            Text(verbatim: debugMenuText(replyModel: selectableReplyModel))
+                            Spacer()
+                            if selectableReplyModel == replyModel {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("debug_select_reply_model_\(selectableReplyModel.rawValue)")
+                }
+                LabeledContent {
+                    Text(verbatim: debugMenuText(replyModel: replyModel))
+                } label: {
+                    Text(verbatim: "選ばれているモデル")
+                }
+                .accessibilityIdentifier("debug_selected_reply_model")
+                LabeledContent {
+                    Text(verbatim: canGenerateReplies(replyModel: replyModel) ? "使える" : "使えない")
+                } label: {
+                    Text(verbatim: "選ばれているモデルが今使えるか")
+                }
+                .accessibilityIdentifier("debug_selected_reply_model_availability")
+            } header: {
+                Text(verbatim: "返信案を作るモデル")
+            } footer: {
+                Text(verbatim: "選んだ後に読む画面 (スクリーンショットからの読み取りと、取り込み) の返信案を、選んだモデルが作る。アプリを起動し直しても選んだままになる。選んだモデルが使えない時は、ほかのモデルに切り替えず、返信案なしで翻訳だけを出す。Private Cloud Compute を選ぶと、画面から読んだ発言が Apple のサーバーへ送られる")
+            }
             Section {
                 NavigationLink {
                     ChatReadingResultView(messages: debugSampleMessages, replySuggestions: debugSampleReplySuggestions)
@@ -136,7 +172,7 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "画面の取り込みの診断の記録")
             } footer: {
-                Text(verbatim: "直近の 1 回の取り込みの記録。始めた時刻があり、止めた時刻が「なし」のまま取り込み中の表示が出ていない時は、止まる前にアプリが終了している。読み取りの各段は、取り込み中に画面が変わるたびに 1 回進む")
+                Text(verbatim: "直近の 1 回の取り込みの記録。始めた時刻があり、止めた時刻が「なし」のまま取り込み中の表示が出ていない時は、止まる前にアプリが終了している。読み取りの各段は、取り込み中に画面が変わるたびに 1 回進む。取り込みの途中で返信案を作るモデルを選び直すと、返信案の生成の回数には選び直す前のモデルの分も入る")
             }
             Section {
                 NavigationLink {
@@ -156,6 +192,7 @@ struct DebugMenuView: View {
         .navigationTitle(Text(verbatim: "開発者メニュー"))
         .onAppear {
             reloadSavedLatestReading()
+            replyModel = selectedReplyModel(userDefaults: .standard)
         }
     }
 
@@ -241,6 +278,12 @@ struct DebugScreenCaptureDiagnosticsRows: View {
             .accessibilityIdentifier("debug_reading_translation")
         DebugScreenReadingStageRow(title: "返信案の生成", stage: diagnostics.reading.replyGeneration)
             .accessibilityIdentifier("debug_reading_reply_generation")
+        LabeledContent {
+            Text(verbatim: diagnostics.reading.replyGenerationModel.map { debugMenuText(replyModel: $0) } ?? "なし")
+        } label: {
+            Text(verbatim: "最後に返信案の生成を試したモデル")
+        }
+        .accessibilityIdentifier("debug_reading_reply_generation_model")
         DebugScreenReadingStageRow(title: "保存", stage: diagnostics.reading.saving)
             .accessibilityIdentifier("debug_reading_saving")
         LabeledContent {
@@ -314,6 +357,7 @@ private let debugSampleDiagnostics = ScreenCaptureDiagnostics(
             lastFailedAt: Date(timeIntervalSinceReferenceDate: 800_000_089),
             lastFailureDescription: "com.example.model 4: 見本のエラーの内容"
         ),
+        replyGenerationModel: .onDevice,
         saving: ScreenReadingStageDiagnostics(successCount: 3, lastSucceededAt: Date(timeIntervalSinceReferenceDate: 800_000_089)),
         noMessagesCount: 4,
         unchangedMessagesCount: 3,
@@ -321,6 +365,16 @@ private let debugSampleDiagnostics = ScreenCaptureDiagnostics(
         shownLatestReadingCount: 1
     )
 )
+
+/// 返信案を作るモデルを、開発者メニューに出す名前にして返す
+private func debugMenuText(replyModel: ReplyModel) -> String {
+    switch replyModel {
+    case .onDevice:
+        "端末内"
+    case .privateCloudCompute:
+        "Private Cloud Compute"
+    }
+}
 
 /// 診断の記録の時刻を、開発者メニューに出す文にして返す。date が nil の時は「なし」を返す
 private func debugDiagnosticsText(date: Date?) -> String {
