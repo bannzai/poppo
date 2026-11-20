@@ -44,10 +44,12 @@ final class ScreenCaptureController {
     private let recognizeTextLines: @MainActor (CGImage) async throws -> [RecognizedTextLine]
     /// 文を利用者の言語に訳す処理
     private let translateTexts: @MainActor ([String]) async throws -> [String]
-    /// 返信案を作れるか (端末内のモデルが使えるか) を返す処理
-    private let canGenerateReplies: @MainActor () -> Bool
-    /// 発言から返信の文を作る処理
-    private let generateReplyTexts: @MainActor ([ExtractedMessage]) async throws -> [String]
+    /// 返信案を作るモデルとして選ばれているものを返す処理。取り込み中に選び直されることがあるため、画面を読むたびに呼ぶ
+    private let selectedReplyModel: @MainActor () -> ReplyModel
+    /// 渡したモデルで返信案を作れるか (そのモデルが使えるか) を返す処理
+    private let canGenerateReplies: @MainActor (ReplyModel) -> Bool
+    /// 発言から、渡したモデルで返信の文を作る処理
+    private let generateReplyTexts: @MainActor ([ExtractedMessage], ReplyModel) async throws -> [String]
     /// 進んでいる途中の、取り込んだ画面の読み取り。読み取っていない間は nil。
     /// 途中の間は次の読み取りを始めない。テストは、この値を待って読み取りが終わったことを知る
     @ObservationIgnored private(set) var readingTask: Task<Void, Never>?
@@ -58,8 +60,14 @@ final class ScreenCaptureController {
     private var lastImageMadeAt: Date?
     /// 今の取り込みで、最後に画像にした画面の、比べるための画素の並び (screenFingerprint)。まだ画像にしていない時は nil
     private var lastScreenFingerprint: [UInt8]?
+    /// 今の取り込みで、最後に画面を画像にした時に、返信案を作るモデルとして選ばれていたモデル。まだ画像にしていない時は nil。
+    /// lastScreenFingerprint と同時に書き換える
+    private var lastScreenReplyModel: ReplyModel?
     /// 今の取り込みで、最後に翻訳を試した発言の原文。成功したか失敗したかを問わない。まだ試していない時は nil
     private var lastTriedMessageTexts: [String]?
+    /// 今の取り込みで、最後に翻訳を試した時に、返信案を作るモデルとして選ばれていたモデル。まだ試していない時は nil。
+    /// lastTriedMessageTexts と同時に書き換える
+    private var lastTriedReplyModel: ReplyModel?
     /// 指定した秒数だけ待つ処理
     private let wait: @MainActor (TimeInterval) async -> Void
     /// 今の取り込みで、読まずに見送った映像のうち最後の 1 枚 (受け取った時刻と、その映像を画像にする処理)。見送った映像が無い時は nil。
@@ -71,8 +79,9 @@ final class ScreenCaptureController {
 
     /// makeSource は取り込みの実体を作る処理、latestReadingFileURL は読み取り結果を保存し、取り込みが終わった時に削除する場所、
     /// diagnosticsFileURL は診断の記録を置く場所 (nil なら保存しない)、now は今の時刻を返す処理。
-    /// recognizeTextLines・translateTexts・canGenerateReplies・generateReplyTexts は、取り込んだ画面を読む時に使う処理
-    /// (simulator では翻訳と生成が動かないため、テストで差し替える)。wait は指定した秒数だけ待つ処理 (テストで待たずに済ませるため)。
+    /// recognizeTextLines・translateTexts・selectedReplyModel・canGenerateReplies・generateReplyTexts は、取り込んだ画面を読む時に使う処理
+    /// (simulator では翻訳と生成が動かないため、テストで差し替える)。返信案は、画面を読むたびに selectedReplyModel が返したモデルで作る。
+    /// wait は指定した秒数だけ待つ処理 (テストで待たずに済ませるため)。
     /// diagnosticsFileURL に前回の記録があれば、それを diagnostics として読み込む (アプリが終了した後でも前回の記録を見られるようにするため)。
     /// latestReadingFileURL に読み取り結果が残っていれば削除する。作った時点では取り込んでいないため、残っているのは
     /// 取り込み中にアプリが終了した時に消せなかったもので、画面を読んでいない間はキーボードに出し続けない
@@ -83,10 +92,12 @@ final class ScreenCaptureController {
         now: @escaping () -> Date,
         recognizeTextLines: @escaping @MainActor (CGImage) async throws -> [RecognizedTextLine],
         translateTexts: @escaping @MainActor ([String]) async throws -> [String],
-        canGenerateReplies: @escaping @MainActor () -> Bool,
-        generateReplyTexts: @escaping @MainActor ([ExtractedMessage]) async throws -> [String],
+        selectedReplyModel: @escaping @MainActor () -> ReplyModel,
+        canGenerateReplies: @escaping @MainActor (ReplyModel) -> Bool,
+        generateReplyTexts: @escaping @MainActor ([ExtractedMessage], ReplyModel) async throws -> [String],
         wait: @escaping @MainActor (TimeInterval) async -> Void
     ) {
+        self.selectedReplyModel = selectedReplyModel
         self.wait = wait
         self.makeSource = makeSource
         self.latestReadingFileURL = latestReadingFileURL
@@ -200,7 +211,9 @@ final class ScreenCaptureController {
     private func forgetReadScreens() {
         lastImageMadeAt = nil
         lastScreenFingerprint = nil
+        lastScreenReplyModel = nil
         lastTriedMessageTexts = nil
+        lastTriedReplyModel = nil
         skippedFrame = nil
     }
 
@@ -268,24 +281,29 @@ final class ScreenCaptureController {
             return
         }
         let fingerprint = screenFingerprint(image: image)
-        // 画素の並びを作れなかった画面 (nil) は、変わったかを比べられないため読む
-        if let fingerprint, fingerprint == lastScreenFingerprint {
+        // 使えるかの判定・生成・診断の記録が同じモデルを指すよう、この読み取りで使うモデルをここで 1 回だけ決める
+        // (読み取りの途中で開発者メニューから選び直されても、この読み取りには効かせない)
+        let replyModel = selectedReplyModel()
+        // 画素の並びを作れなかった画面 (nil) は、変わったかを比べられないため読む。
+        // 画面が同じでも、返信案を作るモデルを選び直した後は読む (選び直したモデルで返信案を作るため)
+        if let fingerprint, fingerprint == lastScreenFingerprint, replyModel == lastScreenReplyModel {
             return
         }
         lastScreenFingerprint = fingerprint
+        lastScreenReplyModel = replyModel
         readingTask = Task { [captureCount] in
-            await self.readScreen(image: image, capturedAt: receivedAt, captureCount: captureCount)
+            await self.readScreen(image: image, capturedAt: receivedAt, captureCount: captureCount, replyModel: replyModel)
             self.readingTask = nil
         }
     }
 
     /// 取り込んだ画面の画像 (image) から読み取り結果を作り、latestReadingFileURL に保存する。前の読み取り結果は上書きされる。
-    /// capturedAt は画面を受け取った時刻、captureCount は読み取りを始めた時の取り込みの回。
+    /// capturedAt は画面を受け取った時刻、captureCount は読み取りを始めた時の取り込みの回、replyModel は読み取りを始めた時に選ばれていた、返信案を作るモデル。
     /// 各段 (文字の読み取り・翻訳・返信案の生成・保存) の成功と失敗を診断の記録に残す。
     /// 次の時は翻訳へ進まず、保存してある読み取り結果をそのまま残す: 画面に Poppo のキーボードが出している読み取り結果が映っている、
-    /// 発言が 1 つも無い、発言が前に翻訳を試した時と同じ。
+    /// 発言が 1 つも無い、発言と返信案を作るモデルの両方が前に翻訳を試した時と同じ。
     /// 読み取りの途中で取り込みが終わっていた時は、保存も記録もしない (止めた後に読み取り結果を残さない)
-    private func readScreen(image: CGImage, capturedAt: Date, captureCount: Int) async {
+    private func readScreen(image: CGImage, capturedAt: Date, captureCount: Int, replyModel: ReplyModel) async {
         let lines: [RecognizedTextLine]
         do {
             lines = try await recognizeTextLines(image)
@@ -294,6 +312,7 @@ final class ScreenCaptureController {
                 // 文字を読めなかった画面は「読んだ画面」として覚えない。同じ画面の映像が次に届いた時に読み直せるようにする
                 // (画面が変わらず映像が届かない間は読み直さない)
                 lastScreenFingerprint = nil
+                lastScreenReplyModel = nil
             }
             recordReading(captureCount: captureCount) {
                 $0.recognition.recordFailure(date: now(), failureDescription: screenReadingFailureDescription(error: error))
@@ -320,7 +339,8 @@ final class ScreenCaptureController {
             }
             return
         }
-        guard extractedMessages.map(\.text) != lastTriedMessageTexts else {
+        // 発言が同じでも、返信案を作るモデルを選び直した後は読み直す (選び直したモデルで返信案を作るため)
+        guard extractedMessages.map(\.text) != lastTriedMessageTexts || replyModel != lastTriedReplyModel else {
             recordReading(captureCount: captureCount) {
                 $0.recognition.recordSuccess(date: now())
                 $0.unchangedMessagesCount += 1
@@ -329,12 +349,13 @@ final class ScreenCaptureController {
         }
         // 翻訳に失敗した発言も「試した」として覚える。同じ画面が映っている間、失敗する翻訳を 2 秒ごとに繰り返さないため
         lastTriedMessageTexts = extractedMessages.map(\.text)
+        lastTriedReplyModel = replyModel
         recordReading(captureCount: captureCount) { $0.recognition.recordSuccess(date: now()) }
 
         // readChat は返信案を作れなかった理由を返さない (翻訳だけを返す) ため、渡す処理の中で理由を覚える
         var didTranslateMessages = false
         var replyGenerationFailureDescription: String?
-        let isReplyGenerationAvailable = self.canGenerateReplies()
+        let isReplyGenerationAvailable = self.canGenerateReplies(replyModel)
         let reading: (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
         do {
             reading = try await readChat(
@@ -360,10 +381,11 @@ final class ScreenCaptureController {
                         throw error
                     }
                 },
-                canGenerateReplies: isReplyGenerationAvailable,
-                generateReplyTexts: { messages in
+                replyModel: replyModel,
+                canGenerateReplies: { _ in isReplyGenerationAvailable },
+                generateReplyTexts: { messages, replyModel in
                     do {
-                        return try await self.generateReplyTexts(messages)
+                        return try await self.generateReplyTexts(messages, replyModel)
                     } catch {
                         replyGenerationFailureDescription = screenReadingFailureDescription(error: error)
                         throw error
@@ -383,11 +405,12 @@ final class ScreenCaptureController {
             return
         }
         recordReading(captureCount: captureCount) {
+            $0.replyGenerationModel = replyModel
             if reading.replySuggestions.isEmpty {
                 $0.replyGeneration.recordFailure(
                     date: now(),
                     failureDescription: replyGenerationFailureDescription
-                        ?? (isReplyGenerationAvailable ? "返信案が 1 つも作られなかった" : "端末内のモデルが使えない")
+                        ?? (isReplyGenerationAvailable ? "返信案が 1 つも作られなかった" : "返信案を作るモデル (\(replyModel.rawValue)) が使えない")
                 )
             } else {
                 $0.replyGeneration.recordSuccess(date: now())
