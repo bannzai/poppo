@@ -60,6 +60,9 @@ final class ScreenCaptureController {
     private var lastImageMadeAt: Date?
     /// 今の取り込みで、最後に画像にした画面の、比べるための画素の並び (screenFingerprint)。まだ画像にしていない時は nil
     private var lastScreenFingerprint: [UInt8]?
+    /// 今の取り込みで、最後に画面を画像にした時に、返信案を作るモデルとして選ばれていたモデル。まだ画像にしていない時は nil。
+    /// lastScreenFingerprint と同時に書き換える
+    private var lastScreenReplyModel: ReplyModel?
     /// 今の取り込みで、最後に翻訳を試した発言の原文。成功したか失敗したかを問わない。まだ試していない時は nil
     private var lastTriedMessageTexts: [String]?
     /// 今の取り込みで、最後に翻訳を試した時に、返信案を作るモデルとして選ばれていたモデル。まだ試していない時は nil。
@@ -208,6 +211,7 @@ final class ScreenCaptureController {
     private func forgetReadScreens() {
         lastImageMadeAt = nil
         lastScreenFingerprint = nil
+        lastScreenReplyModel = nil
         lastTriedMessageTexts = nil
         lastTriedReplyModel = nil
         skippedFrame = nil
@@ -277,24 +281,29 @@ final class ScreenCaptureController {
             return
         }
         let fingerprint = screenFingerprint(image: image)
-        // 画素の並びを作れなかった画面 (nil) は、変わったかを比べられないため読む
-        if let fingerprint, fingerprint == lastScreenFingerprint {
+        // 使えるかの判定・生成・診断の記録が同じモデルを指すよう、この読み取りで使うモデルをここで 1 回だけ決める
+        // (読み取りの途中で開発者メニューから選び直されても、この読み取りには効かせない)
+        let replyModel = selectedReplyModel()
+        // 画素の並びを作れなかった画面 (nil) は、変わったかを比べられないため読む。
+        // 画面が同じでも、返信案を作るモデルを選び直した後は読む (選び直したモデルで返信案を作るため)
+        if let fingerprint, fingerprint == lastScreenFingerprint, replyModel == lastScreenReplyModel {
             return
         }
         lastScreenFingerprint = fingerprint
+        lastScreenReplyModel = replyModel
         readingTask = Task { [captureCount] in
-            await self.readScreen(image: image, capturedAt: receivedAt, captureCount: captureCount)
+            await self.readScreen(image: image, capturedAt: receivedAt, captureCount: captureCount, replyModel: replyModel)
             self.readingTask = nil
         }
     }
 
     /// 取り込んだ画面の画像 (image) から読み取り結果を作り、latestReadingFileURL に保存する。前の読み取り結果は上書きされる。
-    /// capturedAt は画面を受け取った時刻、captureCount は読み取りを始めた時の取り込みの回。
+    /// capturedAt は画面を受け取った時刻、captureCount は読み取りを始めた時の取り込みの回、replyModel は読み取りを始めた時に選ばれていた、返信案を作るモデル。
     /// 各段 (文字の読み取り・翻訳・返信案の生成・保存) の成功と失敗を診断の記録に残す。
     /// 次の時は翻訳へ進まず、保存してある読み取り結果をそのまま残す: 画面に Poppo のキーボードが出している読み取り結果が映っている、
     /// 発言が 1 つも無い、発言と返信案を作るモデルの両方が前に翻訳を試した時と同じ。
     /// 読み取りの途中で取り込みが終わっていた時は、保存も記録もしない (止めた後に読み取り結果を残さない)
-    private func readScreen(image: CGImage, capturedAt: Date, captureCount: Int) async {
+    private func readScreen(image: CGImage, capturedAt: Date, captureCount: Int, replyModel: ReplyModel) async {
         let lines: [RecognizedTextLine]
         do {
             lines = try await recognizeTextLines(image)
@@ -303,6 +312,7 @@ final class ScreenCaptureController {
                 // 文字を読めなかった画面は「読んだ画面」として覚えない。同じ画面の映像が次に届いた時に読み直せるようにする
                 // (画面が変わらず映像が届かない間は読み直さない)
                 lastScreenFingerprint = nil
+                lastScreenReplyModel = nil
             }
             recordReading(captureCount: captureCount) {
                 $0.recognition.recordFailure(date: now(), failureDescription: screenReadingFailureDescription(error: error))
@@ -329,9 +339,6 @@ final class ScreenCaptureController {
             }
             return
         }
-        // 使えるかの判定・生成・診断の記録が同じモデルを指すよう、この読み取りで使うモデルをここで 1 回だけ決める
-        // (読み取りの途中で開発者メニューから選び直されても、この読み取りには効かせない)
-        let replyModel = selectedReplyModel()
         // 発言が同じでも、返信案を作るモデルを選び直した後は読み直す (選び直したモデルで返信案を作るため)
         guard extractedMessages.map(\.text) != lastTriedMessageTexts || replyModel != lastTriedReplyModel else {
             recordReading(captureCount: captureCount) {

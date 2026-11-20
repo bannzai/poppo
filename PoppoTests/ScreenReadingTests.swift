@@ -286,6 +286,39 @@ private let otherChatLines = [
     #expect(controller.diagnostics?.reading.unchangedMessagesCount == 1)
 }
 
+/// 画面の画素が前に読んだ時と同じでも、返信案を作るモデルを選び直した後に届いた画面は読み直し、選び直したモデルで返信案を作ること。
+/// 選び直した後に同じ画素の画面がもう 1 回届いても、3 回目は文字を読み直さない
+@Test func screenReadingReadsSameScreenPixelsAgainAfterReplyModelIsReselected() async throws {
+    let source = FakeScreenCaptureSource()
+    let reader = FakeScreenReader()
+    reader.lines = chatLines
+    reader.selectedReplyModel = .privateCloudCompute
+    let latestReadingFileURL = temporaryFileURL()
+    let controller = makeScreenReadingController(
+        source: source,
+        reader: reader,
+        clock: TestClock(now: Date(timeIntervalSinceReferenceDate: 1000)),
+        latestReadingFileURL: latestReadingFileURL,
+        diagnosticsFileURL: nil
+    )
+    controller.start()
+    source.onEvent?(.started)
+    await receiveFrame(source: source, controller: controller, receivedAt: 1001, image: try makeScreenImage(gray: 0.2))
+
+    reader.selectedReplyModel = .onDevice
+    await receiveFrame(source: source, controller: controller, receivedAt: 1004, image: try makeScreenImage(gray: 0.2))
+
+    #expect(reader.recognitionCallCount == 2)
+    #expect(reader.replyGeneratedModels == [.privateCloudCompute, .onDevice])
+    #expect(loadLatestReading(fileURL: latestReadingFileURL)?.capturedAt == Date(timeIntervalSinceReferenceDate: 1004))
+    #expect(controller.diagnostics?.reading.replyGenerationModel == .onDevice)
+
+    await receiveFrame(source: source, controller: controller, receivedAt: 1007, image: try makeScreenImage(gray: 0.2))
+
+    #expect(reader.recognitionCallCount == 2)
+    #expect(reader.replyGeneratedModels == [.privateCloudCompute, .onDevice])
+}
+
 /// 画面の発言が変わったら読み直し、前の読み取り結果を残さず新しい内容で上書きすること
 @Test func screenReadingOverwritesLatestReadingWhenMessagesChange() async throws {
     let source = FakeScreenCaptureSource()
