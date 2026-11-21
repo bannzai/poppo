@@ -40,6 +40,10 @@ owner (bannzai) は 2026-11-20 に次のように決めた ( https://github.com/
 - 利用者に配るビルド (開発者メニューの無いビルド) は、端末内だけのまま変えない。選んだモデルが端末に保存してあっても見ずに、端末内のモデルで作る。そのため `docs/PrivacyPolicy-ja.md`・App Privacy の回答・輸出コンプライアンスの申告は変えない。開発者メニューのあるビルドを配るのは TestFlight の内部テスト (2026-11-20 の時点で owner だけ) に限る
 - 利用者に配るビルドで端末の外へ送る構成と、外部の API (Claude・Gemini・OpenAI) は、この改めの範囲に入れない。足す時は、同意の画面と文書の直し (`documents/DIRECTION.md`「決めたこと」の 2026-11-20 の行) を済ませ、この ADR を改める
 
+### 2026-11-21: サーバーを経由する案 (ADR 0003。決まるまでこの ADR のまま)
+
+端末の外のモデル (Claude・OpenAI・Gemini) を利用者に配る時に、API キーをサーバーに置く案を `documents/adr/0003-serve-off-device-reply-models-through-genkit-server.md` に書いた (Status は Proposed)。リポジトリにサーバーの処理 (`server/`) とそのテストを足したが、デプロイしておらず、アプリからも呼んでいない。上の表 (サーバー・認証を持たない) は、owner が ADR 0003 の「owner が決めること」を決めて実装する時に改める。
+
 ## Consequences
 
 **良い点:**

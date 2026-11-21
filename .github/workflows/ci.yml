@@ -34,6 +34,31 @@ jobs:
       - name: 本体アプリとキーボード拡張の App Group の設定のテスト
         run: bash scripts/test/test-app-group-entitlements.sh
 
+  # 返信の文を作るサーバーの処理 (server/。Genkit の flow) の型検査とテスト。提供元の API は呼ばず、API キーも使わない
+  server-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: server/package.json
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: 依存を入れる (npm ci)
+        run: npm ci
+
+      - name: 型検査 (npm run typecheck)
+        run: npm run typecheck
+
+      - name: テスト (npm test)
+        run: npm test
+
   build-and-test:
     # iOS 27 の SDK と simulator が入っている GitHub-hosted runner は xcode-27 だけ
     # (macos-latest / macos-26 の Xcode は 26 系。https://github.com/actions/runner-images の images/macos/xcode-27-arm64-Readme.md)
