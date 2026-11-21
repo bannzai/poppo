@@ -13,8 +13,9 @@ DEVELOPMENT_TEAM ?= $(FASTLANE_TEAM_ID)
 .PHONY: build-ios build-ios-device device install-device ios test clean verify
 
 # Simulator 向けビルド。generic destination なら simulator の起動なしでビルドできる
+# 署名は切らない: この成果物を `make ios` が simulator に入れて起動し、開発者メニューの API キーの保存が Keychain を使うため (理由は下の test のコメント)
 build-ios:
-	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) -destination 'generic/platform=iOS Simulator' build
 
 # 実機向けの SDK でのビルドだけを、署名なしで行う (実機には入れられない)。
 # ScreenCaptureKit は iOS Simulator の SDK に入っておらず、画面の取り込みの実体 (Poppo/ScreenCapture/SystemScreenCaptureSource.swift) は
@@ -49,11 +50,13 @@ ios: build-ios
 	xcrun simctl install "$$simulator_udid" $(APP); \
 	xcrun simctl launch "$$simulator_udid" $(BUNDLE_ID)
 
+# 署名は切らない (CODE_SIGNING_ALLOWED=NO を付けない): 署名の無いアプリは entitlements を持たず、Keychain の操作が
+# errSecMissingEntitlement (-34018) で失敗するため (API キーの保存のテスト。CI の実測: https://github.com/bannzai/poppo/actions/runs/44855185498 )
 test:
 	@set -e; \
 	destination="$(DESTINATION)"; \
 	[ -n "$$destination" ] && [ "$$destination" != "platform=iOS Simulator,id=" ] || { echo "Error: sim-boot で Simulator を解決できません (sim-boot が PATH にあるか確認するか、DESTINATION='<destination>' または SIMULATOR_UDID=<UDID> を指定してください)" >&2; exit 1; }; \
-	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -derivedDataPath $(DERIVED_DATA) -destination "$$destination" CODE_SIGNING_ALLOWED=NO test
+	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -derivedDataPath $(DERIVED_DATA) -destination "$$destination" test
 
 clean:
 	rm -rf $(DERIVED_DATA)
