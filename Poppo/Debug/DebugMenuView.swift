@@ -2,7 +2,8 @@
 import SwiftUI
 
 /// 開発者メニュー。simulator では動かない処理 (翻訳・返信案の生成・言語のダウンロード・画面の取り込み) を通さずに、その先の画面を確かめるための入口。
-/// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除) と、返信案を作るモデルの選択だけ
+/// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除)、返信案を作るモデルの選択、
+/// 返信案を作るモデルの API キー (端末の Keychain) だけ
 struct DebugMenuView: View {
     /// 取り込みの状態。診断の記録を出すのに使う
     @Environment(ScreenCaptureController.self) private var screenCaptureController
@@ -16,10 +17,68 @@ struct DebugMenuView: View {
     /// 発言を端末の外へ送るモデルのうち、選ぶ操作をして、送ることの確認の返事を待っているもの。確認を出していない時は nil
     @State private var replyModelWaitingForSendingConfirmation: ReplyModel?
 
+    /// API キーの入力欄に入力している文。モデルごとに持ち、保存か削除をしたモデルの分は空に戻す。保存するまで端末には残らない
+    @State private var enteredAPIKeys: [ReplyModel: String] = [:]
+    /// API キーを Keychain に保存してあるモデル。この画面の操作の後と、画面を開いた時に読み直す
+    @State private var replyModelsWithSavedAPIKey: Set<ReplyModel> = []
+    /// 直前の API キーの保存か削除が失敗した時のエラーの説明 (API キーの値は入らない)。次の保存か削除が成功するまで残す。
+    /// 直前の保存か削除が成功した時と、まだ操作していない時は nil
+    @State private var apiKeyOperationError: String?
+    /// 直前の、保存してある API キーの読み直しが失敗した時のエラーの説明 (API キーの値は入らない)。すべてのモデルを読めた時は nil
+    @State private var apiKeyReloadError: String?
+
     /// 返信案を作るモデルとして selectingReplyModel を選んだことを保存し、この画面の表示を保存した後の値にする
     private func select(replyModel selectingReplyModel: ReplyModel) {
         save(selectedReplyModel: selectingReplyModel, userDefaults: .standard)
         replyModel = selectedReplyModel(userDefaults: .standard)
+    }
+
+    /// 入力欄の文を、apiKeyReplyModel のモデルの API キーとして Keychain に保存する。前に保存したキーは上書きされる。
+    /// 貼り付けた文の前後の空白と改行は取り除く。保存できた時は入力欄を空に戻す。
+    /// 保存できなかった時は、エラーの説明を apiKeyOperationError に入れる (画面を開き直しても、次の保存か削除が成功するまで残る)
+    private func saveEnteredAPIKey(apiKeyReplyModel: ReplyModel) {
+        do {
+            try save(
+                apiKey: apiKey(enteredText: enteredAPIKeys[apiKeyReplyModel, default: ""]),
+                replyModel: apiKeyReplyModel,
+                keychainService: replyModelAPIKeyKeychainService
+            )
+            enteredAPIKeys[apiKeyReplyModel] = nil
+            apiKeyOperationError = nil
+        } catch {
+            apiKeyOperationError = error.localizedDescription
+        }
+        reloadReplyModelsWithSavedAPIKey()
+    }
+
+    /// apiKeyReplyModel のモデルの API キーを Keychain から削除し、入力欄を空に戻す。保存していない時に実行しても何も起きない。
+    /// 削除できなかった時は、エラーの説明を apiKeyOperationError に入れる (画面を開き直しても、次の保存か削除が成功するまで残る)
+    private func deleteSavedAPIKey(apiKeyReplyModel: ReplyModel) {
+        do {
+            try deleteAPIKey(replyModel: apiKeyReplyModel, keychainService: replyModelAPIKeyKeychainService)
+            enteredAPIKeys[apiKeyReplyModel] = nil
+            apiKeyOperationError = nil
+        } catch {
+            apiKeyOperationError = error.localizedDescription
+        }
+        reloadReplyModelsWithSavedAPIKey()
+    }
+
+    /// API キーを保存してあるモデルを Keychain から読み直して replyModelsWithSavedAPIKey に入れる。
+    /// 読めなかったモデルは保存していない扱いにし、エラーの説明を apiKeyReloadError に入れる。
+    /// すべてのモデルを読めた時は apiKeyReloadError を nil にする。保存と削除の失敗の説明 (apiKeyOperationError) は変えない
+    private func reloadReplyModelsWithSavedAPIKey() {
+        apiKeyReloadError = nil
+        replyModelsWithSavedAPIKey = Set(
+            ReplyModel.allCases.filter { usesAPIKey(replyModel: $0) }.filter { apiKeyReplyModel in
+                do {
+                    return try loadAPIKey(replyModel: apiKeyReplyModel, keychainService: replyModelAPIKeyKeychainService) != nil
+                } catch {
+                    apiKeyReloadError = error.localizedDescription
+                    return false
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -58,7 +117,55 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "返信案を作るモデル")
             } footer: {
-                Text(verbatim: "選んだ後に読む画面 (スクリーンショットからの読み取りと、取り込み) の返信案を、選んだモデルが作る。アプリを起動し直しても選んだままになる。選んだモデルが使えない時は、ほかのモデルに切り替えず、返信案なしで翻訳だけを出す。Private Cloud Compute を選ぶと、画面から読んだ発言が Apple のサーバーへ送られるため、選ぶ時に確認が出る (取り消すと選択は変わらない)")
+                Text(verbatim: "選んだ後に読む画面 (スクリーンショットからの読み取りと、取り込み) の返信案を、選んだモデルが作る。アプリを起動し直しても選んだままになる。選んだモデルが使えない時 (OpenAI と Gemini は API キーを保存していない時) は、ほかのモデルに切り替えず、返信案なしで翻訳だけを出す。「端末内」のほかを選ぶと、画面から読んだ発言がそのモデルの提供元のサーバーへ送られるため、選ぶ時に確認が出る (取り消すと選択は変わらない)")
+            }
+            Section {
+                ForEach(ReplyModel.allCases.filter { usesAPIKey(replyModel: $0) }, id: \.self) { apiKeyReplyModel in
+                    SecureField(
+                        text: Binding(
+                            get: { enteredAPIKeys[apiKeyReplyModel, default: ""] },
+                            set: { enteredAPIKeys[apiKeyReplyModel] = $0 }
+                        )
+                    ) {
+                        Text(verbatim: "\(debugMenuText(replyModel: apiKeyReplyModel)) の API キー")
+                    }
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("debug_reply_model_api_key_field_\(apiKeyReplyModel.rawValue)")
+                    Button {
+                        saveEnteredAPIKey(apiKeyReplyModel: apiKeyReplyModel)
+                    } label: {
+                        Text(verbatim: "\(debugMenuText(replyModel: apiKeyReplyModel)) の API キーを保存する")
+                    }
+                    .disabled(apiKey(enteredText: enteredAPIKeys[apiKeyReplyModel, default: ""]).isEmpty)
+                    .accessibilityIdentifier("debug_save_reply_model_api_key_\(apiKeyReplyModel.rawValue)")
+                    Button(role: .destructive) {
+                        deleteSavedAPIKey(apiKeyReplyModel: apiKeyReplyModel)
+                    } label: {
+                        Text(verbatim: "\(debugMenuText(replyModel: apiKeyReplyModel)) の API キーを消す")
+                    }
+                    .accessibilityIdentifier("debug_delete_reply_model_api_key_\(apiKeyReplyModel.rawValue)")
+                    LabeledContent {
+                        Text(verbatim: replyModelsWithSavedAPIKey.contains(apiKeyReplyModel) ? "保存済み" : "なし")
+                    } label: {
+                        Text(verbatim: "保存してある \(debugMenuText(replyModel: apiKeyReplyModel)) の API キー")
+                    }
+                    .accessibilityIdentifier("debug_reply_model_api_key_state_\(apiKeyReplyModel.rawValue)")
+                }
+                if let apiKeyOperationError {
+                    Text(verbatim: apiKeyOperationError)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("debug_reply_model_api_key_error")
+                }
+                if let apiKeyReloadError {
+                    Text(verbatim: apiKeyReloadError)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("debug_reply_model_api_key_reload_error")
+                }
+            } header: {
+                Text(verbatim: "返信案を作るモデルの API キー")
+            } footer: {
+                Text(verbatim: "保存した API キーは、この端末の Keychain にだけ置く (ほかの端末へは移さない)。保存したキーの値はこの画面に出さない。費用の上限は、各社の画面でキーに付ける")
             }
             Section {
                 NavigationLink {
@@ -204,9 +311,10 @@ struct DebugMenuView: View {
         .onAppear {
             reloadSavedLatestReading()
             replyModel = selectedReplyModel(userDefaults: .standard)
+            reloadReplyModelsWithSavedAPIKey()
         }
         .alert(
-            Text(verbatim: "発言を Apple のサーバーへ送る"),
+            Text(verbatim: "発言を端末の外へ送る"),
             isPresented: Binding(
                 get: { replyModelWaitingForSendingConfirmation != nil },
                 set: { isPresented in
@@ -229,7 +337,7 @@ struct DebugMenuView: View {
             }
             .accessibilityIdentifier("debug_cancel_sending_messages_outside_device")
         } message: { confirmingReplyModel in
-            Text(verbatim: "\(debugMenuText(replyModel: confirmingReplyModel)) を選ぶと、この後に読む画面 (スクリーンショットからの読み取りと、取り込み) から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために Apple のサーバー (Private Cloud Compute) へ送る。「端末内」を選び直すまで送り続ける")
+            Text(verbatim: "\(debugMenuText(replyModel: confirmingReplyModel)) を選ぶと、この後に読む画面 (スクリーンショットからの読み取りと、取り込み) から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために \(debugMenuSendingDestinationText(replyModel: confirmingReplyModel)) へ送る。ほかのモデルを選び直すまで送り続ける")
         }
     }
 
@@ -410,6 +518,25 @@ private func debugMenuText(replyModel: ReplyModel) -> String {
         "端末内"
     case .privateCloudCompute:
         "Private Cloud Compute"
+    case .openAI:
+        "OpenAI"
+    case .gemini:
+        "Gemini"
+    }
+}
+
+/// replyModel のモデルで返信案を作る時に、画面から読んだ発言を送る先を、開発者メニューに出す名前にして返す。
+/// 選ぶ時の確認に出す (sendsMessagesOutsideDevice(replyModel:) が true のモデル)
+private func debugMenuSendingDestinationText(replyModel: ReplyModel) -> String {
+    switch replyModel {
+    case .onDevice:
+        "端末内 (端末の外へは送らない)"
+    case .privateCloudCompute:
+        "Apple のサーバー (Private Cloud Compute)"
+    case .openAI:
+        "OpenAI のサーバー"
+    case .gemini:
+        "Google のサーバー"
     }
 }
 

@@ -986,6 +986,8 @@ private let otherChatLines = [
 @Test(arguments: [
     (ReplyModel.onDevice, "返信案を作るモデル (onDevice) が使えない"),
     (ReplyModel.privateCloudCompute, "返信案を作るモデル (privateCloudCompute) が使えない"),
+    (ReplyModel.openAI, "返信案を作るモデル (openAI) が使えない"),
+    (ReplyModel.gemini, "返信案を作るモデル (gemini) が使えない"),
 ])
 func screenReadingSavesTranslationOnlyWhenSelectedModelIsUnavailable(replyModel: ReplyModel, failureDescription: String) async throws {
     let source = FakeScreenCaptureSource()
