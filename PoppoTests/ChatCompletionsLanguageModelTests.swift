@@ -138,6 +138,50 @@ private func makeGenerationRequest(transcript: Transcript, schema: GenerationSch
     )
 }
 
+/// 1 つの発言が文を複数持つ時は順につなぎ、文でない部分 (構造を持つ部分) と、対象外の記録 (tool の出力) は messages に入れないこと
+@Test func requestBodyJoinsTextSegmentsAndOmitsNonTextSegmentsAndOtherEntries() throws {
+    #expect(
+        try JSONSerialization.jsonObject(
+            with: chatCompletionsRequestBody(
+                request: makeGenerationRequest(
+                    transcript: Transcript(entries: [
+                        .prompt(
+                            Transcript.Prompt(
+                                metadata: [:],
+                                segments: [
+                                    .text(Transcript.TextSegment(content: "Them: Hel")),
+                                    .structure(Transcript.StructuredSegment(schemaName: "Sample", content: GeneratedContent("not text"))),
+                                    .text(Transcript.TextSegment(content: "lo")),
+                                ]
+                            )
+                        ),
+                        .toolOutput(
+                            Transcript.ToolOutput(id: "tool-output", toolName: "lookup", segments: textSegments(content: "tool text"))
+                        ),
+                    ]),
+                    schema: nil
+                ),
+                modelName: "model-a"
+            )
+        ) as? NSDictionary == [
+            "model": "model-a",
+            "messages": [
+                ["role": "user", "content": "Them: Hello"]
+            ],
+        ] as NSDictionary
+    )
+}
+
+/// 入力欄の文の前後の空白と改行は取り除き、途中の空白は残すこと。空白と改行だけの入力と空の入力は空文字になること
+/// (空文字の時、開発者メニューは保存のボタンを押せなくする)
+@Test func apiKeyFromEnteredTextDropsSurroundingWhitespaceAndNewlines() {
+    #expect(apiKey(enteredText: "  key-1\n") == "key-1")
+    #expect(apiKey(enteredText: "\n\tkey 2 \r\n") == "key 2")
+    #expect(apiKey(enteredText: "key-3") == "key-3")
+    #expect(apiKey(enteredText: " \n\t") == "")
+    #expect(apiKey(enteredText: "") == "")
+}
+
 /// 会話が空の時は、messages が空の並びになること
 @Test func requestBodyHasEmptyMessagesForEmptyTranscript() throws {
     #expect(
@@ -173,7 +217,7 @@ private func makeGenerationRequest(transcript: Transcript, schema: GenerationSch
                             "maxItems": 3,
                             "minItems": 3,
                             "type": "array",
-                        ],
+                        ]
                     ],
                     "required": ["texts"],
                     "title": "GeneratedReplyTexts",
@@ -188,36 +232,37 @@ private func makeGenerationRequest(transcript: Transcript, schema: GenerationSch
 /// x- で始まらないキーワード (x だけ・途中に x- を含む名前) と、x- で始まるプロパティの名前 (properties・$defs の直下のキー) は残すこと
 @Test func vendorExtensionKeywordsAreRemovedButPropertyNamesAreKept() {
     #expect(
-        removingVendorExtensionKeys(jsonSchema: [
-            "type": "object",
-            "x-order": ["x-rating", "note"],
-            "x": 1,
-            "max-x-value": 2,
-            "properties": [
-                "x-rating": ["type": "integer", "x-hint": "remove"],
-                "note": ["type": "array", "items": ["type": "string", "x-hint": "remove"]],
-            ],
-            "$defs": [
-                "x-shared": ["type": "string", "x-hint": "remove"],
-            ],
-            "anyOf": [
-                ["type": "string", "x-hint": "remove"],
-            ],
-        ] as [String: Any]) as? NSDictionary == [
-            "type": "object",
-            "x": 1,
-            "max-x-value": 2,
-            "properties": [
-                "x-rating": ["type": "integer"],
-                "note": ["type": "array", "items": ["type": "string"]],
-            ],
-            "$defs": [
-                "x-shared": ["type": "string"],
-            ],
-            "anyOf": [
-                ["type": "string"],
-            ],
-        ] as NSDictionary
+        removingVendorExtensionKeys(
+            jsonSchema: [
+                "type": "object",
+                "x-order": ["x-rating", "note"],
+                "x": 1,
+                "max-x-value": 2,
+                "properties": [
+                    "x-rating": ["type": "integer", "x-hint": "remove"],
+                    "note": ["type": "array", "items": ["type": "string", "x-hint": "remove"]],
+                ],
+                "$defs": [
+                    "x-shared": ["type": "string", "x-hint": "remove"]
+                ],
+                "anyOf": [
+                    ["type": "string", "x-hint": "remove"]
+                ],
+            ] as [String: Any]) as? NSDictionary == [
+                "type": "object",
+                "x": 1,
+                "max-x-value": 2,
+                "properties": [
+                    "x-rating": ["type": "integer"],
+                    "note": ["type": "array", "items": ["type": "string"]],
+                ],
+                "$defs": [
+                    "x-shared": ["type": "string"]
+                ],
+                "anyOf": [
+                    ["type": "string"]
+                ],
+            ] as NSDictionary
     )
 }
 

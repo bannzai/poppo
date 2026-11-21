@@ -99,7 +99,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
     /// API キーを置く、このテストだけの Keychain の service
     private let keychainService = "ChatCompletionsRequestTests-\(UUID().uuidString)"
 
-    // 通信の差し替えを始め、前のテストの応答と要求を消すために書く
+    /// 通信の差し替えを始め、前のテストの応答と要求を消す
     init() {
         URLProtocol.registerClass(ChatCompletionsStubURLProtocol.self)
         ChatCompletionsStubURLProtocol.state.withLock { $0 = ChatCompletionsStubState() }
@@ -194,7 +194,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
 
     /// 提供元が 200 番台以外を返すと、その status code を持つエラーになること。診断の記録に書く文は status code を持ち、
     /// 応答の本文に API キーが入っていても、キーを持たないこと
-    @Test(arguments: [300, 401, 429, 500])
+    @Test(arguments: [100, 199, 300, 401, 429, 500])
     func statusOutsideSuccessRangeThrowsErrorWithStatusCodeAndWithoutAPIKey(statusCode: Int) async throws {
         defer {
             deleteAPIKeys()
@@ -241,6 +241,33 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
                 replyModel: .openAI,
                 apiKeyKeychainService: keychainService
             ) == ["A", "B", "C"]
+        )
+    }
+
+    /// 応答に候補が複数ある時は、先頭の候補の文だけを使うこと
+    @Test func firstChoiceIsUsedWhenResponseHasMultipleChoices() async throws {
+        defer {
+            deleteAPIKeys()
+        }
+        try save(apiKey: "test-openai-key", replyModel: .openAI, keychainService: keychainService)
+        try ChatCompletionsStubURLProtocol.state.withLock {
+            $0.responses["api.openai.com"] = StubbedChatCompletionsResponse(
+                statusCode: 200,
+                body: try JSONSerialization.data(withJSONObject: [
+                    "choices": [
+                        ["message": ["role": "assistant", "content": #"{"texts":["First 1","First 2","First 3"]}"#]],
+                        ["message": ["role": "assistant", "content": #"{"texts":["Second 1","Second 2","Second 3"]}"#]],
+                    ]
+                ])
+            )
+        }
+
+        #expect(
+            try await generateReplyTexts(
+                messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
+                replyModel: .openAI,
+                apiKeyKeychainService: keychainService
+            ) == ["First 1", "First 2", "First 3"]
         )
     }
 

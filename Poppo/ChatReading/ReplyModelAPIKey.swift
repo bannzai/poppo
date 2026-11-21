@@ -15,6 +15,12 @@ nonisolated struct ReplyModelAPIKeyKeychainError: Error, Equatable, LocalizedErr
     }
 }
 
+/// enteredText (API キーの入力欄に入力した文) から、前後の空白と改行を取り除いて、保存する API キーにして返す。
+/// 貼り付けで付いた改行や空白が残ると、提供元の認証が通らないため。空白と改行だけの入力では空文字を返す
+nonisolated func apiKey(enteredText: String) -> String {
+    enteredText.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 /// keychainService の下で replyModel の API キーを指す、Keychain の検索の条件を返す
 private nonisolated func apiKeyKeychainQuery(replyModel: ReplyModel, keychainService: String) -> [CFString: Any] {
     [

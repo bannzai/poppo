@@ -56,6 +56,7 @@ owner (bannzai) は 2026-11-21 に、開発者メニューに API キーの入�
 - API キーは、owner が開発者メニューで入力し、その端末の Keychain にだけ置く (`kSecClassGenericPassword`。service は `com.bannzai.poppo.replyModelAPIKey`、account は `ReplyModel` の生の値。`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` で、ほかの端末とバックアップへは移さない)。リポジトリ・ビルドの設定・`UserDefaults`・ログ・診断の記録には置かない。キーを保存していないモデルは使えない扱いにし、ほかのモデルへ切り替えずに返信案なしで翻訳だけを出す
 - 費用の上限はアプリの中に作らない。owner が各社の画面でキーに付ける (月 10 ドルずつ。 https://github.com/bannzai/poppo/issues/1#issuecomment-7043055903 )
 - 利用者に配るビルド (開発者メニューの無いビルド) は、端末内だけのまま変えない (2026-11-20 の改めと同じ)。`docs/PrivacyPolicy-ja.md`・App Privacy の回答は変えない
+- 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption` が false) は見直した上で変えない。足した通信は `URLSession` の HTTPS だけで、アプリのコードは暗号を実装していない (Apple の文書: 「Typically, the use of encryption that’s built into the operating system—for example, when your app makes HTTPS connections using URLSession—is exempt from export documentation upload requirements」 https://developer.apple.com/documentation/security/complying-with-encryption-export-regulations 2026-11-21 に読んだ)
 - この自前の実装は、開発中に返信案の質を比べるためのもの。owner は、リリースの前に Genkit を使う形へ書き換えると決めている (上の引用)。利用者に配るビルドで端末の外へ送る前に、同意の画面と文書の直しを済ませ、この ADR を改める
 
 ## Consequences

@@ -29,8 +29,8 @@ nonisolated struct ChatCompletionsLanguageModel: LanguageModel, Hashable {
 
     /// ChatCompletionsLanguageModel への要求を、Chat Completions の API へ送って応答を返す実行側
     nonisolated struct Executor: LanguageModelExecutor {
-        // 自動で作られる init は引数が無く、LanguageModelExecutor が求める init(configuration:) にならないため書く。
-        // 要求に使う値は respond の model から読むため、configuration は持たない
+        /// 実行側を作る。自動で作られる init は引数が無く、LanguageModelExecutor が求める init(configuration:) にならないため書く。
+        /// 要求に使う値は respond の model から読むため、configuration は持たない
         init(configuration: ChatCompletionsLanguageModel) {}
 
         /// request の会話と出力の形を model の接続先へ送り、返った文を channel へ流す。
@@ -50,9 +50,8 @@ nonisolated struct ChatCompletionsLanguageModel: LanguageModel, Hashable {
             urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
             urlRequest.httpBody = try chatCompletionsRequestBody(request: request, modelName: model.modelName)
             let (data, urlResponse) = try await URLSession.shared.data(for: urlRequest)
-            let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode
-            guard let statusCode, (200..<300).contains(statusCode) else {
-                throw ChatCompletionsError.unexpectedStatus(statusCode: statusCode)
+            guard let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode, (200..<300).contains(statusCode) else {
+                throw ChatCompletionsError.unexpectedStatus(statusCode: (urlResponse as? HTTPURLResponse)?.statusCode)
             }
             guard let content = try JSONDecoder().decode(ChatCompletionsResponse.self, from: data).choices.first?.message.content else {
                 throw ChatCompletionsError.noContent
@@ -112,14 +111,15 @@ nonisolated func chatCompletionsRequestBody(request: LanguageModelExecutorGenera
         "messages": chatCompletionsMessages(transcript: request.transcript),
     ]
     if let schema = request.schema {
-        body["response_format"] = [
-            "type": "json_schema",
-            "json_schema": [
-                "name": schema.name,
-                "strict": true,
-                "schema": removingVendorExtensionKeys(jsonSchema: try JSONSerialization.jsonObject(with: JSONEncoder().encode(schema))),
-            ] as [String: Any],
-        ] as [String: Any]
+        body["response_format"] =
+            [
+                "type": "json_schema",
+                "json_schema": [
+                    "name": schema.name,
+                    "strict": true,
+                    "schema": removingVendorExtensionKeys(jsonSchema: try JSONSerialization.jsonObject(with: JSONEncoder().encode(schema))),
+                ] as [String: Any],
+            ] as [String: Any]
     }
     return try JSONSerialization.data(withJSONObject: body)
 }
