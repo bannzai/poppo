@@ -49,6 +49,20 @@ export const GeneratedReplyTextsSchema = z
   .strict();
 
 /**
+ * text の最初の `{` から最後の `}` までが、閉じた JSON として読めるかを返す (前後の説明の文やコードブロックの囲みは許す)。
+ * Genkit は途中で切れた JSON を補って読む (genkit 1.44.0 の実測: `{"texts":["Yes, I am.","Sorry, I am busy.","What ti` が
+ * 3 つ目を「What ti」とした 3 つの文として schema を通った) ため、出力の上限などで切れた文を返信の文として返さないように確かめる
+ */
+function containsCompleteJSONObject(text: string): boolean {
+  try {
+    JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 会話の文と提供元を受け取り、会話に続けて利用者が送れる返信の文 3 つを返す flow を ai に登録して返す。
  * modelOfProvider は提供元から、その提供元で使うモデルを返す (テストでは提供元の API を呼ばないモデルに差し替える)。
  * モデルの出力が返信の文 3 つの形でない時、flow は失敗する (一部だけを返さない)。
@@ -65,7 +79,7 @@ export function defineGenerateReplyTextsFlow(
       outputSchema: GeneratedReplyTextsSchema,
     },
     async ({ conversation, provider }) => {
-      const { output } = await ai.generate({
+      const { output, text } = await ai.generate({
         model: modelOfProvider(provider),
         system: replyInstructions,
         prompt: conversation,
@@ -73,7 +87,7 @@ export function defineGenerateReplyTextsFlow(
       });
       // 出力が schema に合わない時、output は null になる
       // (「the `output` property can be `null`」「when the model fails to generate output that conforms to the schema」 https://genkit.dev/docs/models/ )
-      if (output === null) {
+      if (output === null || !containsCompleteJSONObject(text)) {
         throw new GenkitError({ status: 'INTERNAL', message: 'The model did not return three reply texts.' });
       }
       return output;

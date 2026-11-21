@@ -52,6 +52,10 @@ test('port に 0 を渡すと、OS が選んだ 0 でない番号で待ち受け
   assert.notEqual(listeningPort, 0);
 });
 
+test('既に待ち受けている port で起動すると失敗する', async () => {
+  await assert.rejects(startLocalFlowServer(generateReplyTexts, listeningPort), /EADDRINUSE/);
+});
+
 for (const hostName of ['127.0.0.1', 'localhost']) {
   test(`Host が ${hostName}:<待ち受けの port> の要求は flow を呼び、返信の文を返す`, async () => {
     assert.deepEqual(await postWithHost(`${hostName}:${listeningPort}`), { status: 200, body: JSON.stringify({ result: { texts: ['a', 'b', 'c'] } }) });
