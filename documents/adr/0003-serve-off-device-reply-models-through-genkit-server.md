@@ -38,11 +38,20 @@ owner は、返信案を作るモデルを端末内だけに決めず、Claude�
 
 **2. アプリ側で、flow を Foundation Models の `LanguageModel` に準拠させるか、`ReplyModel` の先を HTTP の呼び出しに替えるか**
 
-勧めるのは、`ReplyModel` の先を「flow を呼んで返信の文 3 つを受け取る処理」に替える方。
+勧めるのは、flow を呼ぶモデルを `LanguageModel` に準拠させる方 (2026-11-21 に、main に入った `Poppo/ChatReading/ChatCompletionsLanguageModel.swift` を読んで改めた。その前は、準拠に要る処理の量を確かめないまま、`ReplyModel` の先を HTTP の呼び出しに替える方を勧めていた)。
 
-- flow は、指示の文・出力の形・3 つという数をサーバーの側で持ち、仕上がった `texts` を返す。アプリが渡すのは会話の文と提供元だけで済む
-- `LanguageModel` への準拠は、モデルと framework の橋を自分で実装する形になる (「Implement this protocol to create a bridge between a model and the framework.」 https://developer.apple.com/documentation/foundationmodels/languagemodel )。`@Generable` の呼び出しを変えずに済む利点があるが、framework が渡す指示・出力の schema をサーバーへ運ぶ処理が要り、サーバーは「返信の文を作る flow」ではなく「任意の指示と schema を受けるモデルの中継」になる。中継は、アプリを装った呼び出しで何にでも使えるため、呼び出しを絞る意味が薄れる
-- `LanguageModelExecutor` の実装に要る処理の量は、SDK の定義を読んで確かめていない。上の比較は、flow が何を持つかからの推測を含む
+`ChatCompletionsLanguageModel.swift` ( https://github.com/bannzai/poppo/issues/39 の実装。OpenAI と Gemini を `LanguageModel` に準拠させたもの) を読んで分かったこと:
+
+- 準拠に要るのは、モデルの型に `capabilities` と `executorConfiguration` の 2 つ、実行側 (`LanguageModelExecutor`) に `init(configuration:)` と `respond(to:model:streamingInto:)` の 2 つ。同じファイルは、準拠の部分が約 55 行、要求の本文への変換と応答の読み取りを合わせて 177 行
+- 実行側が受け取るのは `request.transcript` (指示の文と、利用者からの文) と `request.schema` (出力の形。無い時がある)。返すのは文で、`channel.send(.response(action: .appendText(content, tokenCount: 0)))` に、出力の形の JSON の文を 1 回流している
+- 実行側は、受け取ったものを全部提供元へ運ぶ必要が無い。同じファイルは、会話の記録のうち文でない部分 (画像・tool の呼び出し) を送っていない。flow を呼ぶ実行側は、利用者からの文 (`replyPrompt(messages:)` が作った会話の文) だけを取り出して flow の `conversation` に入れ、指示の文と出力の形は送らずに済む。サーバーは今の flow (会話の文と提供元だけを受ける) のままでよく、「任意の指示と schema を受けるモデルの中継」にはならない (改める前の比べの、中継になるという見立ては誤りだった)
+- アプリの今の作りは、どのモデルも `LanguageModel` として `LanguageModelSession(model:instructions:).respond(to:generating:)` の 1 つの呼び出しで使う (`Poppo/ChatReading/ReplyGeneration.swift` の `languageModel(replyModel:apiKeyKeychainService:)` と `generateReplyTexts(messages:languageModel:)`)。flow を呼ぶモデルを準拠させれば、`ReplyModel` に case を足して `languageModel(replyModel:)` の分岐を 1 つ足す変更で入る。HTTP の呼び出しに替える方は、`generateReplyTexts` に `LanguageModelSession` を通らない 2 つ目の経路を足すことになる
+
+準拠させる時の作り (実装していない。ビルドも実行もしていない):
+
+- 実行側は、flow が返した `texts` を `{"texts": [...]}` の JSON の文にして `appendText` で流す (`ChatCompletionsLanguageModel` が提供元の返した JSON の文を流すのと同じ形)。framework がその文を `GeneratedReplyTexts` として読むこと、3 つでない時に framework の側で失敗になるかは確かめていない (3 つであることは flow の側で確かめている)
+- framework が渡す指示の文と出力の形は、flow を呼ぶ実行側では使わない。アプリの `replyInstructions` は端末内のモデル・Private Cloud Compute と、開発者メニューの OpenAI・Gemini (API キーを端末に置く経路) のためのもので、flow はサーバーの写しを使う (下の「指示の文の正」)
+- 呼び出しの確かめ (App Check のトークン・匿名のサインイン) は実行側の中で付ける。Firebase の SDK の `httpsCallable` を実行側から呼べるかは確かめていない
 
 **3. 取り込みの間 (本体アプリが背面にいる間) に、App Check のトークンの取得とサーバーへの通信が通るか**
 
@@ -77,7 +86,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 | サーバーの言語 | TypeScript | Python は preview (0.x) で、破壊的な変更が minor の版で入る。Go と Dart は安定版で 3 社の plugin もあるが、Cloud Functions for Firebase への配置 (`onCallGenkit`) の文書が無く、置き場所が Cloud Run か任意の host になり、App Check のトークンの確かめと利用者の見分けを自分で組むことになる。Dart は、テストでのモデルの差し替えの文書も無い (`https://genkit.dev/docs/dart/testing/` は 404。Go と Python にはある)。TypeScript は 3 社の plugin・`onCallGenkit`・テスト用の `mockModel` が文書にあり、`server/` で動かして確かめた。置き場所を Cloud Run にすると決めた時は、Go も候補に戻る (その時に動かして確かめる) |
 | 置き場所 | Cloud Functions for Firebase (`onCallGenkit`) | Cloud Run・Node が動く host は、App Check のトークンの確かめ・利用者の見分け・API キーの受け渡しを自分で組む。`onCallGenkit` はどれも指定で済む。費用はどちらも無料の枠に収まる見込みで、差にならない |
 | アプリからの呼び方 | Firebase の Apple 向けの SDK の `httpsCallable` | HTTP を直接書く形は依存が増えないが、App Check のトークンを付ける処理を自分で書く。Firebase の文書も SDK を勧める |
-| アプリ側の作り | `ReplyModel` の先を、flow を呼ぶ処理に替える | `LanguageModel` への準拠は、サーバーが任意の指示を受ける中継になる (上の 2) |
+| アプリ側の作り | flow を呼ぶモデルを `LanguageModel` に準拠させ、`ReplyModel` の case として足す | `ReplyModel` の先を HTTP の呼び出しに替える方は、`LanguageModelSession` を通らない 2 つ目の経路が要る。準拠させても、実行側が会話の文だけを flow へ送れば、サーバーは任意の指示を受ける中継にならない (上の 2) |
 | 呼び出しの確かめ方 | App Check (App Attest) を `enforceAppCheck` で必須にし、Firebase Authentication の匿名のサインインで利用者を見分ける | App Check だけでは、アプリからの呼び出しかは分かるが利用者を見分けられない。使い回しを防ぐ `consumeAppCheckToken` は入れない (「Replay protection (beta)」で、「adds a network round trip to token verification, and therefore adds latency to the function call」 https://firebase.google.com/docs/app-check/cloud-functions )。返信案は読み取りのたびに作るため、遅れを足さない |
 | 利用者ごとの回数の制限 | flow の中で、Authentication の uid ごとの回数を数えて上限で断る | アプリの中だけで数える形は、書き換えられる端末では守れない (`documents/DIRECTION.md` の 2026-11-20 の行)。数える置き場所 (Firestore 等) は新しいデータ構造になるため、実装の時に型を owner に見せる。匿名の uid は、アプリを入れ直した時と、サインアウトして匿名のサインインをし直した時に新しくなる見込みで (どちらも確かめていない)、新しい uid の回数は 0 から始まる。上限に達した利用者が回数を戻せることは残るため、匿名の uid に頼らない制限 (端末ごと・App Check の単位など) を足すかは owner が決める (下の「利用者の見分け方と回数の上限」)。Claude は、サーバーが利用者ごとの user profile を作り、その ID を利用者ごとに保存して、その利用者の Claude の呼び出しのすべてに付ければ、1 人の利用者の内容で Anthropic の組織の全体が制限される問題 (同じ行) も避けられる (「You register each end customer once with `POST /v1/user_profiles` and store the `uprof_` ID it returns. Then you send that ID in the `anthropic-user-profile-id` header on every request you make on that end customer’s behalf.」「Without a profile on the request, one end customer can trigger an enforcement action that applies to your whole organization.」 https://platform.claude.com/docs/en/manage-claude/user-profiles )。保存する置き場所は新しいデータ構造になり、`@genkit-ai/anthropic` の plugin からこの header を付けられるかは確かめていない |
 
@@ -104,7 +113,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 | 提供元ごとのモデル | 仮に選んだ小さい側のモデルのままにするか、質を比べて決め直すか |
 | 同意の画面と文書の直し | 端末の外へ発言を送る前の同意の画面、`docs/PrivacyPolicy-ja.md`、App Privacy の回答、輸出コンプライアンスの申告。利用者に配るビルドで端末の外へ送る変更と同じ変更で行う (`documents/DIRECTION.md`「決めたこと」の 2026-11-20 の行) |
 
-決まった後に別の issue で行うこと: `onCallGenkit` の入口とデプロイ、アプリ側の呼び出しの切り替え ( https://github.com/bannzai/poppo/issues/39 のマージの後)、同意の画面と文書の直し、`documents/adr/0002-process-on-device-without-backend.md` の改め。
+決まった後に別の issue で行うこと: `onCallGenkit` の入口とデプロイ、アプリ側の呼び出しの切り替え ( https://github.com/bannzai/poppo/issues/39 の実装は main に入っている。開発者メニューの OpenAI・Gemini の経路をこの flow に替えるか、残すかもその時に決める)、同意の画面と文書の直し、`documents/adr/0002-process-on-device-without-backend.md` の改め。
 
 ## Consequences
 
