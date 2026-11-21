@@ -10,12 +10,8 @@ let package = Package(
     name: "PoppoClaude",
     // 本体アプリと同じ iOS 27 以降。.v27 の定数は tools-version 6.4 を求めるため、文字列で書く
     platforms: [.iOS("27.0")],
-    products: [
-        .library(name: "PoppoClaude", targets: ["PoppoClaude"]),
-    ],
-    targets: [
-        .target(name: "PoppoClaude"),
-    ]
+    products: [.library(name: "PoppoClaude", targets: ["PoppoClaude"])],
+    targets: [.target(name: "PoppoClaude")]
 )
 
 #if compiler(>=6.4)
