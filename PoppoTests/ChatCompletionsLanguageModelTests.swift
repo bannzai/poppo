@@ -91,6 +91,23 @@ private func makeGenerationRequest(transcript: Transcript, schema: GenerationSch
     #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService) == false)
 }
 
+/// Gemini も、自分の API キーを保存すると返信案を作れると答え、消すと作れないと答えること。Gemini のキーだけでは OpenAI は作れないと答えること
+@Test func geminiCanGenerateRepliesOnlyWhileOwnKeyIsSaved() throws {
+    let keychainService = makeUnusedKeychainService()
+    defer {
+        try? deleteAPIKey(replyModel: .gemini, keychainService: keychainService)
+    }
+
+    try save(apiKey: "gemini-key", replyModel: .gemini, keychainService: keychainService)
+
+    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService) == true)
+    #expect(canGenerateReplies(replyModel: .openAI, apiKeyKeychainService: keychainService) == false)
+
+    try deleteAPIKey(replyModel: .gemini, keychainService: keychainService)
+
+    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService) == false)
+}
+
 /// API キーを保存していないモデルで返信案を作ろうとすると、提供元へ何も送らずに「API キーを保存していない」のエラーになること
 @Test func respondingWithoutSavedAPIKeyThrowsMissingAPIKey() async throws {
     let model = ChatCompletionsLanguageModel(

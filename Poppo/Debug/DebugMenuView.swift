@@ -21,8 +21,11 @@ struct DebugMenuView: View {
     @State private var enteredAPIKeys: [ReplyModel: String] = [:]
     /// API キーを Keychain に保存してあるモデル。この画面の操作の後と、画面を開いた時に読み直す
     @State private var replyModelsWithSavedAPIKey: Set<ReplyModel> = []
-    /// 直前の API キーの保存・削除か、その後の読み直しが失敗した時のエラーの説明 (API キーの値は入らない)。どちらも成功した時と、まだ操作していない時は nil
+    /// 直前の API キーの保存か削除が失敗した時のエラーの説明 (API キーの値は入らない)。次の保存か削除が成功するまで残す。
+    /// 直前の保存か削除が成功した時と、まだ操作していない時は nil
     @State private var apiKeyOperationError: String?
+    /// 直前の、保存してある API キーの読み直しが失敗した時のエラーの説明 (API キーの値は入らない)。すべてのモデルを読めた時は nil
+    @State private var apiKeyReloadError: String?
 
     /// 返信案を作るモデルとして selectingReplyModel を選んだことを保存し、この画面の表示を保存した後の値にする
     private func select(replyModel selectingReplyModel: ReplyModel) {
@@ -32,7 +35,7 @@ struct DebugMenuView: View {
 
     /// 入力欄の文を、apiKeyReplyModel のモデルの API キーとして Keychain に保存する。前に保存したキーは上書きされる。
     /// 貼り付けた文の前後の空白と改行は取り除く。保存できた時は入力欄を空に戻す。
-    /// 保存できなかった時は、その後の読み直しが成功しても、保存のエラーの説明を apiKeyOperationError に残す
+    /// 保存できなかった時は、エラーの説明を apiKeyOperationError に入れる (画面を開き直しても、次の保存か削除が成功するまで残る)
     private func saveEnteredAPIKey(apiKeyReplyModel: ReplyModel) {
         do {
             try save(
@@ -41,37 +44,37 @@ struct DebugMenuView: View {
                 keychainService: replyModelAPIKeyKeychainService
             )
             enteredAPIKeys[apiKeyReplyModel] = nil
-            reloadReplyModelsWithSavedAPIKey()
+            apiKeyOperationError = nil
         } catch {
-            reloadReplyModelsWithSavedAPIKey()
             apiKeyOperationError = error.localizedDescription
         }
+        reloadReplyModelsWithSavedAPIKey()
     }
 
     /// apiKeyReplyModel のモデルの API キーを Keychain から削除し、入力欄を空に戻す。保存していない時に実行しても何も起きない。
-    /// 削除できなかった時は、その後の読み直しが成功しても、削除のエラーの説明を apiKeyOperationError に残す
+    /// 削除できなかった時は、エラーの説明を apiKeyOperationError に入れる (画面を開き直しても、次の保存か削除が成功するまで残る)
     private func deleteSavedAPIKey(apiKeyReplyModel: ReplyModel) {
         do {
             try deleteAPIKey(replyModel: apiKeyReplyModel, keychainService: replyModelAPIKeyKeychainService)
             enteredAPIKeys[apiKeyReplyModel] = nil
-            reloadReplyModelsWithSavedAPIKey()
+            apiKeyOperationError = nil
         } catch {
-            reloadReplyModelsWithSavedAPIKey()
             apiKeyOperationError = error.localizedDescription
         }
+        reloadReplyModelsWithSavedAPIKey()
     }
 
     /// API キーを保存してあるモデルを Keychain から読み直して replyModelsWithSavedAPIKey に入れる。
-    /// 読めなかったモデルは保存していない扱いにし、エラーの説明を apiKeyOperationError に入れる。
-    /// すべてのモデルを読めた時は apiKeyOperationError を nil にする (前の失敗の説明を、解消した後に残さない)
+    /// 読めなかったモデルは保存していない扱いにし、エラーの説明を apiKeyReloadError に入れる。
+    /// すべてのモデルを読めた時は apiKeyReloadError を nil にする。保存と削除の失敗の説明 (apiKeyOperationError) は変えない
     private func reloadReplyModelsWithSavedAPIKey() {
-        apiKeyOperationError = nil
+        apiKeyReloadError = nil
         replyModelsWithSavedAPIKey = Set(
             ReplyModel.allCases.filter { usesAPIKey(replyModel: $0) }.filter { apiKeyReplyModel in
                 do {
                     return try loadAPIKey(replyModel: apiKeyReplyModel, keychainService: replyModelAPIKeyKeychainService) != nil
                 } catch {
-                    apiKeyOperationError = error.localizedDescription
+                    apiKeyReloadError = error.localizedDescription
                     return false
                 }
             }
@@ -153,6 +156,11 @@ struct DebugMenuView: View {
                     Text(verbatim: apiKeyOperationError)
                         .foregroundStyle(.red)
                         .accessibilityIdentifier("debug_reply_model_api_key_error")
+                }
+                if let apiKeyReloadError {
+                    Text(verbatim: apiKeyReloadError)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("debug_reply_model_api_key_reload_error")
                 }
             } header: {
                 Text(verbatim: "返信案を作るモデルの API キー")
