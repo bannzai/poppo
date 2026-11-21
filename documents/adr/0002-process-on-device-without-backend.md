@@ -21,7 +21,7 @@ owner の返答までは、翻訳・返信案の生成・保存をすべて端�
 | サーバー・データベース | 持たない |
 | 認証 | 持たない (アカウントなし) |
 | アクセス解析・クラッシュの収集 | 入れない。公開後の指標は App Store Connect の数値で見る |
-| 返信案の生成 | 端末内のモデル。使えない端末では翻訳だけを出す。開発者メニューのあるビルドに限り、Private Cloud Compute (下の「2026-11-20 の改め」) と、OpenAI・Gemini の API (下の「2026-11-21 の改め」) でも作れる |
+| 返信案の生成 | 端末内のモデル。使えない端末では翻訳だけを出す。開発者メニューのあるビルドに限り、Private Cloud Compute (下の「2026-11-20 の改め」) と、OpenAI・Gemini の API (下の「2026-11-21 の改め」の 1 つ目) と、Claude の API (同じ日の 2 つ目) でも作れる |
 | 課金 | 持たない |
 | 通知 | サービスからの通知は無い。開発の連絡は Slack の `#poppo-notification` |
 
@@ -49,7 +49,7 @@ owner (bannzai) は 2026-11-21 に、開発者メニューに API キーの入�
 
 > 承認。ただ、将来的にGenKitに書き換えた方が筋が良いし安全な気もしたからそのissueを立てて並行して進めておいて。リリース前には絶対対応する。
 
-この決定のうち、OpenAI と Gemini を次の範囲で足す (実装: https://github.com/bannzai/poppo/issues/39 )。Claude は別の issue で足す。
+この決定のうち、OpenAI と Gemini を次の範囲で足す (実装: https://github.com/bannzai/poppo/issues/39 )。Claude は下の改めで足す。
 
 - 開発者メニューのあるビルド (DEBUG の条件があるビルド) に限り、開発者メニューで返信案を作るモデルに「OpenAI」と「Gemini」を選べる。選んでいる間は、画面から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために OpenAI の API (`https://api.openai.com/v1`) か Google の Gemini API (`https://generativelanguage.googleapis.com/v1beta/openai`) へ送る。翻訳と保存は端末内のまま。サーバーも Firebase も足さない (本体アプリが各社の API を直接呼ぶ)
 - 選ぶ時に、送る内容と送信先 (OpenAI のサーバー / Google のサーバー) を画面で示して確かめる。Private Cloud Compute と同じ仕組みで、確かめた時だけ切り替える。送り先が変わる切り替え (Private Cloud Compute から OpenAI など) でも確かめる
@@ -58,6 +58,22 @@ owner (bannzai) は 2026-11-21 に、開発者メニューに API キーの入�
 - 利用者に配るビルド (開発者メニューの無いビルド) は、端末内だけのまま変えない (2026-11-20 の改めと同じ)。`docs/PrivacyPolicy-ja.md`・App Privacy の回答は変えない
 - 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption` が false) は見直した上で変えない。足した通信は `URLSession` の HTTPS だけで、アプリのコードは暗号を実装していない (Apple の文書: 「Typically, the use of encryption that’s built into the operating system—for example, when your app makes HTTPS connections using URLSession—is exempt from export documentation upload requirements」 https://developer.apple.com/documentation/security/complying-with-encryption-export-regulations 2026-11-21 に読んだ)
 - この自前の実装は、開発中に返信案の質を比べるためのもの。owner は、リリースの前に Genkit を使う形へ書き換えると決めている (上の引用)。利用者に配るビルドで端末の外へ送る前に、同意の画面と文書の直しを済ませ、この ADR を改める
+
+### 2026-11-21 の改め: 開発者メニューのあるビルドに限り、Claude の API で返信案を作れる
+
+owner (bannzai) は、複数のモデルを使えるようにすると決め (2026-11-20 の改めの引用)、先に OpenAI と Gemini・次に Claude を作る計画を承認した ( https://github.com/bannzai/poppo/issues/1#issuecomment-7055573516 )。
+
+> 承認。
+
+2026-11-21 に owner が Claude Console で app integration を作り、client ID を知らせた。この決定のうち、Claude を次の範囲で足す (実装: https://github.com/bannzai/poppo/issues/43 )。
+
+- 開発者メニューのあるビルド (DEBUG の条件があるビルド) に限り、開発者メニューで返信案を作るモデルに「Claude」を選べる。選んでいる間は、画面から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために Anthropic の API (`https://api.anthropic.com`) へ送る。翻訳と保存は端末内のまま。サーバーは足さない (本体アプリが Anthropic の公式の Swift package `ClaudeForFoundationModels` で API を直接呼ぶ。Beta。版は 0.2.3 に固定)
+- 選ぶ時に、送る内容と送信先 (Anthropic のサーバー) を画面で示して確かめる。Private Cloud Compute・OpenAI・Gemini と同じ仕組みで、確かめた時だけ切り替える
+- API キーを持たない。認証は App Attest で行い、アプリに入れるのは client ID だけ (公開してよい設定の値: 「The client ID it issues is public configuration that is safe to include in the app binary.」「The app ships no key and needs no developer backend.」 https://github.com/anthropics/ClaudeForFoundationModels )。simulator 用にも API キーの認証は足さない。App Attest を使えない端末 (simulator など) では Claude は使えない扱いにし、ほかのモデルへ切り替えずに返信案なしで翻訳だけを出す
+- Claude の user profile は使わない (作るのにサーバーが要るため。試す間の利用者は owner だけ)。利用者に配るビルドで Claude を使う時にどうするかは、`documents/DIRECTION.md`「bannzai の返答を待っていること」の問いのまま
+- 費用の上限はアプリの中に作らない。owner が Claude Console の workspace の支出の上限で付ける (月 10 ドル。 https://github.com/bannzai/poppo/issues/1#issuecomment-7043055903 )
+- 利用者に配るビルド (開発者メニューの無いビルド) は、端末内だけのまま変えない (2026-11-20 の改めと同じ)。`docs/PrivacyPolicy-ja.md`・App Privacy の回答は変えない
+- 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption` が false) は変えない。足した通信は package が行う HTTPS で、App Attest の鍵の生成と署名は OS の DeviceCheck が行う。package 0.2.3 のソース (`Sources/`) で暗号の API を使うのは、OS の CryptoKit の `SHA256` (App Attest に渡すハッシュ。`AppAttestSession.swift`) と、Keychain を読み書きする Security の import (`AppAttestStore.swift`) だけで、自前の暗号の実装は無い (`CryptoKit|CommonCrypto|Security|SecKey|SHA256|AES|Curve25519|P256` で検索した結果)。OS に組み込まれた暗号だけを使うため、OpenAI・Gemini の改めに引用した Apple の文書と同じ扱いにした
 
 ## Consequences
 

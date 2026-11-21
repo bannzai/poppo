@@ -1,3 +1,4 @@
+import ClaudeForFoundationModels
 import Foundation
 import FoundationModels
 import Testing
@@ -33,6 +34,40 @@ import Testing
                 apiKeyReplyModel: .gemini,
                 apiKeyKeychainService: "service-b"
             )
+    )
+}
+
+/// Claude は、Anthropic の API の接続先と Claude Haiku 5.5 を指し、owner が作った client ID の App Attest で認証すること (API キーを使わない)。
+/// 取り違えると、別の workspace に請求が行くか、高いモデルで作る
+@Test func languageModelForClaudeAuthenticatesByAppAttestWithClientID() throws {
+    let claudeLanguageModel = try #require(
+        languageModel(replyModel: .claude, apiKeyKeychainService: "unused") as? ClaudeLanguageModel
+    )
+
+    #expect(claudeLanguageModel.executorConfiguration.authMode == .appAttest(clientID: "clid_01CC3t6y8WKskisGqkiMy9o1"))
+    #expect(claudeLanguageModel.model == .haiku5_5)
+    #expect(claudeLanguageModel.baseURL == URL(string: "https://api.anthropic.com"))
+    #expect(claudeLanguageModel.userProfileID == nil)
+}
+
+/// Claude は、端末が App Attest を使える時だけ返信案を作れると答えること (simulator は使えないので、作れないと答える)。
+/// App Attest を使えることは、API キーが要るモデル (キーを保存していない OpenAI・Gemini) を作れると答える理由にならないこと
+@Test func claudeCanGenerateRepliesOnlyWhenAppAttestIsSupported() {
+    #expect(canGenerateReplies(replyModel: .claude, apiKeyKeychainService: "unused", isAppAttestSupported: false) == false)
+    #expect(canGenerateReplies(replyModel: .claude, apiKeyKeychainService: "unused", isAppAttestSupported: true) == true)
+    #expect(
+        canGenerateReplies(
+            replyModel: .openAI,
+            apiKeyKeychainService: "ReplyGenerationTests-\(UUID().uuidString)",
+            isAppAttestSupported: true
+        ) == false
+    )
+    #expect(
+        canGenerateReplies(
+            replyModel: .gemini,
+            apiKeyKeychainService: "ReplyGenerationTests-\(UUID().uuidString)",
+            isAppAttestSupported: true
+        ) == false
     )
 }
 

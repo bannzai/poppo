@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3B2BFE2AD6460AF2A4FFCF10 /* PoppoKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A23034E0A983E06D39CB87B0 /* PoppoKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6F1C3A8E2D4B5C7091E2A3B4 /* ClaudeForFoundationModels in Frameworks */ = {isa = PBXBuildFile; productRef = C7D9E1F3A5B6C8D0E2F4A6B8 /* ClaudeForFoundationModels */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +87,17 @@
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		9D2E4F6A8B1C3D5E7F9A0B1C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6F1C3A8E2D4B5C7091E2A3B4 /* ClaudeForFoundationModels in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
 		25BB2CDC7A0D5B52DCD77AA1 /* Products */ = {
 			isa = PBXGroup;
@@ -159,6 +171,7 @@
 			buildConfigurationList = 21A5EF69DD5655EC6B7EA1D9 /* Build configuration list for PBXNativeTarget "Poppo" */;
 			buildPhases = (
 				E4C97F9B0322526ABEE43F97 /* Sources */,
+				9D2E4F6A8B1C3D5E7F9A0B1C /* Frameworks */,
 				3C1A8F6E9D2B47A5E0F4C812 /* Resources */,
 				F8EC8797D2F85429F68D7DCF /* Embed Foundation Extensions */,
 			);
@@ -173,6 +186,7 @@
 			);
 			name = Poppo;
 			packageProductDependencies = (
+				C7D9E1F3A5B6C8D0E2F4A6B8 /* ClaudeForFoundationModels */,
 			);
 			productName = Poppo;
 			productReference = 634B645E06A5CCAA80874D46 /* Poppo.app */;
@@ -198,6 +212,9 @@
 			);
 			mainGroup = A735306C23C6607F34478511;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B3C5D7E9F1A2B4C6D8E0F2A4 /* XCRemoteSwiftPackageReference "ClaudeForFoundationModels" */,
+			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
@@ -557,6 +574,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B3C5D7E9F1A2B4C6D8E0F2A4 /* XCRemoteSwiftPackageReference "ClaudeForFoundationModels" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/anthropics/ClaudeForFoundationModels";
+			requirement = {
+				kind = exactVersion;
+				version = 0.2.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C7D9E1F3A5B6C8D0E2F4A6B8 /* ClaudeForFoundationModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B3C5D7E9F1A2B4C6D8E0F2A4 /* XCRemoteSwiftPackageReference "ClaudeForFoundationModels" */;
+			productName = ClaudeForFoundationModels;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 8C338BB9825A5A35E34E1979 /* Project object */;
 }
