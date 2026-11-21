@@ -37,7 +37,10 @@ nonisolated func save(apiKey: String, replyModel: ReplyModel, keychainService: S
         apiKeyKeychainQuery(replyModel: replyModel, keychainService: keychainService).merging([
             kSecValueData: Data(apiKey.utf8),
             // 取り込みの間は本体アプリが背面にいて、画面を閉じた間にも読むため、最初のロック解除の後はいつでも読める指定にする。
-            // ThisDeviceOnly: ほかの端末とバックアップへ移さない
+            // ThisDeviceOnly: ほかの端末へ移さない (「Items with this attribute do not migrate to a new device. Thus, after restoring from a backup
+            // of a different device, these items will not be present.」
+            // https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly )。
+            // この端末のバックアップに入るかは、この文書に書かれておらず確かめていない
             kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]) { _, new in new } as CFDictionary,
         nil

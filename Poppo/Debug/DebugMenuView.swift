@@ -165,7 +165,7 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "返信案を作るモデルの API キー")
             } footer: {
-                Text(verbatim: "保存した API キーは、この端末の Keychain にだけ置く (ほかの端末とバックアップへは移さない)。保存したキーの値はこの画面に出さない。費用の上限は、各社の画面でキーに付ける")
+                Text(verbatim: "保存した API キーは、この端末の Keychain にだけ置く (ほかの端末へは移さない)。保存したキーの値はこの画面に出さない。費用の上限は、各社の画面でキーに付ける")
             }
             Section {
                 NavigationLink {
