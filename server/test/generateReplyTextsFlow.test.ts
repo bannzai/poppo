@@ -84,6 +84,7 @@ for (const [name, text] of [
   ['JSON でない文', 'Sure! Here are three replies.'],
   ['3 つ目の文の途中で切れた JSON', '{"texts":["Yes, I am.","Sorry, I am busy.","What ti'],
   ['3 つ目の文の後の閉じる括弧が無い JSON', '{"texts":["a","b","c"'],
+  ['文の中に } があり、途中で切れた JSON', '{"texts":["a}","b","c'],
   ['空の文', ''],
 ] as const) {
   test(`モデルの出力が ${name} の時は失敗し、一部だけを返さない`, async () => {
@@ -96,6 +97,7 @@ for (const [name, text] of [
 for (const [name, text] of [
   ['コードブロックで囲んだ JSON', '```json\n{"texts":["a","b","c"]}\n```'],
   ['前に説明の文が付いた JSON', 'Here you go: {"texts":["a","b","c"]}'],
+  ['後ろに波括弧を含む説明の文が付いた JSON', '{"texts":["a","b","c"]} Replace {name} if needed.'],
 ] as const) {
   test(`モデルの出力が ${name} の時は、中の返信の文 3 つを返す`, async () => {
     mockModelOfProvider.gemini.respondWith({ text });

@@ -49,17 +49,25 @@ export const GeneratedReplyTextsSchema = z
   .strict();
 
 /**
- * text の最初の `{` から最後の `}` までが、閉じた JSON として読めるかを返す (前後の説明の文やコードブロックの囲みは許す)。
+ * text の最初の `{` から始まる、閉じた JSON として読める部分があるかを返す
+ * (前後の説明の文やコードブロックの囲みは許す。後ろの説明の文に `}` があってもよい)。
  * Genkit は途中で切れた JSON を補って読む (genkit 1.44.0 の実測: `{"texts":["Yes, I am.","Sorry, I am busy.","What ti` が
  * 3 つ目を「What ti」とした 3 つの文として schema を通った) ため、出力の上限などで切れた文を返信の文として返さないように確かめる
  */
 function containsCompleteJSONObject(text: string): boolean {
-  try {
-    JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
-    return true;
-  } catch {
+  const start = text.indexOf('{');
+  if (start === -1) {
     return false;
   }
+  for (let end = text.indexOf('}', start); end !== -1; end = text.indexOf('}', end + 1)) {
+    try {
+      JSON.parse(text.slice(start, end + 1));
+      return true;
+    } catch {
+      // この `}` までは閉じた JSON でない (文字列の中の `}` や内側の object の終わり)。次の `}` までを試す
+    }
+  }
+  return false;
 }
 
 /**
