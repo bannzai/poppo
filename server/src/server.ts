@@ -1,30 +1,26 @@
 import { anthropic } from '@genkit-ai/anthropic';
 import { openAI } from '@genkit-ai/compat-oai/openai';
-import { startFlowServer } from '@genkit-ai/express';
 import { googleAI } from '@genkit-ai/google-genai';
 import { genkit } from 'genkit';
+import { createUsablePlugins } from './createUsablePlugins.js';
 import { defineGenerateReplyTextsFlow } from './generateReplyTextsFlow.js';
+import { startLocalFlowServer } from './localFlowServer.js';
 import { modelOfProvider } from './providerModels.js';
 
-// 手元で試すための起動口。呼び出しの確かめ (認証・回数の制限) を持たないため、外から届く場所で動かさない。
+// 手元で試すための起動口。このマシンの中からだけ届く (127.0.0.1)。
 // 各提供元の API キーは、plugin が環境変数 (ANTHROPIC_API_KEY・OPENAI_API_KEY・GEMINI_API_KEY) から読む。
-// API キーが無い提供元の plugin は作る時に失敗するものがある (API キー無しの起動の実測: anthropic() が
-// 「Please pass in the API key or set the ANTHROPIC_API_KEY environment variable」で失敗した) ため、
-// 作れた plugin だけで起動し、キーを 1 社分しか持たない時もその提供元を試せるようにする。作れなかった提供元を指定した呼び出しは失敗する
-startFlowServer({
-  flows: [
-    defineGenerateReplyTextsFlow(
-      genkit({
-        plugins: [anthropic, openAI, googleAI].flatMap((plugin) => {
-          try {
-            return [plugin()];
-          } catch (error) {
-            console.warn(`${plugin.name} の plugin を使わずに起動する: ${error instanceof Error ? error.message : error}`);
-            return [];
-          }
-        }),
-      }),
-      modelOfProvider,
-    ),
-  ],
-});
+// plugin を作れなかった提供元を指定した呼び出しは失敗する
+// PORT が無い時の 3400 は、Genkit の `startFlowServer` の既定と同じ番号 (Genkit の文書の例の URL をそのまま使えるようにするため)
+const port = Number.parseInt(process.env.PORT ?? '3400');
+await startLocalFlowServer(
+  defineGenerateReplyTextsFlow(
+    genkit({
+      plugins: createUsablePlugins([() => anthropic(), () => openAI(), () => googleAI()], (message) =>
+        console.warn(`plugin を 1 つ使わずに起動する: ${message}`),
+      ),
+    }),
+    modelOfProvider,
+  ),
+  port,
+);
+console.log(`http://127.0.0.1:${port}/generateReplyTexts で待ち受けている`);

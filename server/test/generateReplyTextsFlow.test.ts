@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:net';
 import { beforeEach, test } from 'node:test';
-import { startFlowServer } from '@genkit-ai/express';
 import { genkit } from 'genkit';
 import { mockModel } from 'genkit/testing';
 import { defineGenerateReplyTextsFlow, replyInstructions, ReplyProviderSchema } from '../src/generateReplyTextsFlow.js';
+import { startLocalFlowServer } from '../src/localFlowServer.js';
 
 // 提供元の plugin を入れない ai。提供元の API は呼ばず、API キーも使わない
 const ai = genkit({});
@@ -126,10 +126,21 @@ function findFreePort(): Promise<number> {
   });
 }
 
+test('手元のサーバーは 127.0.0.1 だけで待ち受ける (このマシンの外から届かない)', async () => {
+  const server = await startLocalFlowServer(generateReplyTexts, await findFreePort());
+  try {
+    const address = server.address();
+    assert.ok(address !== null && typeof address === 'object');
+    assert.equal(address.address, '127.0.0.1');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('HTTP では、{"data": 入力} を POST すると {"result": 出力} が返り、形の合わない入力には成功でない応答を返して result を返さない', async () => {
   mockModelOfProvider.gemini.respondWith({ text: JSON.stringify({ texts: ['a', 'b', 'c'] }) });
   const port = await findFreePort();
-  const flowServer = startFlowServer({ flows: [generateReplyTexts], port });
+  const server = await startLocalFlowServer(generateReplyTexts, port);
   try {
     const response = await fetch(`http://127.0.0.1:${port}/generateReplyTexts`, {
       method: 'POST',
@@ -147,6 +158,6 @@ test('HTTP では、{"data": 入力} を POST すると {"result": 出力} が�
     assert.equal(invalidInputResponse.ok, false);
     assert.equal('result' in ((await invalidInputResponse.json()) as object), false);
   } finally {
-    await flowServer.stop();
+    await new Promise((resolve) => server.close(resolve));
   }
 });
