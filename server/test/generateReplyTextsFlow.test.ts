@@ -85,6 +85,8 @@ for (const [name, text] of [
   ['3 つ目の文の途中で切れた JSON', '{"texts":["Yes, I am.","Sorry, I am busy.","What ti'],
   ['3 つ目の文の後の閉じる括弧が無い JSON', '{"texts":["a","b","c"'],
   ['文の中に } があり、途中で切れた JSON', '{"texts":["a}","b","c'],
+  ['前の説明の文の " の中に閉じた {} があり、その後で途中で切れた JSON', 'Example "{}". {"texts":["Yes.","No.","What ti'],
+  ['文の中に \\" と } があり、途中で切れた JSON', '{"texts":["a\\"}","b","c'],
   ['空の文', ''],
 ] as const) {
   test(`モデルの出力が ${name} の時は失敗し、一部だけを返さない`, async () => {
@@ -108,6 +110,12 @@ for (const [name, text] of [
 
 test('モデルの出力が文でない部分 (data) で届いた時は、その返信の文 3 つを返す', async () => {
   mockModelOfProvider.claude.respondWith({ content: [{ data: { texts: ['a', 'b', 'c'] } }] });
+
+  assert.deepEqual(await generateReplyTexts({ conversation, provider: 'claude' }), { texts: ['a', 'b', 'c'] });
+});
+
+test('モデルの出力が、JSON を含まない説明の文と、文でない部分 (data) で届いた時は、data の返信の文 3 つを返す', async () => {
+  mockModelOfProvider.claude.respondWith({ content: [{ text: 'Here are the replies.' }, { data: { texts: ['a', 'b', 'c'] } }] });
 
   assert.deepEqual(await generateReplyTexts({ conversation, provider: 'claude' }), { texts: ['a', 'b', 'c'] });
 });

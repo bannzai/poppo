@@ -49,25 +49,41 @@ export const GeneratedReplyTextsSchema = z
   .strict();
 
 /**
- * text の最初の `{` から始まる、閉じた JSON として読める部分があるかを返す
- * (前後の説明の文やコードブロックの囲みは許す。後ろの説明の文に `}` があってもよい)。
- * Genkit は途中で切れた JSON を補って読む (genkit 1.44.0 の実測: `{"texts":["Yes, I am.","Sorry, I am busy.","What ti` が
- * 3 つ目を「What ti」とした 3 つの文として schema を通った) ため、出力の上限などで切れた文を返信の文として返さないように確かめる
+ * text の中の JSON が、閉じないまま text の終わりに達しているかを返す (JSON が無い時と、閉じている時は false)。
+ * Genkit は閉じていない JSON を補って読む (genkit 1.44.0 の実測: `{"texts":["Yes, I am.","Sorry, I am busy.","What ti` が
+ * 3 つ目を「What ti」とした 3 つの文として schema を通った) ため、出力の上限などで切れた文を返信の文として返さないように確かめる。
+ * JSON の始まりと終わりは、Genkit が output を読む時と同じ選び方で探す (`@genkit-ai/ai` 1.44.0 の `extractJson`:
+ * `"` で囲まれていない最初の `{` か `[` から、同じ種類の括弧が閉じる所まで。`"` の中の括弧と `\` の次の 1 文字は数えない)。
+ * 選び方を変えると、Genkit が補って読んだ JSON とは別の括弧を見て閉じていると判断してしまう
+ * (例: `Example "{}". {"texts":["Yes.","No.","What ti`)
  */
-function containsCompleteJSONObject(text: string): boolean {
-  const start = text.indexOf('{');
-  if (start === -1) {
-    return false;
-  }
-  for (let end = text.indexOf('}', start); end !== -1; end = text.indexOf('}', end + 1)) {
-    try {
-      JSON.parse(text.slice(start, end + 1));
-      return true;
-    } catch {
-      // この `}` までは閉じた JSON でない (文字列の中の `}` や内側の object の終わり)。次の `}` までを試す
+function endsInsideUnclosedJSON(text: string): boolean {
+  let openingBracket: '{' | '[' | undefined;
+  let nestingCount = 0;
+  let isInsideString = false;
+  let isEscaped = false;
+  for (const character of text) {
+    if (isEscaped) {
+      isEscaped = false;
+    } else if (character === '\\') {
+      isEscaped = true;
+    } else if (character === '"') {
+      isInsideString = !isInsideString;
+    } else if (isInsideString) {
+      continue;
+    } else if (openingBracket === undefined && (character === '{' || character === '[')) {
+      openingBracket = character;
+      nestingCount = 1;
+    } else if (character === openingBracket) {
+      nestingCount += 1;
+    } else if (character === (openingBracket === '{' ? '}' : ']') && openingBracket !== undefined) {
+      nestingCount -= 1;
+      if (nestingCount === 0) {
+        return false;
+      }
     }
   }
-  return false;
+  return openingBracket !== undefined;
 }
 
 /**
@@ -95,9 +111,8 @@ export function defineGenerateReplyTextsFlow(
       });
       // 出力が schema に合わない時、output は null になる
       // (「the `output` property can be `null`」「when the model fails to generate output that conforms to the schema」 https://genkit.dev/docs/models/ )
-      // 閉じた JSON かは、出力が文で届いた時だけ確かめる。文でない部分 (data) で届いた出力は切れた文を補って読んだものではなく、
-      // その時 text は空になる (genkit 1.44.0 の実測: `content: [{ data: { texts: [...] } }]` の応答で output が読め、text は空だった)
-      if (output === null || (text !== '' && !containsCompleteJSONObject(text))) {
+      // 文に JSON が無い時 (出力が文でない部分 (data) で届いた時。説明の文が付いていてもよい) は、切れた文を補って読んだ出力ではないので通す
+      if (output === null || endsInsideUnclosedJSON(text)) {
         throw new GenkitError({ status: 'INTERNAL', message: 'The model did not return three reply texts.' });
       }
       return output;

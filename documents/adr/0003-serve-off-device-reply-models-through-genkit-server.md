@@ -79,7 +79,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 | アプリからの呼び方 | Firebase の Apple 向けの SDK の `httpsCallable` | HTTP を直接書く形は依存が増えないが、App Check のトークンを付ける処理を自分で書く。Firebase の文書も SDK を勧める |
 | アプリ側の作り | `ReplyModel` の先を、flow を呼ぶ処理に替える | `LanguageModel` への準拠は、サーバーが任意の指示を受ける中継になる (上の 2) |
 | 呼び出しの確かめ方 | App Check (App Attest) を `enforceAppCheck` で必須にし、Firebase Authentication の匿名のサインインで利用者を見分ける | App Check だけでは、アプリからの呼び出しかは分かるが利用者を見分けられない。使い回しを防ぐ `consumeAppCheckToken` は入れない (「Replay protection (beta)」で、「adds a network round trip to token verification, and therefore adds latency to the function call」 https://firebase.google.com/docs/app-check/cloud-functions )。返信案は読み取りのたびに作るため、遅れを足さない |
-| 利用者ごとの回数の制限 | flow の中で、Authentication の uid ごとの回数を数えて上限で断る | アプリの中だけで数える形は、書き換えられる端末では守れない (`documents/DIRECTION.md` の 2026-11-20 の行)。数える置き場所 (Firestore 等) は新しいデータ構造になるため、実装の時に型を owner に見せる。匿名の uid はアプリを入れ直すと変わる見込みで (確かめていない)、入れ直しで回数が戻ることは残る。Claude は、サーバーが利用者ごとの user profile を作れば、1 人の利用者の内容で Anthropic の組織の全体が制限される問題 (同じ行) も避けられる |
+| 利用者ごとの回数の制限 | flow の中で、Authentication の uid ごとの回数を数えて上限で断る | アプリの中だけで数える形は、書き換えられる端末では守れない (`documents/DIRECTION.md` の 2026-11-20 の行)。数える置き場所 (Firestore 等) は新しいデータ構造になるため、実装の時に型を owner に見せる。匿名の uid は、アプリを入れ直した時と、サインアウトして匿名のサインインをし直した時に新しくなる見込みで (どちらも確かめていない)、新しい uid の回数は 0 から始まる。上限に達した利用者が回数を戻せることは残るため、匿名の uid に頼らない制限 (端末ごと・App Check の単位など) を足すかは owner が決める (下の「利用者の見分け方と回数の上限」)。Claude は、サーバーが利用者ごとの user profile を作り、その ID を利用者ごとに保存して、その利用者の Claude の呼び出しのすべてに付ければ、1 人の利用者の内容で Anthropic の組織の全体が制限される問題 (同じ行) も避けられる (「You register each end customer once with `POST /v1/user_profiles` and store the `uprof_` ID it returns. Then you send that ID in the `anthropic-user-profile-id` header on every request you make on that end customer’s behalf.」「Without a profile on the request, one end customer can trigger an enforcement action that applies to your whole organization.」 https://platform.claude.com/docs/en/manage-claude/user-profiles )。保存する置き場所は新しいデータ構造になり、`@genkit-ai/anthropic` の plugin からこの header を付けられるかは確かめていない |
 
 ### `server/` に足したもの
 
@@ -100,7 +100,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 | 費用の上限 | 置き場所の予算の通知の額。各社のモデルの利用料の、利用者に配る時の月の上限 (試す間は 3 社それぞれ 10 ドルと決まっている) |
 | 各社の API キーをサーバーの secret に置くこと | `ANTHROPIC_API_KEY`・`OPENAI_API_KEY`・`GEMINI_API_KEY` の 3 つを Cloud Secret Manager に置く。どの提供元を利用者に配るか (3 社とも / 一部) |
 | `GoogleService-Info.plist` の扱い | リポジトリに置かず、ビルドの時に Secrets から書き出す (勧める案。Secrets に名前が 1 つ増える) か、Firebase の文書に従ってコミットする |
-| 利用者の見分け方と回数の上限 | 匿名のサインインでよいか。無料の利用者の 1 日あたり (または通算) の回数 |
+| 利用者の見分け方と回数の上限 | 匿名のサインインでよいか (入れ直しやサインインのし直しで回数が戻ることを許すか、匿名の uid に頼らない制限を足すか)。無料の利用者の 1 日あたり (または通算) の回数 |
 | 提供元ごとのモデル | 仮に選んだ小さい側のモデルのままにするか、質を比べて決め直すか |
 | 同意の画面と文書の直し | 端末の外へ発言を送る前の同意の画面、`docs/PrivacyPolicy-ja.md`、App Privacy の回答、輸出コンプライアンスの申告。利用者に配るビルドで端末の外へ送る変更と同じ変更で行う (`documents/DIRECTION.md`「決めたこと」の 2026-11-20 の行) |
 
