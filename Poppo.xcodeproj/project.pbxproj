@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3B2BFE2AD6460AF2A4FFCF10 /* PoppoKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A23034E0A983E06D39CB87B0 /* PoppoKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		6F1C3A8E2D4B5C7091E2A3B4 /* ClaudeForFoundationModels in Frameworks */ = {isa = PBXBuildFile; productRef = C7D9E1F3A5B6C8D0E2F4A6B8 /* ClaudeForFoundationModels */; };
+		6F1C3A8E2D4B5C7091E2A3B4 /* PoppoClaude in Frameworks */ = {isa = PBXBuildFile; productRef = C7D9E1F3A5B6C8D0E2F4A6B8 /* PoppoClaude */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -92,7 +92,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6F1C3A8E2D4B5C7091E2A3B4 /* ClaudeForFoundationModels in Frameworks */,
+				6F1C3A8E2D4B5C7091E2A3B4 /* PoppoClaude in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,7 +186,7 @@
 			);
 			name = Poppo;
 			packageProductDependencies = (
-				C7D9E1F3A5B6C8D0E2F4A6B8 /* ClaudeForFoundationModels */,
+				C7D9E1F3A5B6C8D0E2F4A6B8 /* PoppoClaude */,
 			);
 			productName = Poppo;
 			productReference = 634B645E06A5CCAA80874D46 /* Poppo.app */;
@@ -213,7 +213,7 @@
 			mainGroup = A735306C23C6607F34478511;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B3C5D7E9F1A2B4C6D8E0F2A4 /* XCRemoteSwiftPackageReference "ClaudeForFoundationModels" */,
+				B3C5D7E9F1A2B4C6D8E0F2A4 /* XCLocalSwiftPackageReference "Packages/PoppoClaude" */,
 			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
@@ -575,22 +575,17 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		B3C5D7E9F1A2B4C6D8E0F2A4 /* XCRemoteSwiftPackageReference "ClaudeForFoundationModels" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/anthropics/ClaudeForFoundationModels";
-			requirement = {
-				kind = exactVersion;
-				version = 0.2.3;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		B3C5D7E9F1A2B4C6D8E0F2A4 /* XCLocalSwiftPackageReference "Packages/PoppoClaude" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/PoppoClaude;
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C7D9E1F3A5B6C8D0E2F4A6B8 /* ClaudeForFoundationModels */ = {
+		C7D9E1F3A5B6C8D0E2F4A6B8 /* PoppoClaude */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B3C5D7E9F1A2B4C6D8E0F2A4 /* XCRemoteSwiftPackageReference "ClaudeForFoundationModels" */;
-			productName = ClaudeForFoundationModels;
+			productName = PoppoClaude;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,6 +1,6 @@
-import ClaudeForFoundationModels
 import Foundation
 import FoundationModels
+import PoppoClaude
 import Testing
 @testable import Poppo
 

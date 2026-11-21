@@ -67,7 +67,7 @@ owner (bannzai) は、複数のモデルを使えるようにすると決め (20
 
 2026-11-21 に owner が Claude Console で app integration を作り、client ID を知らせた。この決定のうち、Claude を次の範囲で足す (実装: https://github.com/bannzai/poppo/issues/43 )。
 
-- 開発者メニューのあるビルド (DEBUG の条件があるビルド) に限り、開発者メニューで返信案を作るモデルに「Claude」を選べる。選んでいる間は、画面から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために Anthropic の API (`https://api.anthropic.com`) へ送る。翻訳と保存は端末内のまま。サーバーは足さない (本体アプリが Anthropic の公式の Swift package `ClaudeForFoundationModels` で API を直接呼ぶ。Beta。版は 0.2.3 に固定)
+- 開発者メニューのあるビルド (DEBUG の条件があるビルド) に限り、開発者メニューで返信案を作るモデルに「Claude」を選べる。選んでいる間は、画面から読んだチャットの発言 (相手の発言を含む) を、返信案を作るために Anthropic の API (`https://api.anthropic.com`) へ送る。翻訳と保存は端末内のまま。サーバーは足さない (本体アプリが Anthropic の公式の Swift package `ClaudeForFoundationModels` で API を直接呼ぶ。Beta。版は 0.2.3 に固定。この package は Xcode 26 でコンパイルできず、Xcode 26 でアプリをビルドする CodeQL の解析が止まるため (実測: https://github.com/bannzai/poppo/actions/runs/44881737135 )、Swift 6.4 以降でだけ依存に入れるリポジトリ内の package `Packages/PoppoClaude` を通して足す)
 - 選ぶ時に、送る内容と送信先 (Anthropic のサーバー) を画面で示して確かめる。Private Cloud Compute・OpenAI・Gemini と同じ仕組みで、確かめた時だけ切り替える
 - API キーを持たない。認証は App Attest で行い、アプリに入れるのは client ID だけ (公開してよい設定の値: 「The client ID it issues is public configuration that is safe to include in the app binary.」「The app ships no key and needs no developer backend.」 https://github.com/anthropics/ClaudeForFoundationModels )。simulator 用にも API キーの認証は足さない。App Attest を使えない端末 (simulator など) では Claude は使えない扱いにし、ほかのモデルへ切り替えずに返信案なしで翻訳だけを出す
 - Claude の user profile は使わない (作るのにサーバーが要るため。試す間の利用者は owner だけ)。利用者に配るビルドで Claude を使う時にどうするかは、`documents/DIRECTION.md`「bannzai の返答を待っていること」の問いのまま

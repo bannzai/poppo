@@ -2,6 +2,9 @@
 xcuserdata/
 *.xcuserstate
 build/
+.build/
+# 依存の版の pin は Poppo.xcodeproj の Package.resolved だけに置く (これはエディタが package を単体で解決した時に作る)
+Packages/*/Package.resolved
 DerivedData/
 tmp/
 .claude/settings.local.json

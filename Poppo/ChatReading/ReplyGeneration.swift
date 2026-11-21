@@ -1,9 +1,10 @@
 import Foundation
 import FoundationModels
-// Claude をつなぐ package は iOS 27 の SDK (Swift 6.4 以降) でしかコンパイルできないため、下の #if と同じ条件で読み込む
+// Claude をつなぐ package (ClaudeForFoundationModels) は iOS 27 の SDK (Swift 6.4 以降) でしかコンパイルできないため、
+// 同じ条件でだけ依存に入れる PoppoClaude (Packages/PoppoClaude/Package.swift) を通して、下の #if と同じ条件で読み込む
 #if compiler(>=6.4)
-import ClaudeForFoundationModels
 import DeviceCheck
+import PoppoClaude
 #endif
 
 /// 返信案を作るモデルに書かせる返信の文の組。モデルの出力をこの形に絞るために使う
