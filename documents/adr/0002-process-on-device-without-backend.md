@@ -75,6 +75,10 @@ owner (bannzai) は、複数のモデルを使えるようにすると決め (20
 - 利用者に配るビルド (開発者メニューの無いビルド) は、端末内だけのまま変えない (2026-11-20 の改めと同じ)。`docs/PrivacyPolicy-ja.md`・App Privacy の回答は変えない
 - 輸出コンプライアンスの申告 (`ITSAppUsesNonExemptEncryption` が false) は変えない。足した通信は package が行う HTTPS で、App Attest の鍵の生成と署名は OS の DeviceCheck が行う。package 0.2.3 のソース (`Sources/`) で暗号の API を使うのは、OS の CryptoKit の `SHA256` (App Attest に渡すハッシュ。`AppAttestSession.swift`) と、Keychain を読み書きする Security の import (`AppAttestStore.swift`) だけで、自前の暗号の実装は無い (`CryptoKit|CommonCrypto|Security|SecKey|SHA256|AES|Curve25519|P256` で検索した結果)。OS に組み込まれた暗号だけを使うため、OpenAI・Gemini の改めに引用した Apple の文書と同じ扱いにした
 
+### 2026-11-21: サーバーを経由する案 (ADR 0003。決まるまでこの ADR のまま)
+
+端末の外のモデル (Claude・OpenAI・Gemini) を利用者に配る時に、API キーをサーバーに置く案を `documents/adr/0003-serve-off-device-reply-models-through-genkit-server.md` に書いた (Status は Proposed)。リポジトリにサーバーの処理 (`server/`) とそのテストを足したが、デプロイしておらず、アプリからも呼んでいない。上の表 (サーバー・認証を持たない) は、owner が ADR 0003 の「owner が決めること」を決めて実装する時に改める。
+
 ## Consequences
 
 **良い点:**

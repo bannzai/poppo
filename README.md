@@ -41,5 +41,6 @@
 - 方向性 (仮説・判定基準・必要な機能・決めたこと・用語): [documents/DIRECTION.md](documents/DIRECTION.md)
 - 評価の記録: [documents/evaluation/2026-11-17-report.md](documents/evaluation/2026-11-17-report.md)
 - 開発の手順と検証方法: [AGENTS.md](AGENTS.md)
+- 端末の外のモデルで返信の文を作るサーバーの処理 (デプロイしていない。手元での起動とテスト): [server/README.md](server/README.md)。置き場所・費用・呼び方の案: [documents/adr/0003-serve-off-device-reply-models-through-genkit-server.md](documents/adr/0003-serve-off-device-reply-models-through-genkit-server.md)
 - TestFlight の内部テストへの配布: [documents/ios-testflight-distribution.md](documents/ios-testflight-distribution.md)
 - 利用規約: [docs/Terms-ja.md](docs/Terms-ja.md)、プライバシーポリシー: [docs/PrivacyPolicy-ja.md](docs/PrivacyPolicy-ja.md)
