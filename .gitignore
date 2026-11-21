@@ -16,5 +16,8 @@ lib/firebase_options.dart
 **/GoogleService-Info.plist
 **/google-services.json
 
+# npm のインストール先 (server/)
+node_modules/
+
 # bundler のローカルインストール先
 vendor/bundle/
