@@ -13,8 +13,9 @@ DEVELOPMENT_TEAM ?= $(FASTLANE_TEAM_ID)
 .PHONY: build-ios build-ios-device device install-device ios test clean verify
 
 # Simulator 向けビルド。generic destination なら simulator の起動なしでビルドできる
+# 署名は切らない: この成果物を `make ios` が simulator に入れて起動し、開発者メニューの API キーの保存が Keychain を使うため (理由は下の test のコメント)
 build-ios:
-	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) -destination 'generic/platform=iOS Simulator' build
 
 # 実機向けの SDK でのビルドだけを、署名なしで行う (実機には入れられない)。
 # ScreenCaptureKit は iOS Simulator の SDK に入っておらず、画面の取り込みの実体 (Poppo/ScreenCapture/SystemScreenCaptureSource.swift) は

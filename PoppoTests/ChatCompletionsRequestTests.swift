@@ -13,8 +13,8 @@ private nonisolated struct ReceivedChatCompletionsRequest {
 
 /// 差し替えた通信が返す応答
 private nonisolated struct StubbedChatCompletionsResponse {
-    /// HTTP の status code
-    let statusCode: Int
+    /// HTTP の status code。nil の時は、HTTP でない応答 (status code を持たない URLResponse) を返す
+    let statusCode: Int?
     /// 応答の本文
     let body: Data
 }
@@ -52,10 +52,21 @@ private nonisolated final class ChatCompletionsStubURLProtocol: URLProtocol {
             )
             return state.responses[host]
         }
-        guard
-            let stubbedResponse,
-            let httpURLResponse = HTTPURLResponse(url: url, statusCode: stubbedResponse.statusCode, httpVersion: "HTTP/1.1", headerFields: nil)
-        else {
+        guard let stubbedResponse else {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
+        guard let statusCode = stubbedResponse.statusCode else {
+            client?.urlProtocol(
+                self,
+                didReceive: URLResponse(url: url, mimeType: "application/json", expectedContentLength: stubbedResponse.body.count, textEncodingName: nil),
+                cacheStoragePolicy: .notAllowed
+            )
+            client?.urlProtocol(self, didLoad: stubbedResponse.body)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        guard let httpURLResponse = HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: "HTTP/1.1", headerFields: nil) else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
@@ -242,6 +253,67 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
                 apiKeyKeychainService: keychainService
             ) == ["A", "B", "C"]
         )
+    }
+
+    /// 200 番台でも、本文が Chat Completions の応答として読めない時 (JSON でない・choices が無い) は、読み取りのエラー (DecodingError) になること
+    @Test(arguments: [
+        "not json",
+        #"{"object":"chat.completion"}"#,
+    ])
+    func unreadableResponseBodyThrowsDecodingError(responseBody: String) async throws {
+        defer {
+            deleteAPIKeys()
+        }
+        try save(apiKey: "test-openai-key", replyModel: .openAI, keychainService: keychainService)
+        ChatCompletionsStubURLProtocol.state.withLock {
+            $0.responses["api.openai.com"] = StubbedChatCompletionsResponse(statusCode: 200, body: Data(responseBody.utf8))
+        }
+
+        await #expect(throws: DecodingError.self) {
+            try await generateReplyTexts(
+                messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
+                replyModel: .openAI,
+                apiKeyKeychainService: keychainService
+            )
+        }
+    }
+
+    /// 通信そのものが失敗した時 (接続できない) は、通信のエラー (URLError) がそのまま届くこと
+    @Test func connectionFailureThrowsURLError() async throws {
+        defer {
+            deleteAPIKeys()
+        }
+        try save(apiKey: "test-openai-key", replyModel: .openAI, keychainService: keychainService)
+
+        await #expect(throws: URLError.self) {
+            try await generateReplyTexts(
+                messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
+                replyModel: .openAI,
+                apiKeyKeychainService: keychainService
+            )
+        }
+    }
+
+    /// HTTP でない応答 (status code が無い) が返った時は、status code が nil のエラーになること
+    @Test func nonHTTPResponseThrowsErrorWithoutStatusCode() async throws {
+        defer {
+            deleteAPIKeys()
+        }
+        try save(apiKey: "test-openai-key", replyModel: .openAI, keychainService: keychainService)
+        try ChatCompletionsStubURLProtocol.state.withLock {
+            $0.responses["api.openai.com"] = StubbedChatCompletionsResponse(
+                statusCode: nil,
+                body: try chatCompletionsResponseBody(content: #"{"texts":["A","B","C"]}"#)
+            )
+        }
+
+        await #expect(throws: ChatCompletionsError.unexpectedStatus(statusCode: nil)) {
+            try await generateReplyTexts(
+                messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
+                replyModel: .openAI,
+                apiKeyKeychainService: keychainService
+            )
+        }
     }
 
     /// 応答に候補が複数ある時は、先頭の候補の文だけを使うこと
