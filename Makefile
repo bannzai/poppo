@@ -49,11 +49,13 @@ ios: build-ios
 	xcrun simctl install "$$simulator_udid" $(APP); \
 	xcrun simctl launch "$$simulator_udid" $(BUNDLE_ID)
 
+# 署名は切らない (CODE_SIGNING_ALLOWED=NO を付けない): 署名の無いアプリは entitlements を持たず、Keychain の操作が
+# errSecMissingEntitlement (-34018) で失敗するため (API キーの保存のテスト。CI の実測: https://github.com/bannzai/poppo/actions/runs/44855185498 )
 test:
 	@set -e; \
 	destination="$(DESTINATION)"; \
 	[ -n "$$destination" ] && [ "$$destination" != "platform=iOS Simulator,id=" ] || { echo "Error: sim-boot で Simulator を解決できません (sim-boot が PATH にあるか確認するか、DESTINATION='<destination>' または SIMULATOR_UDID=<UDID> を指定してください)" >&2; exit 1; }; \
-	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -derivedDataPath $(DERIVED_DATA) -destination "$$destination" CODE_SIGNING_ALLOWED=NO test
+	xcodebuild -project $(XCODEPROJ) -scheme $(SCHEME) -derivedDataPath $(DERIVED_DATA) -destination "$$destination" test
 
 clean:
 	rm -rf $(DERIVED_DATA)
