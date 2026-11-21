@@ -8,6 +8,12 @@ nonisolated enum ReplyModel: String, CaseIterable, Codable {
     /// Private Cloud Compute (Apple のサーバーで動くモデル。Foundation Models の PrivateCloudComputeLanguageModel)。
     /// 選ぶと、画面から読んだ発言が Apple のサーバーへ送られる
     case privateCloudCompute
+    /// OpenAI のモデル (OpenAI の API。開発者メニューで保存した API キーで使う)。
+    /// 選ぶと、画面から読んだ発言が OpenAI のサーバーへ送られる
+    case openAI
+    /// Gemini のモデル (Google の Gemini API。開発者メニューで保存した API キーで使う)。
+    /// 選ぶと、画面から読んだ発言が Google のサーバーへ送られる
+    case gemini
 }
 
 /// replyModel のモデルで返信案を作る時に、画面から読んだ発言を端末の外へ送るかを返す。
@@ -16,7 +22,17 @@ func sendsMessagesOutsideDevice(replyModel: ReplyModel) -> Bool {
     switch replyModel {
     case .onDevice:
         false
-    case .privateCloudCompute:
+    case .privateCloudCompute, .openAI, .gemini:
+        true
+    }
+}
+
+/// replyModel のモデルで返信案を作るのに、開発者メニューで保存する API キーが要るかを返す
+func usesAPIKey(replyModel: ReplyModel) -> Bool {
+    switch replyModel {
+    case .onDevice, .privateCloudCompute:
+        false
+    case .openAI, .gemini:
         true
     }
 }
