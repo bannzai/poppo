@@ -95,7 +95,9 @@ export function defineGenerateReplyTextsFlow(
       });
       // 出力が schema に合わない時、output は null になる
       // (「the `output` property can be `null`」「when the model fails to generate output that conforms to the schema」 https://genkit.dev/docs/models/ )
-      if (output === null || !containsCompleteJSONObject(text)) {
+      // 閉じた JSON かは、出力が文で届いた時だけ確かめる。文でない部分 (data) で届いた出力は切れた文を補って読んだものではなく、
+      // その時 text は空になる (genkit 1.44.0 の実測: `content: [{ data: { texts: [...] } }]` の応答で output が読め、text は空だった)
+      if (output === null || (text !== '' && !containsCompleteJSONObject(text))) {
         throw new GenkitError({ status: 'INTERNAL', message: 'The model did not return three reply texts.' });
       }
       return output;

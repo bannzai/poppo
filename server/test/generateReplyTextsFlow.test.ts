@@ -106,6 +106,18 @@ for (const [name, text] of [
   });
 }
 
+test('モデルの出力が文でない部分 (data) で届いた時は、その返信の文 3 つを返す', async () => {
+  mockModelOfProvider.claude.respondWith({ content: [{ data: { texts: ['a', 'b', 'c'] } }] });
+
+  assert.deepEqual(await generateReplyTexts({ conversation, provider: 'claude' }), { texts: ['a', 'b', 'c'] });
+});
+
+test('モデルの出力が文でない部分 (data) で届き、返信の文が 2 つの時は失敗する', async () => {
+  mockModelOfProvider.claude.respondWith({ content: [{ data: { texts: ['a', 'b'] } }] });
+
+  await assert.rejects(generateReplyTexts({ conversation, provider: 'claude' }));
+});
+
 test('モデルの呼び出しが失敗した時は、その失敗を返す', async () => {
   mockModelOfProvider.claude.respondWith([new Error('rate limited')]);
 
