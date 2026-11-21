@@ -93,7 +93,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 ### `server/` に足したもの
 
 - `generateReplyTexts` という flow (`server/src/generateReplyTextsFlow.ts`)。入力は会話の文 (`conversation`。アプリの `replyPrompt(messages:)` が作る文) と提供元 (`provider`。`claude`・`openAI`・`gemini`)。出力は `texts` (文字列 3 つ)。3 つの形でない出力は失敗にし、一部だけを返さない
-- 提供元ごとのモデル (`server/src/providerModels.ts`): `claude-haiku-4-5`・`gpt-5.4-mini`・`gemini-3.5-flash-lite`。各 plugin の文書に載っているモデルのうち小さい側を仮に選んだ (試す間の費用を 3 社それぞれ 10 ドルに収めるため)。質を比べて決め直す
+- 提供元ごとのモデル (`server/src/providerModels.ts`): `claude-haiku-4-5`・`gpt-5.4-mini`・`gemini-3.5-flash-lite`。各 plugin の文書に載っているモデルのうち小さい側を仮に選んだ (試す間の費用を 3 社それぞれ 10 ドルに収めるため)。質を比べて決め直す。OpenAI は、アプリの開発者メニューの経路 (API キーを端末に置く経路) が使う `gpt-6-luna` (`documents/DIRECTION.md`「決めたこと」の 2026-11-21 の行が、廃止の予定が無いモデルのうち最も安いと記録したもの) と揃っていない。サーバーのモデルはその行より前に選んだもので、2 つの単価は比べていない。Gemini は同じ `gemini-3.5-flash-lite`
 - 手元で試す起動口 (`server/src/server.ts`)。呼び出しの確かめを持たないため、このマシンの中からだけ届くアドレス (127.0.0.1) で待ち受ける (実測: 起動して `lsof` で見た待ち受けは `127.0.0.1:3499`)。Host ヘッダーが `127.0.0.1:<port>`・`localhost:<port>` でない要求は 403 で断る (起動中にブラウザで開いたページが、自分のドメインの解決先を 127.0.0.1 に切り替えて呼ぶ経路を断つため)。`onCallGenkit` で包む入口は、置き場所が決まってから足す
 - 置き場所を `server/` にしたのは、Xcode の同期フォルダ (`Poppo/`・`PoppoKeyboard/`・`PoppoTests/`・`Shared/`) の外で、アプリのターゲットに入らないため
 
@@ -110,7 +110,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 | 各社の API キーをサーバーの secret に置くこと | `ANTHROPIC_API_KEY`・`OPENAI_API_KEY`・`GEMINI_API_KEY` の 3 つを Cloud Secret Manager に置く。どの提供元を利用者に配るか (3 社とも / 一部) |
 | `GoogleService-Info.plist` の扱い | リポジトリに置かず、ビルドの時に Secrets から書き出す (勧める案。Secrets に名前が 1 つ増える) か、Firebase の文書に従ってコミットする |
 | 利用者の見分け方と回数の上限 | 匿名のサインインでよいか (入れ直しやサインインのし直しで回数が戻ることを許すか、匿名の uid に頼らない制限を足すか)。無料の利用者の 1 日あたり (または通算) の回数 |
-| 提供元ごとのモデル | 仮に選んだ小さい側のモデルのままにするか、質を比べて決め直すか |
+| 提供元ごとのモデル | 仮に選んだ小さい側のモデルのままにするか、質を比べて決め直すか。OpenAI を、アプリの開発者メニューの経路と同じ `gpt-6-luna` に揃えるか |
 | 同意の画面と文書の直し | 端末の外へ発言を送る前の同意の画面、`docs/PrivacyPolicy-ja.md`、App Privacy の回答、輸出コンプライアンスの申告。利用者に配るビルドで端末の外へ送る変更と同じ変更で行う (`documents/DIRECTION.md`「決めたこと」の 2026-11-20 の行) |
 
 決まった後に別の issue で行うこと: `onCallGenkit` の入口とデプロイ、アプリ側の呼び出しの切り替え ( https://github.com/bannzai/poppo/issues/39 の実装は main に入っている。開発者メニューの OpenAI・Gemini の経路をこの flow に替えるか、残すかもその時に決める)、同意の画面と文書の直し、`documents/adr/0002-process-on-device-without-backend.md` の改め。
