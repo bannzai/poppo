@@ -1,4 +1,3 @@
-import FoundationModels
 import SwiftUI
 
 /// 本体アプリの入口。ホーム画面から開いた時の最初の画面を出す
@@ -19,7 +18,7 @@ struct PoppoApp: App {
 }
 
 /// 本体アプリが使う取り込みの状態を作って返す。取り込みの実体と、取り込んだ画面を読む処理 (文字の読み取り・翻訳・返信案の生成) には、
-/// 端末内で動く本物を使う。latestReadingFileURL は読み取り結果を置く場所、diagnosticsFileURL は診断の記録を置く場所
+/// 本物を使う (返信案は、選ばれているモデルで作る)。latestReadingFileURL は読み取り結果を置く場所、diagnosticsFileURL は診断の記録を置く場所
 func makeOnDeviceScreenCaptureController(latestReadingFileURL: URL?, diagnosticsFileURL: URL?) -> ScreenCaptureController {
     ScreenCaptureController(
         makeSource: makeScreenCaptureSource,
@@ -30,8 +29,9 @@ func makeOnDeviceScreenCaptureController(latestReadingFileURL: URL?, diagnostics
         translateTexts: {
             try await translateOnDevice(texts: $0, targetLanguage: userLanguage(preferredLanguages: Locale.preferredLanguages))
         },
-        canGenerateReplies: { SystemLanguageModel.default.isAvailable },
-        generateReplyTexts: { try await generateReplyTexts(messages: $0) },
+        selectedReplyModel: { selectedReplyModel(userDefaults: .standard) },
+        canGenerateReplies: { canGenerateReplies(replyModel: $0) },
+        generateReplyTexts: { try await generateReplyTexts(messages: $0, replyModel: $1) },
         wait: { try? await Task.sleep(for: .seconds($0)) }
     )
 }

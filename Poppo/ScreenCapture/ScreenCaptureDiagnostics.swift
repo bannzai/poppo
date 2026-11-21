@@ -47,8 +47,12 @@ struct ScreenReadingDiagnostics: Codable, Equatable {
     var recognition = ScreenReadingStageDiagnostics()
     /// 翻訳の段 (読んだ発言を利用者の言語に訳す)
     var translation = ScreenReadingStageDiagnostics()
-    /// 返信案の生成の段 (返信の文を作り、その意味を訳す)。端末内のモデルが使えない時は失敗として数える
+    /// 返信案の生成の段 (返信の文を作り、その意味を訳す)。選ばれているモデルが使えない時は失敗として数える
     var replyGeneration = ScreenReadingStageDiagnostics()
+    /// 最後に返信案の生成の段の結果 (成功か失敗) を記録した時に、返信案を作るモデルとして選ばれていたモデル。
+    /// まだ 1 回も記録していない時と、この項目を足す前の版が保存した記録では nil。
+    /// 取り込みの途中でモデルを選び直すと、replyGeneration の回数には選び直す前のモデルの分も入る
+    var replyGenerationModel: ReplyModel?
     /// 保存の段 (読み取り結果をキーボードが読む場所に書く)
     var saving = ScreenReadingStageDiagnostics()
     /// 画面の文字は読めたが、発言が 1 つも無かった回数 (ホーム画面など)。失敗には数えない

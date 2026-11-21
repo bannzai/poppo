@@ -30,8 +30,9 @@ private let recognizedChatLines = [
         image: makeTestImage(),
         recognizeTextLines: { _ in recognizedChatLines },
         translateTexts: { texts in texts.map { "訳: " + $0 } },
-        canGenerateReplies: true,
-        generateReplyTexts: { _ in ["Sounds good", "Maybe tomorrow"] }
+        replyModel: .onDevice,
+        canGenerateReplies: { _ in true },
+        generateReplyTexts: { _, _ in ["Sounds good", "Maybe tomorrow"] }
     )
 
     #expect(reading.messages.map(\.originalText) == ["Are you free today?", "Yes, after lunch"])
@@ -47,8 +48,9 @@ private let recognizedChatLines = [
         image: makeTestImage(),
         recognizeTextLines: { _ in recognizedChatLines },
         translateTexts: { $0 },
-        canGenerateReplies: true,
-        generateReplyTexts: { messages in
+        replyModel: .onDevice,
+        canGenerateReplies: { _ in true },
+        generateReplyTexts: { messages, _ in
             receivedMessages = messages
             return []
         }
@@ -58,15 +60,17 @@ private let recognizedChatLines = [
     #expect(receivedMessages.map(\.isFromUser) == [false, true])
 }
 
-/// 端末内のモデルが使えない時は、返信の文の生成を呼ばず、返信案を空にして翻訳だけを返すこと
-@Test func readChatReturnsOnlyTranslationWhenModelIsUnavailable() async throws {
+/// 選ばれているモデルが使えない時は、ほかのモデルが使えても、どのモデルでも返信の文の生成を呼ばず、返信案を空にして翻訳だけを返すこと
+/// (使えるモデルへ黙って切り替えると、どのモデルが作った返信案かが分からなくなるため)。選べるモデルのそれぞれで確かめる
+@Test(arguments: ReplyModel.allCases) func readChatReturnsOnlyTranslationWhenSelectedModelIsUnavailable(replyModel: ReplyModel) async throws {
     var replyGenerationCallCount = 0
     let reading = try await readChat(
         image: makeTestImage(),
         recognizeTextLines: { _ in recognizedChatLines },
         translateTexts: { texts in texts.map { "訳: " + $0 } },
-        canGenerateReplies: false,
-        generateReplyTexts: { _ in
+        replyModel: replyModel,
+        canGenerateReplies: { $0 != replyModel },
+        generateReplyTexts: { _, _ in
             replyGenerationCallCount += 1
             return ["Sounds good"]
         }
@@ -77,14 +81,40 @@ private let recognizedChatLines = [
     #expect(reading.messages.map(\.translatedText) == ["訳: Are you free today?", "訳: Yes, after lunch"])
 }
 
+/// 使えるかの判定と返信の文の生成の両方に、選ばれているモデルを渡し、そのモデルが作った文を返信案にすること。
+/// 選べるモデルのそれぞれで確かめる
+@Test(arguments: ReplyModel.allCases) func readChatUsesSelectedModelForAvailabilityAndReplyGeneration(replyModel: ReplyModel) async throws {
+    var availabilityCheckedModels: [ReplyModel] = []
+    var replyGeneratedModels: [ReplyModel] = []
+    let reading = try await readChat(
+        image: makeTestImage(),
+        recognizeTextLines: { _ in recognizedChatLines },
+        translateTexts: { $0 },
+        replyModel: replyModel,
+        canGenerateReplies: {
+            availabilityCheckedModels.append($0)
+            return true
+        },
+        generateReplyTexts: { _, generatingReplyModel in
+            replyGeneratedModels.append(generatingReplyModel)
+            return ["reply by \(generatingReplyModel.rawValue)"]
+        }
+    )
+
+    #expect(availabilityCheckedModels == [replyModel])
+    #expect(replyGeneratedModels == [replyModel])
+    #expect(reading.replySuggestions.map(\.text) == ["reply by \(replyModel.rawValue)"])
+}
+
 /// 返信の文の生成が失敗した時は、翻訳を失わず、返信案を空にして返すこと
 @Test func readChatReturnsOnlyTranslationWhenReplyGenerationFails() async throws {
     let reading = try await readChat(
         image: makeTestImage(),
         recognizeTextLines: { _ in recognizedChatLines },
         translateTexts: { texts in texts.map { "訳: " + $0 } },
-        canGenerateReplies: true,
-        generateReplyTexts: { _ in throw CocoaError(.featureUnsupported) }
+        replyModel: .onDevice,
+        canGenerateReplies: { _ in true },
+        generateReplyTexts: { _, _ in throw CocoaError(.featureUnsupported) }
     )
 
     #expect(reading.replySuggestions.isEmpty)
@@ -104,8 +134,9 @@ private let recognizedChatLines = [
             }
             return texts.map { "訳: " + $0 }
         },
-        canGenerateReplies: true,
-        generateReplyTexts: { _ in ["Sounds good"] }
+        replyModel: .onDevice,
+        canGenerateReplies: { _ in true },
+        generateReplyTexts: { _, _ in ["Sounds good"] }
     )
 
     #expect(reading.replySuggestions.isEmpty)
@@ -122,8 +153,9 @@ private let recognizedChatLines = [
             translationCallCount += 1
             return translationCallCount == 1 ? texts.map { "訳: " + $0 } : ["訳: Sounds good"]
         },
-        canGenerateReplies: true,
-        generateReplyTexts: { _ in ["Sounds good", "Maybe tomorrow"] }
+        replyModel: .onDevice,
+        canGenerateReplies: { _ in true },
+        generateReplyTexts: { _, _ in ["Sounds good", "Maybe tomorrow"] }
     )
 
     #expect(reading.replySuggestions.isEmpty)
@@ -138,8 +170,9 @@ private let recognizedChatLines = [
             image: image,
             recognizeTextLines: { _ in [] },
             translateTexts: { $0 },
-            canGenerateReplies: true,
-            generateReplyTexts: { _ in [] }
+            replyModel: .onDevice,
+            canGenerateReplies: { _ in true },
+            generateReplyTexts: { _, _ in [] }
         )
     }
 }
@@ -152,8 +185,9 @@ private let recognizedChatLines = [
             image: image,
             recognizeTextLines: { _ in recognizedChatLines },
             translateTexts: { _ in ["訳: Are you free today?"] },
-            canGenerateReplies: true,
-            generateReplyTexts: { _ in [] }
+            replyModel: .onDevice,
+            canGenerateReplies: { _ in true },
+            generateReplyTexts: { _, _ in [] }
         )
     }
 }
@@ -176,8 +210,9 @@ private let recognizedChatLines = [
                     target: Locale.Language(identifier: "ja")
                 )
             },
-            canGenerateReplies: true,
-            generateReplyTexts: { _ in [] }
+            replyModel: .onDevice,
+            canGenerateReplies: { _ in true },
+            generateReplyTexts: { _, _ in [] }
         )
     }
 }
