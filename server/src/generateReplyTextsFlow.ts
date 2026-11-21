@@ -27,9 +27,10 @@ export const ReplyProviderSchema = z.enum(['claude', 'openAI', 'gemini']);
 export const GenerateReplyTextsInputSchema = z.object({
   /**
    * 会話の文。アプリの `replyPrompt(messages:)` が作る形 (発言を古い順に並べ、
-   * 利用者自身の発言に「Me:」、相手の発言に「Them:」を付けた文)
+   * 利用者自身の発言に「Me:」、相手の発言に「Them:」を付けた文)。
+   * 空白と改行のほかの文字を 1 つ以上含む (返信する相手の発言が無いままモデルを呼んで利用料をかけないため)
    */
-  conversation: z.string().min(1),
+  conversation: z.string().regex(/\S/),
   /** 返信の文を作るモデルの提供元 */
   provider: ReplyProviderSchema,
 });

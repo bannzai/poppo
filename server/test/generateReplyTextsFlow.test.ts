@@ -101,6 +101,7 @@ for (const [name, input] of [
   ['提供元が一覧に無い', { conversation, provider: 'llama' }],
   ['提供元が無い', { conversation }],
   ['会話の文が空', { conversation: '', provider: 'claude' }],
+  ['会話の文が空白と改行だけ', { conversation: ' \n\t ', provider: 'claude' }],
   ['会話の文が無い', { provider: 'claude' }],
 ] as const) {
   test(`入力が ${name} の時は、どのモデルも呼ばずに失敗する`, async () => {

@@ -85,7 +85,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 
 - `generateReplyTexts` という flow (`server/src/generateReplyTextsFlow.ts`)。入力は会話の文 (`conversation`。アプリの `replyPrompt(messages:)` が作る文) と提供元 (`provider`。`claude`・`openAI`・`gemini`)。出力は `texts` (文字列 3 つ)。3 つの形でない出力は失敗にし、一部だけを返さない
 - 提供元ごとのモデル (`server/src/providerModels.ts`): `claude-haiku-4-5`・`gpt-5.4-mini`・`gemini-3.5-flash-lite`。各 plugin の文書に載っているモデルのうち小さい側を仮に選んだ (試す間の費用を 3 社それぞれ 10 ドルに収めるため)。質を比べて決め直す
-- 手元で試す起動口 (`server/src/server.ts`)。呼び出しの確かめを持たないため、このマシンの中からだけ届くアドレス (127.0.0.1) で待ち受ける (実測: 起動して `lsof` で見た待ち受けは `127.0.0.1:3499`)。`onCallGenkit` で包む入口は、置き場所が決まってから足す
+- 手元で試す起動口 (`server/src/server.ts`)。呼び出しの確かめを持たないため、このマシンの中からだけ届くアドレス (127.0.0.1) で待ち受ける (実測: 起動して `lsof` で見た待ち受けは `127.0.0.1:3499`)。Host ヘッダーが `127.0.0.1:<port>`・`localhost:<port>` でない要求は 403 で断る (起動中にブラウザで開いたページが、自分のドメインの解決先を 127.0.0.1 に切り替えて呼ぶ経路を断つため)。`onCallGenkit` で包む入口は、置き場所が決まってから足す
 - 置き場所を `server/` にしたのは、Xcode の同期フォルダ (`Poppo/`・`PoppoKeyboard/`・`PoppoTests/`・`Shared/`) の外で、アプリのターゲットに入らないため
 
 ### 指示の文の正
