@@ -82,13 +82,13 @@ private func makeGenerationRequest(transcript: Transcript, schema: GenerationSch
         try? deleteAPIKey(replyModel: .openAI, keychainService: keychainService)
     }
 
-    #expect(canGenerateReplies(replyModel: .openAI, apiKeyKeychainService: keychainService) == false)
-    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService) == false)
+    #expect(canGenerateReplies(replyModel: .openAI, apiKeyKeychainService: keychainService, isAppAttestSupported: false) == false)
+    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService, isAppAttestSupported: false) == false)
 
     try save(apiKey: "openai-key", replyModel: .openAI, keychainService: keychainService)
 
-    #expect(canGenerateReplies(replyModel: .openAI, apiKeyKeychainService: keychainService) == true)
-    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService) == false)
+    #expect(canGenerateReplies(replyModel: .openAI, apiKeyKeychainService: keychainService, isAppAttestSupported: false) == true)
+    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService, isAppAttestSupported: false) == false)
 }
 
 /// Gemini も、自分の API キーを保存すると返信案を作れると答え、消すと作れないと答えること。Gemini のキーだけでは OpenAI は作れないと答えること
@@ -100,12 +100,12 @@ private func makeGenerationRequest(transcript: Transcript, schema: GenerationSch
 
     try save(apiKey: "gemini-key", replyModel: .gemini, keychainService: keychainService)
 
-    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService) == true)
-    #expect(canGenerateReplies(replyModel: .openAI, apiKeyKeychainService: keychainService) == false)
+    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService, isAppAttestSupported: false) == true)
+    #expect(canGenerateReplies(replyModel: .openAI, apiKeyKeychainService: keychainService, isAppAttestSupported: false) == false)
 
     try deleteAPIKey(replyModel: .gemini, keychainService: keychainService)
 
-    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService) == false)
+    #expect(canGenerateReplies(replyModel: .gemini, apiKeyKeychainService: keychainService, isAppAttestSupported: false) == false)
 }
 
 /// API キーを保存していないモデルで返信案を作ろうとすると、提供元へ何も送らずに「API キーを保存していない」のエラーになること

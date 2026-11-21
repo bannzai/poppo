@@ -61,7 +61,7 @@ Release 構成の実機向け (`sdk=iphoneos*`) だけを手動署名にして�
 | --- | --- | --- |
 | `ASC_API_KEY_ID`・`ASC_API_KEY_ISSUER_ID`・`ASC_API_KEY_P8_BASE64` | App Store Connect API の Key (アップロードに使う) | 2026-11-18 |
 | `IOS_P12_CERTIFICATE_BASE64`・`IOS_P12_PASSWORD` | 配布証明書の `.p12` とそのパスワード | 2026-11-18 |
-| `IOS_PROVISIONING_PROFILE_BASE64` | 本体アプリの App Store 用 provisioning profile (`Poppo.AppStore`。App Store Connect の profile の id `7Y96J77CJ4`) | 2026-11-18 |
+| `IOS_PROVISIONING_PROFILE_BASE64` | 本体アプリの App Store 用 provisioning profile (`Poppo.AppStore`。App Store Connect の profile の id `85B47JSDVW`。App ID で App Attest を有効にした後に発行し直した。Entitlements の `com.apple.developer.devicecheck.appattest-environment` は `development` と `production`) | 2026-11-21 |
 | `IOS_KEYBOARD_PROVISIONING_PROFILE_BASE64` | キーボードの App Store 用 provisioning profile (`Poppo.PoppoKeyboard.AppStore`。profile の id `CFT5FW2D7U`) | 2026-11-18 |
 
 登録は ios-deploy-actions skill の `register-secrets.sh` で行う (値を画面に出さない)。登録済みの名前は `gh secret list -R bannzai/poppo --env ios-deploy` で読める。
@@ -72,7 +72,7 @@ bash ~/.agents/skills/ios-deploy-actions/scripts/register-secrets.sh --repo bann
 
 ### profile を発行し直す時
 
-発行し直すのは、profile の期限が切れる時、配布証明書を替えた時、App ID の Capability (App Group など) を変えた時。今の `.p12` の証明書は App Store Connect の証明書の id `68L9PY6PX2` で、期限は 2027-01-17。2026-11-18 にこの証明書で発行した今の 2 つの profile の期限も、同じ 2027-01-17。
+発行し直すのは、profile の期限が切れる時、配布証明書を替えた時、App ID の Capability (App Group・App Attest など) を変えた時。Capability を変えると、その App ID の今の profile は無効になる (2026-11-21 に `com.bannzai.poppo` で App Attest を有効にした後、本体アプリの profile の `profileState` が `INVALID` になっていた。キーボードの profile は `ACTIVE` のまま)。今の `.p12` の証明書は App Store Connect の証明書の id `68L9PY6PX2` で、期限は 2027-01-17。この証明書で発行した今の 2 つの profile (キーボードは 2026-11-18、本体アプリは 2026-11-21 に発行) の期限も、同じ 2027-01-17。
 
 1. 今ある同じ名前の profile を消してから、profile を発行する。消さずに発行すると、`create-profile` は同じ名前の profile を先に探し、条件が揃っていれば新しく作らずに今ある profile の中身を書き出すだけになる (`signing-assets.sh` のヘッダー「冪等性」)。App Store Connect API を直接呼ぶ方法も、同じ名前の profile が残っている時にどう応えるかは試していないため、先に消す。消すと、次の配布までに手順 3 の登録をやり直す必要がある
 

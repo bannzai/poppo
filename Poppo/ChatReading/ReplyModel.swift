@@ -14,6 +14,9 @@ nonisolated enum ReplyModel: String, CaseIterable, Codable {
     /// Gemini のモデル (Google の Gemini API。開発者メニューで保存した API キーで使う)。
     /// 選ぶと、画面から読んだ発言が Google のサーバーへ送られる
     case gemini
+    /// Claude のモデル (Anthropic の API。API キーを持たず、App Attest で認証する)。
+    /// 選ぶと、画面から読んだ発言が Anthropic のサーバーへ送られる
+    case claude
 }
 
 /// replyModel のモデルで返信案を作る時に、画面から読んだ発言を端末の外へ送るかを返す。
@@ -22,7 +25,7 @@ func sendsMessagesOutsideDevice(replyModel: ReplyModel) -> Bool {
     switch replyModel {
     case .onDevice:
         false
-    case .privateCloudCompute, .openAI, .gemini:
+    case .privateCloudCompute, .openAI, .gemini, .claude:
         true
     }
 }
@@ -30,7 +33,7 @@ func sendsMessagesOutsideDevice(replyModel: ReplyModel) -> Bool {
 /// replyModel のモデルで返信案を作るのに、開発者メニューで保存する API キーが要るかを返す
 func usesAPIKey(replyModel: ReplyModel) -> Bool {
     switch replyModel {
-    case .onDevice, .privateCloudCompute:
+    case .onDevice, .privateCloudCompute, .claude:
         false
     case .openAI, .gemini:
         true
