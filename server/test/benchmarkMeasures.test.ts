@@ -90,6 +90,13 @@ test('失敗の文には、エラーの種類と status だけを入れ、エラ
   );
 });
 
+test('status が文字列のエラー (Genkit のエラー) の失敗の文にも、status を入れる', () => {
+  assert.equal(
+    failureOfError(Object.assign(new Error('The model did not return three reply texts.'), { name: 'GenkitError', status: 'INTERNAL' })),
+    'GenkitError status INTERNAL',
+  );
+});
+
 test('status の無いエラーの失敗の文は、エラーの種類だけ', () => {
   assert.equal(failureOfError(new TypeError('fetch failed for key sk-proj-abc')), 'TypeError');
 });
