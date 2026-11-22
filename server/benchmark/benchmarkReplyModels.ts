@@ -97,10 +97,6 @@ const calls = (
   )
 ).flat();
 
-if (options.output !== undefined) {
-  await writeFile(options.output, `${JSON.stringify(calls, null, 2)}\n`);
-}
-
 console.log(
   [
     `測った日時: ${new Date().toISOString()} (見本 ${conversationSamples.length} つ × ${runCount} 回)`,
@@ -126,3 +122,8 @@ console.log(
     ),
   ].join('\n'),
 );
+
+// 表を出した後に書き出す (書き出しに失敗しても、利用料を払って測った結果が標準出力に残るようにするため)
+if (options.output !== undefined) {
+  await writeFile(options.output, `${JSON.stringify(calls, null, 2)}\n`);
+}
