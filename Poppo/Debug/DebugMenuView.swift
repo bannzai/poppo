@@ -117,7 +117,7 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "返信案を作るモデル")
             } footer: {
-                Text(verbatim: "選んだ後に読む画面 (スクリーンショットからの読み取りと、取り込み) の返信案を、選んだモデルが作る。アプリを起動し直しても選んだままになる。選んだモデルが使えない時 (OpenAI と Gemini は API キーを保存していない時) は、ほかのモデルに切り替えず、返信案なしで翻訳だけを出す。「端末内」のほかを選ぶと、画面から読んだ発言がそのモデルの提供元のサーバーへ送られるため、選ぶ時に確認が出る (取り消すと選択は変わらない)")
+                Text(verbatim: "選んだ後に読む画面 (スクリーンショットからの読み取りと、取り込み) の返信案を、選んだモデルが作る。アプリを起動し直しても選んだままになる。選んだモデルが使えない時 (OpenAI と Gemini は API キーを保存していない時。Claude は simulator など App Attest を使えない端末の時) は、ほかのモデルに切り替えず、返信案なしで翻訳だけを出す。「端末内」のほかを選ぶと、画面から読んだ発言がそのモデルの提供元のサーバーへ送られるため、選ぶ時に確認が出る (取り消すと選択は変わらない)")
             }
             Section {
                 ForEach(ReplyModel.allCases.filter { usesAPIKey(replyModel: $0) }, id: \.self) { apiKeyReplyModel in
@@ -522,6 +522,8 @@ private func debugMenuText(replyModel: ReplyModel) -> String {
         "OpenAI"
     case .gemini:
         "Gemini"
+    case .claude:
+        "Claude"
     }
 }
 
@@ -537,6 +539,8 @@ private func debugMenuSendingDestinationText(replyModel: ReplyModel) -> String {
         "OpenAI のサーバー"
     case .gemini:
         "Google のサーバー"
+    case .claude:
+        "Anthropic のサーバー"
     }
 }
 

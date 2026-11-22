@@ -1,5 +1,11 @@
 import Foundation
 import FoundationModels
+// Claude をつなぐ package (ClaudeForFoundationModels) は iOS 27 の SDK (Swift 6.4 以降) でしかコンパイルできないため、
+// 同じ条件でだけ依存に入れる PoppoClaude (Packages/PoppoClaude/Package.swift) を通して、下の #if と同じ条件で読み込む
+#if compiler(>=6.4)
+import DeviceCheck
+import PoppoClaude
+#endif
 
 /// 返信案を作るモデルに書かせる返信の文の組。モデルの出力をこの形に絞るために使う
 @Generable
@@ -45,6 +51,15 @@ private let geminiBaseURL = URL(string: "https://generativelanguage.googleapis.c
 /// (入力 $0.30・出力 $2.50。100 万トークンあたり。https://ai.google.dev/gemini-api/docs/pricing を 2026-11-20 に読んだ値)
 private let geminiModelName = "gemini-3.5-flash-lite"
 
+/// Claude の API を App Attest で使うための client ID。owner が Claude Console の app integration (Team ID と bundle ID の登録) で作った値。
+/// API キーではなく、公開してよい設定の値 (package の README: 「The client ID it issues is public configuration that is safe to include
+/// in the app binary.」 https://github.com/anthropics/ClaudeForFoundationModels )
+private let claudeAppAttestClientID = "clid_01CC3t6y8WKskisGqkiMy9o1"
+
+/// 返信案を作る Claude のモデル。Claude の値段の表で最も安い現行のモデル (Claude Haiku 5.5。10 万トークン以下の要求で
+/// 入力 $0.10・出力 $0.50。100 万トークンあたり。https://platform.claude.com/docs/en/about-claude/pricing を 2026-11-21 に読んだ値)
+private let claudeModel = ClaudeModel.haiku5_5
+
 /// replyModel が指す Foundation Models のモデルを返す。モデルの種類と Foundation Models の型の対応は、この関数だけに置く。
 /// apiKeyKeychainService は、API キーが要るモデルのキーを保存してある Keychain の service
 func languageModel(replyModel: ReplyModel, apiKeyKeychainService: String) -> any LanguageModel {
@@ -67,18 +82,25 @@ func languageModel(replyModel: ReplyModel, apiKeyKeychainService: String) -> any
             apiKeyReplyModel: replyModel,
             apiKeyKeychainService: apiKeyKeychainService
         )
+    case .claude:
+        ClaudeLanguageModel(name: claudeModel, auth: .appAttest(clientID: claudeAppAttestClientID))
     }
 }
 
 /// replyModel のモデルで、今返信案を作れるか (モデルが使える端末・状態か) を返す
 func canGenerateReplies(replyModel: ReplyModel) -> Bool {
-    canGenerateReplies(replyModel: replyModel, apiKeyKeychainService: replyModelAPIKeyKeychainService)
+    canGenerateReplies(
+        replyModel: replyModel,
+        apiKeyKeychainService: replyModelAPIKeyKeychainService,
+        isAppAttestSupported: DCAppAttestService.shared.isSupported
+    )
 }
 
 /// replyModel のモデルで、今返信案を作れるか (モデルが使える端末・状態か) を返す。
 /// apiKeyKeychainService は、API キーが要るモデルのキーを保存してある Keychain の service。
-/// API キーが要るモデルは、キーを保存していて今読める時だけ true を返す
-func canGenerateReplies(replyModel: ReplyModel, apiKeyKeychainService: String) -> Bool {
+/// isAppAttestSupported は、この端末が App Attest を使えるか (simulator では使えない)。
+/// API キーが要るモデルは、キーを保存していて今読める時だけ、App Attest で認証するモデルは、isAppAttestSupported が true の時だけ true を返す
+func canGenerateReplies(replyModel: ReplyModel, apiKeyKeychainService: String, isAppAttestSupported: Bool) -> Bool {
     // 使えるか (isAvailable) は LanguageModel プロトコルの要件に無く、型ごとに持つため、型で分けて聞く
     switch languageModel(replyModel: replyModel, apiKeyKeychainService: apiKeyKeychainService) {
     case let systemLanguageModel as SystemLanguageModel:
@@ -90,6 +112,8 @@ func canGenerateReplies(replyModel: ReplyModel, apiKeyKeychainService: String) -
             replyModel: chatCompletionsLanguageModel.apiKeyReplyModel,
             keychainService: chatCompletionsLanguageModel.apiKeyKeychainService
         )) != nil
+    case is ClaudeLanguageModel:
+        isAppAttestSupported
     default:
         // 使えるかを聞けない型のモデルでは作らない: 使えるか分からないモデルで生成を試して、失敗の理由が診断の記録に残らなくなるのを避けるため
         false
@@ -98,7 +122,7 @@ func canGenerateReplies(replyModel: ReplyModel, apiKeyKeychainService: String) -
 
 /// replyModel のモデルで、会話に続けて利用者が送れる返信の文を、相手の言語で作る。
 /// モデルが使えない端末・状態では失敗するため、呼ぶ前に canGenerateReplies(replyModel:) を確かめる。
-/// Private Cloud Compute では Apple の、OpenAI では OpenAI の、Gemini では Google のサーバーへ、messages の発言が送られる
+/// Private Cloud Compute では Apple の、OpenAI では OpenAI の、Gemini では Google の、Claude では Anthropic のサーバーへ、messages の発言が送られる
 func generateReplyTexts(messages: [ExtractedMessage], replyModel: ReplyModel) async throws -> [String] {
     try await generateReplyTexts(messages: messages, replyModel: replyModel, apiKeyKeychainService: replyModelAPIKeyKeychainService)
 }
@@ -131,7 +155,7 @@ func canGenerateReplies(replyModel: ReplyModel) -> Bool {
     switch replyModel {
     case .onDevice:
         SystemLanguageModel.default.isAvailable
-    case .privateCloudCompute, .openAI, .gemini:
+    case .privateCloudCompute, .openAI, .gemini, .claude:
         false
     }
 }
@@ -145,7 +169,7 @@ func generateReplyTexts(messages: [ExtractedMessage], replyModel: ReplyModel) as
             .respond(to: replyPrompt(messages: messages), generating: GeneratedReplyTexts.self)
             .content
             .texts
-    case .privateCloudCompute, .openAI, .gemini:
+    case .privateCloudCompute, .openAI, .gemini, .claude:
         throw ReplyModelNotInSDKError()
     }
 }

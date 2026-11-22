@@ -11,27 +11,29 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     return userDefaults
 }
 
-/// 選べるモデルは、端末内・Private Cloud Compute・OpenAI・Gemini の 4 つで、保存・診断の記録・API キーの置き場所に書く生の値が
-/// この 4 つの文字列であること (生の値を変えると、保存してある選択・診断の記録・保存してある API キーを読めなくなる)
-@Test func replyModelsAreOnDevicePrivateCloudComputeOpenAIAndGemini() {
-    #expect(ReplyModel.allCases.map(\.rawValue) == ["onDevice", "privateCloudCompute", "openAI", "gemini"])
+/// 選べるモデルは、端末内・Private Cloud Compute・OpenAI・Gemini・Claude の 5 つで、保存・診断の記録・API キーの置き場所に書く生の値が
+/// この 5 つの文字列であること (生の値を変えると、保存してある選択・診断の記録・保存してある API キーを読めなくなる)
+@Test func replyModelsAreOnDevicePrivateCloudComputeOpenAIGeminiAndClaude() {
+    #expect(ReplyModel.allCases.map(\.rawValue) == ["onDevice", "privateCloudCompute", "openAI", "gemini", "claude"])
 }
 
-/// 発言を端末の外へ送らない (選ぶ前に確認が要らない) のは端末内だけで、Private Cloud Compute・OpenAI・Gemini は送ること
+/// 発言を端末の外へ送らない (選ぶ前に確認が要らない) のは端末内だけで、Private Cloud Compute・OpenAI・Gemini・Claude は送ること
 @Test func everyModelExceptOnDeviceSendsMessagesOutsideDevice() {
     #expect(sendsMessagesOutsideDevice(replyModel: .onDevice) == false)
     #expect(sendsMessagesOutsideDevice(replyModel: .privateCloudCompute) == true)
     #expect(sendsMessagesOutsideDevice(replyModel: .openAI) == true)
     #expect(sendsMessagesOutsideDevice(replyModel: .gemini) == true)
+    #expect(sendsMessagesOutsideDevice(replyModel: .claude) == true)
 }
 
-/// API キーが要るのは OpenAI と Gemini だけで、端末内と Private Cloud Compute は要らないこと
+/// API キーが要るのは OpenAI と Gemini だけで、端末内・Private Cloud Compute・Claude (App Attest で認証する) は要らないこと
 /// (開発者メニューは、要るモデルにだけ API キーの入力欄を出す)
 @Test func onlyOpenAIAndGeminiUseAPIKey() {
     #expect(usesAPIKey(replyModel: .onDevice) == false)
     #expect(usesAPIKey(replyModel: .privateCloudCompute) == false)
     #expect(usesAPIKey(replyModel: .openAI) == true)
     #expect(usesAPIKey(replyModel: .gemini) == true)
+    #expect(usesAPIKey(replyModel: .claude) == false)
 }
 
 /// 何も選んでいない時は、端末内のモデルが選ばれていること (モデルを選べるようにする前の動きを変えない)
@@ -69,10 +71,10 @@ private func makeEmptyUserDefaults() throws -> UserDefaults {
     #expect(selectedReplyModel(userDefaults: userDefaults, hasDeveloperMenu: true) == .onDevice)
 }
 
-/// 開発者メニューの無いビルドでは、発言を端末の外へ送るモデル (Private Cloud Compute・OpenAI・Gemini) が保存してあっても、
+/// 開発者メニューの無いビルドでは、発言を端末の外へ送るモデル (Private Cloud Compute・OpenAI・Gemini・Claude) が保存してあっても、
 /// 端末内のモデルが選ばれていること。同じ保存先を開発者メニューのあるビルドで読むと保存したモデルになることも確かめる
 /// (保存してある値ではなく、開発者メニューの有無で結果が分かれていることを見るため)
-@Test(arguments: [ReplyModel.privateCloudCompute, .openAI, .gemini])
+@Test(arguments: [ReplyModel.privateCloudCompute, .openAI, .gemini, .claude])
 func selectedReplyModelIsOnDeviceWithoutDeveloperMenu(savedReplyModel: ReplyModel) throws {
     let userDefaults = try makeEmptyUserDefaults()
     save(selectedReplyModel: savedReplyModel, userDefaults: userDefaults)
@@ -90,6 +92,10 @@ func selectedReplyModelIsOnDeviceWithoutDeveloperMenu(savedReplyModel: ReplyMode
     #expect(needsSendingConfirmation(selectingReplyModel: .gemini, currentReplyModel: .onDevice) == true)
     #expect(needsSendingConfirmation(selectingReplyModel: .openAI, currentReplyModel: .privateCloudCompute) == true)
     #expect(needsSendingConfirmation(selectingReplyModel: .gemini, currentReplyModel: .openAI) == true)
+    #expect(needsSendingConfirmation(selectingReplyModel: .claude, currentReplyModel: .onDevice) == true)
+    #expect(needsSendingConfirmation(selectingReplyModel: .claude, currentReplyModel: .gemini) == true)
+    #expect(needsSendingConfirmation(selectingReplyModel: .claude, currentReplyModel: .claude) == false)
+    #expect(needsSendingConfirmation(selectingReplyModel: .onDevice, currentReplyModel: .claude) == false)
     #expect(needsSendingConfirmation(selectingReplyModel: .privateCloudCompute, currentReplyModel: .privateCloudCompute) == false)
     #expect(needsSendingConfirmation(selectingReplyModel: .openAI, currentReplyModel: .openAI) == false)
     #expect(needsSendingConfirmation(selectingReplyModel: .gemini, currentReplyModel: .gemini) == false)
