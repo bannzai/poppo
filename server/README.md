@@ -39,6 +39,26 @@ curl -X POST http://127.0.0.1:3400/generateReplyTexts \
 
 返信の文 3 つが `{"result": {"texts": ["...", "...", "..."]}}` の形で返る。
 
+## モデルを比べる
+
+候補のモデル (`benchmark/candidateReplyModels.ts`) を、同じ会話の見本 (`benchmark/conversationSamples.ts`) で実際に呼んで、モデルごとに次を出す: 返信の文 3 つの形で返った回数と呼んだ回数、相手の言語の文字で書かれた文の数、返るまでの時間の中央値と最も遅かった値、入力と出力のトークンの数の平均、1 回あたりの費用。その下に、各モデルが返した返信の文の実物を見本ごとに並べる。提供元の API を呼ぶため利用料がかかる (2026-11-22 の実測: OpenAI の 4 つを見本 8 つ × 3 回で約 0.04 USD)。
+
+API キーは「手元での起動」と同じ環境変数で渡す。キーの無い提供元のモデルは呼ばず、「測っていない」と出す。
+
+```sh
+cd server
+npm ci
+npm run benchmark --silent > ../tmp/benchmark.md
+```
+
+- `--runs <回数>`: 見本 1 つあたりの呼ぶ回数 (指定しない時は 3)
+- `--models <名前,名前>`: 測るモデルを絞る (指定しない時は候補の全部)
+- `--output <ファイル>`: 全部の呼び出しの結果を JSON で書き出す
+
+1 回の実行で呼ぶ回数が 300 回を超える指定は、呼ぶ前に失敗する。1 回の呼び出しは 60 秒で打ち切って失敗に数える。失敗した呼び出しは、エラーの種類と status だけを結果に出す (エラーの文は API キーの一部を含むことがあるため出さない。plugin が標準エラーに出す記録には文が含まれるので、標準エラーをファイルに残してコミットしない)。
+
+単価は `benchmark/candidateReplyModels.ts` に書いてある。料金が変わった時と候補を足す時は、出典のページを読み直してから直す。測った結果と提案は [../documents/evaluation/2026-11-22-reply-model-benchmark.md](../documents/evaluation/2026-11-22-reply-model-benchmark.md)。
+
 ## モデルへの指示の文
 
 正はアプリの `replyInstructions` (`Poppo/ChatReading/ReplyGeneration.swift`) で、`src/generateReplyTextsFlow.ts` の文はその写し。アプリの文を変えた時は、ここも同じ文に直す (違うと `test/replyInstructionsMatchApp.test.ts` が落ちる)。
