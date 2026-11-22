@@ -67,6 +67,66 @@ export function failureOfError(error: unknown): string {
     : error.name;
 }
 
+/**
+ * generate を 1 回実行し、返るまでの時間と結果を、call (どのモデルを・どの見本で・何回目か) と合わせて返す。
+ * generate が失敗しても投げずに、失敗の内容 (`failureOfError`) を結果に入れる
+ */
+export async function measureReplyModelCall(
+  call: Pick<ReplyModelCall, 'modelName' | 'sampleID' | 'runNumber'>,
+  generate: () => Promise<{ texts: string[]; usage: { inputTokens?: number; outputTokens?: number; thoughtsTokens?: number } }>,
+): Promise<ReplyModelCall> {
+  const startedAt = performance.now();
+  try {
+    const { texts, usage } = await generate();
+    return {
+      ...call,
+      durationMilliseconds: performance.now() - startedAt,
+      texts,
+      failure: null,
+      // inputTokens が無いのは提供元がトークンの数を返さなかった時で、費用を計算しない
+      inputTokens: usage.inputTokens ?? null,
+      billedOutputTokens: billedOutputTokensOfUsage(usage),
+    };
+  } catch (error) {
+    return {
+      ...call,
+      durationMilliseconds: performance.now() - startedAt,
+      texts: null,
+      failure: failureOfError(error),
+      inputTokens: null,
+      billedOutputTokens: null,
+    };
+  }
+}
+
+/**
+ * 実行の引数から、見本 1 つあたりの呼ぶ回数 (`runCount`)、測ると選ばれた候補 (`selectedModels`)、そのうち実際に呼ぶ候補 (`measuredModels`) を返す。
+ * runs は `--runs` の値、modelNames は `--models` の値 (カンマ区切り。undefined は候補の全部)。
+ * hasAPIKey が false を返した候補 (提供元の API キーが無い) は呼ばない。
+ * runs が 1 以上の整数でない時と、呼ぶ回数 (呼ぶ候補の数 × sampleCount × runCount) が maximumCallCount を超える時は、Error を投げる (提供元を呼ぶ前に止めるため)
+ */
+export function planReplyModelCalls<Model extends { modelName: string }>(plan: {
+  candidates: Model[];
+  runs: string;
+  modelNames: string | undefined;
+  sampleCount: number;
+  maximumCallCount: number;
+  hasAPIKey: (model: Model) => boolean;
+}): { runCount: number; selectedModels: Model[]; measuredModels: Model[] } {
+  const runCount = Number(plan.runs);
+  if (!Number.isInteger(runCount) || runCount < 1) {
+    throw new Error(`--runs は 1 以上の整数にする: ${plan.runs}`);
+  }
+  const selectedModels = plan.candidates.filter(
+    (model) => plan.modelNames === undefined || plan.modelNames.split(',').includes(model.modelName),
+  );
+  const measuredModels = selectedModels.filter(plan.hasAPIKey);
+  if (measuredModels.length * plan.sampleCount * runCount > plan.maximumCallCount) {
+    throw new Error(`呼ぶ回数が上限 (${plan.maximumCallCount} 回) を超える。--runs か --models で減らす`);
+  }
+  return { runCount, selectedModels, measuredModels };
+}
+
 /** トークンの数と 100 万トークンあたりの単価 (USD) から、1 回の呼び出しの費用 (USD) を返す */
 export function costUSDOfTokens(tokens: {
   inputTokens: number;

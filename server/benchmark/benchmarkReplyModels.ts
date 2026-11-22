@@ -3,18 +3,18 @@ import { parseArgs } from 'node:util';
 import { anthropic } from '@genkit-ai/anthropic';
 import { openAI } from '@genkit-ai/compat-oai/openai';
 import { googleAI } from '@genkit-ai/google-genai';
-import { genkit, type Genkit, type ModelArgument } from 'genkit';
+import { genkit, type ModelArgument } from 'genkit';
 import { generateReplyTextsWithModel } from '../src/generateReplyTextsFlow.js';
 import {
-  billedOutputTokensOfUsage,
-  failureOfError,
+  measureReplyModelCall,
+  planReplyModelCalls,
   renderReplyTexts,
   renderSummaryTable,
   summarizeReplyModelCalls,
   type ReplyModelCall,
 } from './benchmarkMeasures.js';
 import { candidateReplyModels, type CandidateReplyModel } from './candidateReplyModels.js';
-import { conversationSamples, type ConversationSample } from './conversationSamples.js';
+import { conversationSamples } from './conversationSamples.js';
 
 // 候補のモデルを、同じ会話の見本で実際に呼んで比べる。提供元の API を呼ぶため利用料がかかる。
 // 使い方と、結果の読み方は server/README.md「モデルを比べる」
@@ -49,41 +49,6 @@ const maximumCallCount = 300;
  */
 const callTimeoutMilliseconds = 60_000;
 
-/** model を sample の会話の文で 1 回呼び、結果を返す (失敗しても投げずに、失敗の内容を結果に入れる)。提供元の API を 1 回呼ぶ */
-async function callReplyModel(ai: Genkit, model: CandidateReplyModel, sample: ConversationSample, runNumber: number): Promise<ReplyModelCall> {
-  const startedAt = performance.now();
-  try {
-    const { texts, usage } = await generateReplyTextsWithModel(
-      ai,
-      providers[model.provider].model(model),
-      sample.conversation,
-      AbortSignal.timeout(callTimeoutMilliseconds),
-    );
-    return {
-      modelName: model.modelName,
-      sampleID: sample.id,
-      runNumber,
-      durationMilliseconds: performance.now() - startedAt,
-      texts,
-      failure: null,
-      // inputTokens が無いのは提供元がトークンの数を返さなかった時で、費用を計算しない
-      inputTokens: usage.inputTokens ?? null,
-      billedOutputTokens: billedOutputTokensOfUsage(usage),
-    };
-  } catch (error) {
-    return {
-      modelName: model.modelName,
-      sampleID: sample.id,
-      runNumber,
-      durationMilliseconds: performance.now() - startedAt,
-      texts: null,
-      failure: failureOfError(error),
-      inputTokens: null,
-      billedOutputTokens: null,
-    };
-  }
-}
-
 const { values: options } = parseArgs({
   options: {
     // 見本 1 つあたりの呼ぶ回数。3 は、中央値と最も遅い値を見本 8 つ × 3 回 = 24 回から出すための数
@@ -95,16 +60,14 @@ const { values: options } = parseArgs({
   },
 });
 
-const runCount = Number(options.runs);
-if (!Number.isInteger(runCount) || runCount < 1) {
-  throw new Error(`--runs は 1 以上の整数にする: ${options.runs}`);
-}
-
-const selectedModels = candidateReplyModels.filter((model) => options.models === undefined || options.models.split(',').includes(model.modelName));
-const measuredModels = selectedModels.filter((model) => process.env[providers[model.provider].apiKeyEnvironmentName]);
-if (measuredModels.length * conversationSamples.length * runCount > maximumCallCount) {
-  throw new Error(`呼ぶ回数が上限 (${maximumCallCount} 回) を超える。--runs か --models で減らす`);
-}
+const { runCount, selectedModels, measuredModels } = planReplyModelCalls({
+  candidates: candidateReplyModels,
+  runs: options.runs,
+  modelNames: options.models,
+  sampleCount: conversationSamples.length,
+  maximumCallCount,
+  hasAPIKey: (model) => Boolean(process.env[providers[model.provider].apiKeyEnvironmentName]),
+});
 
 const ai = genkit({
   plugins: [...new Set(measuredModels.map((model) => model.provider))].map((provider) => providers[provider].createPlugin()),
@@ -117,7 +80,16 @@ const calls = (
       const modelCalls: ReplyModelCall[] = [];
       for (const sample of conversationSamples) {
         for (let runNumber = 1; runNumber <= runCount; runNumber += 1) {
-          modelCalls.push(await callReplyModel(ai, model, sample, runNumber));
+          modelCalls.push(
+            await measureReplyModelCall({ modelName: model.modelName, sampleID: sample.id, runNumber }, () =>
+              generateReplyTextsWithModel(
+                ai,
+                providers[model.provider].model(model),
+                sample.conversation,
+                AbortSignal.timeout(callTimeoutMilliseconds),
+              ),
+            ),
+          );
         }
       }
       return modelCalls;

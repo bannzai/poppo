@@ -70,6 +70,7 @@ test('モデルを指定した呼び出しは、止めてある signal を渡す
   mockModelOfProvider.gemini.respondWith({ text: JSON.stringify({ texts: ['a', 'b', 'c'] }) });
 
   await assert.rejects(generateReplyTextsWithModel(ai, mockModelOfProvider.gemini, conversation, AbortSignal.abort()));
+  assert.equal(mockModelOfProvider.gemini.requestCount, 0);
 });
 
 test('モデルへ、指示の文を system として、会話の文をそのまま利用者の発言として渡す', async () => {

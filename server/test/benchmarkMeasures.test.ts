@@ -5,7 +5,9 @@ import {
   costUSDOfTokens,
   failureOfError,
   isWrittenInScript,
+  measureReplyModelCall,
   medianOf,
+  planReplyModelCalls,
   renderReplyTexts,
   renderSummaryTable,
   summarizeReplyModelCalls,
@@ -94,6 +96,108 @@ test('status の無いエラーの失敗の文は、エラーの種類だけ', (
 
 test('Error でないものが投げられた時の失敗の文は unknown error (投げられた値を入れない)', () => {
   assert.equal(failureOfError('sk-proj-abc'), 'unknown error');
+});
+
+/** 計画のテストで使う候補。b は API キーが無い提供元のモデルとして扱う */
+const planCandidates = [{ modelName: 'a' }, { modelName: 'b' }, { modelName: 'c' }];
+
+/** planCandidates を、b だけ API キーが無いものとして計画する (上書きする引数だけを渡す) */
+function plan(overrides: { runs?: string; modelNames?: string; sampleCount?: number; maximumCallCount?: number }) {
+  return planReplyModelCalls({
+    candidates: planCandidates,
+    runs: '3',
+    modelNames: undefined,
+    sampleCount: 8,
+    maximumCallCount: 300,
+    hasAPIKey: (model) => model.modelName !== 'b',
+    ...overrides,
+  });
+}
+
+test('モデルを指定しない計画は、候補の全部を選び、API キーの無い提供元のモデルだけを呼ばない', () => {
+  assert.deepEqual(plan({}), {
+    runCount: 3,
+    selectedModels: [{ modelName: 'a' }, { modelName: 'b' }, { modelName: 'c' }],
+    measuredModels: [{ modelName: 'a' }, { modelName: 'c' }],
+  });
+});
+
+test('モデルを指定した計画は、指定した名前の候補だけを選ぶ (候補に無い名前は選ばない)', () => {
+  assert.deepEqual(plan({ modelNames: 'c,b,unknown' }), {
+    runCount: 3,
+    selectedModels: [{ modelName: 'b' }, { modelName: 'c' }],
+    measuredModels: [{ modelName: 'c' }],
+  });
+});
+
+for (const runs of ['0', '-1', '1.5', 'abc', '']) {
+  test(`--runs が「${runs}」の計画は失敗する`, () => {
+    assert.throws(() => plan({ runs }), /--runs は 1 以上の整数にする/);
+  });
+}
+
+test('--runs が 1 の計画は通る', () => {
+  assert.equal(plan({ runs: '1' }).runCount, 1);
+});
+
+test('呼ぶ回数が上限ちょうどの計画は通る (呼ばない候補は回数に数えない)', () => {
+  // 呼ぶ候補 2 つ × 見本 8 つ × 3 回 = 48 回
+  assert.equal(plan({ maximumCallCount: 48 }).measuredModels.length, 2);
+});
+
+test('呼ぶ回数が上限を 1 回超える計画は失敗する', () => {
+  assert.throws(() => plan({ maximumCallCount: 47 }), /呼ぶ回数が上限 \(47 回\) を超える/);
+});
+
+test('1 回の呼び出しの計測は、返った返信の文とトークンの数を、どの呼び出しかと合わせて返す', async () => {
+  const call = await measureReplyModelCall({ modelName: 'model-a', sampleID: 'english', runNumber: 2 }, async () => ({
+    texts: ['a', 'b', 'c'],
+    usage: { inputTokens: 120, outputTokens: 30, thoughtsTokens: 50 },
+  }));
+
+  assert.ok(call.durationMilliseconds >= 0);
+  assert.deepEqual(
+    { ...call, durationMilliseconds: 0 },
+    {
+      modelName: 'model-a',
+      sampleID: 'english',
+      runNumber: 2,
+      durationMilliseconds: 0,
+      texts: ['a', 'b', 'c'],
+      failure: null,
+      inputTokens: 120,
+      billedOutputTokens: 80,
+    },
+  );
+});
+
+test('1 回の呼び出しの計測は、提供元がトークンの数を返さなかった時、トークンの数を null にする (0 にしない)', async () => {
+  const { inputTokens, billedOutputTokens } = await measureReplyModelCall({ modelName: 'model-a', sampleID: 'english', runNumber: 1 }, async () => ({
+    texts: ['a', 'b', 'c'],
+    usage: {},
+  }));
+
+  assert.deepEqual([inputTokens, billedOutputTokens], [null, null]);
+});
+
+test('1 回の呼び出しの計測は、呼び出しが失敗しても投げずに、失敗の内容を結果に入れる', async () => {
+  const call = await measureReplyModelCall({ modelName: 'model-a', sampleID: 'english', runNumber: 1 }, async () => {
+    throw Object.assign(new Error('Incorrect API key provided: sk-proj-abc***xyz'), { name: 'AuthenticationError', status: 401 });
+  });
+
+  assert.deepEqual(
+    { ...call, durationMilliseconds: 0 },
+    {
+      modelName: 'model-a',
+      sampleID: 'english',
+      runNumber: 1,
+      durationMilliseconds: 0,
+      texts: null,
+      failure: 'AuthenticationError status 401',
+      inputTokens: null,
+      billedOutputTokens: null,
+    },
+  );
 });
 
 /** まとめのテストで使う、モデル 2 つ・見本 2 つの呼び出しの結果 */
