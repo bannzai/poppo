@@ -105,6 +105,16 @@ test('Error でないものが投げられた時の失敗の文は unknown error
   assert.equal(failureOfError('sk-proj-abc'), 'unknown error');
 });
 
+/** 呼ぶたびに times の値を順に返す、時刻の関数を作る (計測のテストで、返るまでの時間を決まった値にするため) */
+function clockReturning(times: number[]) {
+  const remainingTimes = [...times];
+  return () => {
+    const time = remainingTimes.shift();
+    assert.ok(time !== undefined, '時刻が想定より多く読まれた');
+    return time;
+  };
+}
+
 /** 計画のテストで使う候補。b は API キーが無い提供元のモデルとして扱う */
 const planCandidates = [{ modelName: 'a' }, { modelName: 'b' }, { modelName: 'c' }];
 
@@ -157,19 +167,18 @@ test('呼ぶ回数が上限を 1 回超える計画は失敗する', () => {
 });
 
 test('1 回の呼び出しの計測は、返った返信の文とトークンの数を、どの呼び出しかと合わせて返す', async () => {
-  const call = await measureReplyModelCall({ modelName: 'model-a', sampleID: 'english', runNumber: 2 }, async () => ({
-    texts: ['a', 'b', 'c'],
-    usage: { inputTokens: 120, outputTokens: 30, thoughtsTokens: 50 },
-  }));
-
-  assert.ok(call.durationMilliseconds >= 0);
   assert.deepEqual(
-    { ...call, durationMilliseconds: 0 },
+    await measureReplyModelCall(
+      { modelName: 'model-a', sampleID: 'english', runNumber: 2 },
+      async () => ({ texts: ['a', 'b', 'c'], usage: { inputTokens: 120, outputTokens: 30, thoughtsTokens: 50 } }),
+      // 呼ぶ前が 1000、返った後が 3500
+      clockReturning([1000, 3500]),
+    ),
     {
       modelName: 'model-a',
       sampleID: 'english',
       runNumber: 2,
-      durationMilliseconds: 0,
+      durationMilliseconds: 2500,
       texts: ['a', 'b', 'c'],
       failure: null,
       inputTokens: 120,
@@ -188,17 +197,20 @@ test('1 回の呼び出しの計測は、提供元がトークンの数を返さ
 });
 
 test('1 回の呼び出しの計測は、呼び出しが失敗しても投げずに、失敗の内容を結果に入れる', async () => {
-  const call = await measureReplyModelCall({ modelName: 'model-a', sampleID: 'english', runNumber: 1 }, async () => {
-    throw Object.assign(new Error('Incorrect API key provided: sk-proj-abc***xyz'), { name: 'AuthenticationError', status: 401 });
-  });
-
   assert.deepEqual(
-    { ...call, durationMilliseconds: 0 },
+    await measureReplyModelCall(
+      { modelName: 'model-a', sampleID: 'english', runNumber: 1 },
+      async () => {
+        throw Object.assign(new Error('Incorrect API key provided: sk-proj-abc***xyz'), { name: 'AuthenticationError', status: 401 });
+      },
+      // 呼ぶ前が 200、失敗した後が 60200 (打ち切りの 60 秒)
+      clockReturning([200, 60200]),
+    ),
     {
       modelName: 'model-a',
       sampleID: 'english',
       runNumber: 1,
-      durationMilliseconds: 0,
+      durationMilliseconds: 60000,
       texts: null,
       failure: 'AuthenticationError status 401',
       inputTokens: null,
@@ -369,6 +381,13 @@ for (const modelName of ['gpt-5.4-mini', 'gpt-6-luna']) {
     assert.ok(candidateReplyModels.some((model) => model.provider === 'openAI' && model.modelName === modelName));
   });
 }
+
+test('OpenAI のほかの提供元の候補は、OpenAI の strict の指定を付けない', () => {
+  assert.deepEqual(
+    candidateReplyModels.filter((model) => model.provider !== 'openAI' && model.usesStrictOutput),
+    [],
+  );
+});
 
 test('候補のモデルの名前は重ならない (結果をモデルの名前で分けるため)', () => {
   assert.equal(new Set(candidateReplyModels.map((model) => model.modelName)).size, candidateReplyModels.length);

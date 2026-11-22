@@ -69,18 +69,21 @@ export function failureOfError(error: unknown): string {
 
 /**
  * generate を 1 回実行し、返るまでの時間と結果を、call (どのモデルを・どの見本で・何回目か) と合わせて返す。
- * generate が失敗しても投げずに、失敗の内容 (`failureOfError`) を結果に入れる
+ * generate が失敗しても投げずに、失敗の内容 (`failureOfError`) を結果に入れる。
+ * now は今の時刻をミリ秒で返す関数で、時間は generate の前後の now の差
  */
 export async function measureReplyModelCall(
   call: Pick<ReplyModelCall, 'modelName' | 'sampleID' | 'runNumber'>,
   generate: () => Promise<{ texts: string[]; usage: { inputTokens?: number; outputTokens?: number; thoughtsTokens?: number } }>,
+  // 既定は、時計の合わせ直しで戻らない performance.now (経過の時間を測るため)。テストは決まった時刻を返す関数を渡す
+  now: () => number = () => performance.now(),
 ): Promise<ReplyModelCall> {
-  const startedAt = performance.now();
+  const startedAt = now();
   try {
     const { texts, usage } = await generate();
     return {
       ...call,
-      durationMilliseconds: performance.now() - startedAt,
+      durationMilliseconds: now() - startedAt,
       texts,
       failure: null,
       // inputTokens が無いのは提供元がトークンの数を返さなかった時で、費用を計算しない
@@ -90,7 +93,7 @@ export async function measureReplyModelCall(
   } catch (error) {
     return {
       ...call,
-      durationMilliseconds: performance.now() - startedAt,
+      durationMilliseconds: now() - startedAt,
       texts: null,
       failure: failureOfError(error),
       inputTokens: null,
