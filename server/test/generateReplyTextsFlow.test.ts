@@ -3,7 +3,12 @@ import { createServer } from 'node:net';
 import { beforeEach, test } from 'node:test';
 import { genkit } from 'genkit';
 import { mockModel } from 'genkit/testing';
-import { defineGenerateReplyTextsFlow, replyInstructions, ReplyProviderSchema } from '../src/generateReplyTextsFlow.js';
+import {
+  defineGenerateReplyTextsFlow,
+  generateReplyTextsWithModel,
+  replyInstructions,
+  ReplyProviderSchema,
+} from '../src/generateReplyTextsFlow.js';
 import { startLocalFlowServer } from '../src/localFlowServer.js';
 
 // 提供元の plugin を入れない ai。提供元の API は呼ばず、API キーも使わない
@@ -45,6 +50,28 @@ for (const provider of ReplyProviderSchema.options) {
     );
   });
 }
+
+test('モデルを指定した呼び出しは、返信の文 3 つと、モデルが返したトークンの数を返す', async () => {
+  mockModelOfProvider.gemini.respondWith({
+    text: JSON.stringify({ texts: ['Yes, I am.', 'Sorry, I am busy.', 'What time?'] }),
+    usage: { inputTokens: 120, outputTokens: 30, thoughtsTokens: 50 },
+  });
+
+  const { texts, usage } = await generateReplyTextsWithModel(ai, mockModelOfProvider.gemini, conversation);
+
+  assert.deepEqual(texts, ['Yes, I am.', 'Sorry, I am busy.', 'What time?']);
+  assert.deepEqual(
+    { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, thoughtsTokens: usage.thoughtsTokens },
+    { inputTokens: 120, outputTokens: 30, thoughtsTokens: 50 },
+  );
+});
+
+test('モデルを指定した呼び出しは、止めてある signal を渡すとモデルを呼ばずに失敗する', async () => {
+  mockModelOfProvider.gemini.respondWith({ text: JSON.stringify({ texts: ['a', 'b', 'c'] }) });
+
+  await assert.rejects(generateReplyTextsWithModel(ai, mockModelOfProvider.gemini, conversation, AbortSignal.abort()));
+  assert.equal(mockModelOfProvider.gemini.requestCount, 0);
+});
 
 test('モデルへ、指示の文を system として、会話の文をそのまま利用者の発言として渡す', async () => {
   mockModelOfProvider.claude.respondWith({ text: JSON.stringify({ texts: ['a', 'b', 'c'] }) });

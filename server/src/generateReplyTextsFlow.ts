@@ -87,6 +87,28 @@ function endsInsideUnclosedJSON(text: string): boolean {
 }
 
 /**
+ * model に会話の文を渡し、会話に続けて利用者が送れる返信の文 3 つ (`texts`) と、その呼び出しで数えられたトークンの数 (`usage`) を返す。
+ * 提供元の API を 1 回呼ぶ (利用料がかかる)。モデルの出力が返信の文 3 つの形でない時は失敗する (一部だけを返さない)。
+ * abortSignal を渡すと、その signal が止めた時に呼び出しを打ち切って失敗する (渡さない時は打ち切らない)
+ */
+export async function generateReplyTextsWithModel(ai: Genkit, model: ModelArgument, conversation: string, abortSignal?: AbortSignal) {
+  const { output, text, usage } = await ai.generate({
+    model,
+    system: replyInstructions,
+    prompt: conversation,
+    output: { schema: GeneratedReplyTextsSchema },
+    abortSignal,
+  });
+  // 出力が schema に合わない時、output は null になる
+  // (「the `output` property can be `null`」「when the model fails to generate output that conforms to the schema」 https://genkit.dev/docs/models/ )
+  // 文に JSON が無い時 (出力が文でない部分 (data) で届いた時。説明の文が付いていてもよい) は、切れた文を補って読んだ出力ではないので通す
+  if (output === null || endsInsideUnclosedJSON(text)) {
+    throw new GenkitError({ status: 'INTERNAL', message: 'The model did not return three reply texts.' });
+  }
+  return { texts: output.texts, usage };
+}
+
+/**
  * 会話の文と提供元を受け取り、会話に続けて利用者が送れる返信の文 3 つを返す flow を ai に登録して返す。
  * modelOfProvider は提供元から、その提供元で使うモデルを返す (テストでは提供元の API を呼ばないモデルに差し替える)。
  * モデルの出力が返信の文 3 つの形でない時、flow は失敗する (一部だけを返さない)。
@@ -102,20 +124,8 @@ export function defineGenerateReplyTextsFlow(
       inputSchema: GenerateReplyTextsInputSchema,
       outputSchema: GeneratedReplyTextsSchema,
     },
-    async ({ conversation, provider }) => {
-      const { output, text } = await ai.generate({
-        model: modelOfProvider(provider),
-        system: replyInstructions,
-        prompt: conversation,
-        output: { schema: GeneratedReplyTextsSchema },
-      });
-      // 出力が schema に合わない時、output は null になる
-      // (「the `output` property can be `null`」「when the model fails to generate output that conforms to the schema」 https://genkit.dev/docs/models/ )
-      // 文に JSON が無い時 (出力が文でない部分 (data) で届いた時。説明の文が付いていてもよい) は、切れた文を補って読んだ出力ではないので通す
-      if (output === null || endsInsideUnclosedJSON(text)) {
-        throw new GenkitError({ status: 'INTERNAL', message: 'The model did not return three reply texts.' });
-      }
-      return output;
-    },
+    async ({ conversation, provider }) => ({
+      texts: (await generateReplyTextsWithModel(ai, modelOfProvider(provider), conversation)).texts,
+    }),
   );
 }
