@@ -106,7 +106,7 @@ export async function measureReplyModelCall(
  * 実行の引数から、見本 1 つあたりの呼ぶ回数 (`runCount`)、測ると選ばれた候補 (`selectedModels`)、そのうち実際に呼ぶ候補 (`measuredModels`) を返す。
  * runs は `--runs` の値、modelNames は `--models` の値 (カンマ区切り。undefined は候補の全部)。
  * hasAPIKey が false を返した候補 (提供元の API キーが無い) は呼ばない。
- * runs が 1 以上の整数でない時と、呼ぶ回数 (呼ぶ候補の数 × sampleCount × runCount) が maximumCallCount を超える時は、Error を投げる (提供元を呼ぶ前に止めるため)
+ * runs が 1 以上の整数でない時、modelNames に候補に無い名前がある時 (名前の打ち間違いで何も測らずに終わらないため)、呼ぶ回数 (呼ぶ候補の数 × sampleCount × runCount) が maximumCallCount を超える時は、Error を投げる (提供元を呼ぶ前に止めるため)
  */
 export function planReplyModelCalls<Model extends { modelName: string }>(plan: {
   candidates: Model[];
@@ -119,6 +119,12 @@ export function planReplyModelCalls<Model extends { modelName: string }>(plan: {
   const runCount = Number(plan.runs);
   if (!Number.isInteger(runCount) || runCount < 1) {
     throw new Error(`--runs は 1 以上の整数にする: ${plan.runs}`);
+  }
+  const unknownModelNames = (plan.modelNames?.split(',') ?? []).filter(
+    (modelName) => !plan.candidates.some((model) => model.modelName === modelName),
+  );
+  if (unknownModelNames.length > 0) {
+    throw new Error(`--models に候補に無い名前がある: ${unknownModelNames.join(', ')}`);
   }
   const selectedModels = plan.candidates.filter(
     (model) => plan.modelNames === undefined || plan.modelNames.split(',').includes(model.modelName),

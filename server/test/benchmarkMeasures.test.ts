@@ -139,12 +139,22 @@ test('モデルを指定しない計画は、候補の全部を選び、API キ�
   });
 });
 
-test('モデルを指定した計画は、指定した名前の候補だけを選ぶ (候補に無い名前は選ばない)', () => {
-  assert.deepEqual(plan({ modelNames: 'c,b,unknown' }), {
+test('モデルを指定した計画は、指定した名前の候補だけを、候補の並びの順で選ぶ', () => {
+  assert.deepEqual(plan({ modelNames: 'c,b' }), {
     runCount: 3,
     selectedModels: [{ modelName: 'b' }, { modelName: 'c' }],
     measuredModels: [{ modelName: 'c' }],
   });
+});
+
+for (const modelNames of ['c,unknown', 'aa', '']) {
+  test(`--models が「${modelNames}」(候補に無い名前を含む) の計画は失敗する`, () => {
+    assert.throws(() => plan({ modelNames }), /--models に候補に無い名前がある/);
+  });
+}
+
+test('候補に無い名前だけを、失敗の文に並べる', () => {
+  assert.throws(() => plan({ modelNames: 'x,a,y' }), /--models に候補に無い名前がある: x, y$/);
 });
 
 for (const runs of ['0', '-1', '1.5', 'abc', '']) {
