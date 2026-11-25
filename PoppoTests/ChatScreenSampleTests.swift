@@ -29,6 +29,7 @@ nonisolated private struct ChatScreenSample: Decodable, Sendable, CustomTestStri
     /// 今の実装で抜き出せない見本の、抜き出せない事実と理由。抜き出せる見本には無い
     let knownIssue: String?
 
+    /// テストの結果の一覧で、引数の見本を見分けるための名前。見本の画像のファイル名を返す
     var testDescription: String { imageFileName }
 }
 
