@@ -23,7 +23,7 @@
 3. 入力欄でキーボードを Poppo に切り替えると、直前の翻訳と返信案が出る
 4. 返信案をタップすると、その文が入力欄に入る
 
-翻訳と返信案の生成は端末内で行う構成で作り始める。端末の外のモデル (Private Cloud Compute・Claude・Gemini など) も使えるようにすると決まったが、利用者に配るビルドは今も端末内だけで作る。開発者メニューのあるビルドだけ、返信案を作るモデルを「端末内」「Private Cloud Compute」「OpenAI」「Gemini」「Claude」から選べる (質を比べるため。「端末内」のほかを選ぶと、画面から読んだ発言がそのモデルの提供元 (Apple・OpenAI・Google・Anthropic) のサーバーへ送られる。Private Cloud Compute を使うには Apple からの entitlement の割り当てが要る。OpenAI と Gemini は、開発者メニューで入力して端末の Keychain に保存した API キーで使う。Claude は API キーを持たず、App Attest で認証するため実機でだけ使える。どれも実機では確かめていない)。費用の許容など owner の返答待ちの点と、決まるまでの進め方は [documents/DIRECTION.md](documents/DIRECTION.md) の「bannzai の返答を待っていること」に書いてある。
+翻訳と返信案の生成は端末内で行う構成で作り始める。端末の外のモデル (Private Cloud Compute・Claude・Gemini など) も使えるようにすると決まったが、利用者に配るビルドは今も端末内だけで作る。開発者メニューのあるビルドだけ、返信案を作るモデルを「端末内」「Private Cloud Compute」「OpenAI」「Gemini」「Claude」から選べる (質を比べるため。「端末内」のほかを選ぶと、画面から読んだ発言がそのモデルの提供元 (Apple・OpenAI・Google・Anthropic) のサーバーへ送られる。Private Cloud Compute は、Apple から entitlement の割り当てを 2026-11-25 に受け、本体アプリの entitlements に入れてある。OpenAI と Gemini は、開発者メニューで入力して端末の Keychain に保存した API キーで使う。Claude は API キーを持たず、App Attest で認証するため実機でだけ使える。どれも実機では確かめていない)。費用の許容など owner の返答待ちの点と、決まるまでの進め方は [documents/DIRECTION.md](documents/DIRECTION.md) の「bannzai の返答を待っていること」に書いてある。
 
 ## 使う技術
 
