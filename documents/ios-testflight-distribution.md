@@ -61,7 +61,7 @@ Release 構成の実機向け (`sdk=iphoneos*`) だけを手動署名にして�
 | --- | --- | --- |
 | `ASC_API_KEY_ID`・`ASC_API_KEY_ISSUER_ID`・`ASC_API_KEY_P8_BASE64` | App Store Connect API の Key (アップロードに使う) | 2026-11-18 |
 | `IOS_P12_CERTIFICATE_BASE64`・`IOS_P12_PASSWORD` | 配布証明書の `.p12` とそのパスワード | 2026-11-18 |
-| `IOS_PROVISIONING_PROFILE_BASE64` | 本体アプリの App Store 用 provisioning profile (`Poppo.AppStore`。App Store Connect の profile の id `85B47JSDVW`。App ID で App Attest を有効にした後に発行し直した。Entitlements の `com.apple.developer.devicecheck.appattest-environment` は `development` と `production`) | 2026-11-21 |
+| `IOS_PROVISIONING_PROFILE_BASE64` | 本体アプリの App Store 用 provisioning profile (`Poppo.AppStore`。App Store Connect の profile の id `P536GU8TCY`。App ID で Private Cloud Compute を有効にした後に発行し直した。Entitlements の `com.apple.developer.private-cloud-compute` は true、`com.apple.developer.devicecheck.appattest-environment` は `development` と `production`) | 2026-11-25 |
 | `IOS_KEYBOARD_PROVISIONING_PROFILE_BASE64` | キーボードの App Store 用 provisioning profile (`Poppo.PoppoKeyboard.AppStore`。profile の id `CFT5FW2D7U`) | 2026-11-18 |
 
 登録は ios-deploy-actions skill の `register-secrets.sh` で行う (値を画面に出さない)。登録済みの名前は `gh secret list -R bannzai/poppo --env ios-deploy` で読める。
@@ -72,7 +72,7 @@ bash ~/.agents/skills/ios-deploy-actions/scripts/register-secrets.sh --repo bann
 
 ### profile を発行し直す時
 
-発行し直すのは、profile の期限が切れる時、配布証明書を替えた時、App ID の Capability (App Group・App Attest など) を変えた時。Capability を変えると、その App ID の今の profile は無効になる (2026-11-21 に `com.bannzai.poppo` で App Attest を有効にした後、本体アプリの profile の `profileState` が `INVALID` になっていた。キーボードの profile は `ACTIVE` のまま)。今の `.p12` の証明書は App Store Connect の証明書の id `68L9PY6PX2` で、期限は 2027-01-17。この証明書で発行した今の 2 つの profile (キーボードは 2026-11-18、本体アプリは 2026-11-21 に発行) の期限も、同じ 2027-01-17。
+発行し直すのは、profile の期限が切れる時、配布証明書を替えた時、App ID の Capability (App Group・App Attest など) を変えた時。Capability を変えると、その App ID の今の profile は無効になる (2026-11-21 に `com.bannzai.poppo` で App Attest を有効にした後、本体アプリの profile の `profileState` が `INVALID` になっていた。キーボードの profile は `ACTIVE` のまま。2026-11-25 に Private Cloud Compute を有効にした時も同じで、この時は本体アプリの profile だけを消して発行し直した)。今の `.p12` の証明書は App Store Connect の証明書の id `68L9PY6PX2` で、期限は 2027-01-17。この証明書で発行した今の 2 つの profile (キーボードは 2026-11-18、本体アプリは 2026-11-25 に発行) の期限も、同じ 2027-01-17。
 
 1. 今ある同じ名前の profile を消してから、profile を発行する。消さずに発行すると、`create-profile` は同じ名前の profile を先に探し、条件が揃っていれば新しく作らずに今ある profile の中身を書き出すだけになる (`signing-assets.sh` のヘッダー「冪等性」)。App Store Connect API を直接呼ぶ方法も、同じ名前の profile が残っている時にどう応えるかは試していないため、先に消す。消すと、次の配布までに手順 3 の登録をやり直す必要がある
 
@@ -138,7 +138,9 @@ bash ~/.agents/skills/ios-deploy-actions/scripts/register-secrets.sh --repo bann
 - App Group の登録と割り当て: App Group を扱う API が無い。`GET /v1/appGroups` は `404 NOT_FOUND`「The path provided does not match a defined resource type.」を返した
 - アプリの登録: `POST /v1/apps` は `403 FORBIDDEN_ERROR`「The resource 'apps' does not allow 'CREATE'. Allowed operations are: GET_COLLECTION, GET_INSTANCE, UPDATE」を返した
 
-どちらも、Apple ID でログインした状態 (2 ファクタ認証を通したセッション) が要る。fastlane の `produce` がこの 2 つを行う ( https://docs.fastlane.tools/actions/produce/ )。2026-11-18 に、owner が `spaceauth` を実行した後、agent が残りを次のとおり実行した (fastlane 2.240.1)。
+- Private Cloud Compute の Capability を App ID で有効にする (2026-11-25 に試した): `POST /v1/bundleIdCapabilities` は `capabilityType` の `PRIVATE_CLOUD_COMPUTE` を `409 ENTITY_ERROR.ATTRIBUTE.TYPE`「'PRIVATE_CLOUD_COMPUTE' is not a valid value for the attribute 'capabilityType'.」で拒否した。fastlane 2.240.1 の `produce enable_services` にも Private Cloud Compute のオプションは無い。Apple ID でログインした状態で fastlane の spaceship を直接呼ぶと有効にできた (`Spaceship::ConnectAPI.login(<Apple ID>, use_portal: true, use_tunes: false)` の後に `Spaceship::ConnectAPI::BundleId.find('com.bannzai.poppo').update_capability('PRIVATE_CLOUD_COMPUTE', enabled: true)`)。有効にした後は、`GET /v1/bundleIds/XZPY677UXL/bundleIdCapabilities` に `PRIVATE_CLOUD_COMPUTE` が出て、発行し直した profile の Entitlements に `com.apple.developer.private-cloud-compute` が true で入った。有効にできるのは、Apple がアカウントに entitlement を割り当てた後 (申請は https://developer.apple.com/contact/request/private-cloud-compute/ )
+
+App Group の登録とアプリの登録は、Apple ID でログインした状態 (2 ファクタ認証を通したセッション) が要る。fastlane の `produce` がこの 2 つを行う ( https://docs.fastlane.tools/actions/produce/ )。2026-11-18 に、owner が `spaceauth` を実行した後、agent が残りを次のとおり実行した (fastlane 2.240.1)。
 
 ```sh
 # owner が、通常のターミナルで 1 回だけ実行する (2 ファクタ認証のコードを入力する。agent は代行できない)
