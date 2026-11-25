@@ -155,6 +155,28 @@ private func textLine(text: String, minX: Double, minY: Double, width: Double) -
     )
 }
 
+/// 名前の右の時刻の行が、その行だけを見ると画面の中央にあっても、名前とつないだ見出しの行として発言に残すこと
+/// (見本の Discord に似た画面の 4 つ目の発言の配置。CI の実測: https://github.com/bannzai/poppo/actions/runs/45587820896 )
+@Test func timeInSameRowAsNameIsKeptEvenWhenCentered() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Marisol77", minX: 0.17, minY: 0.3, width: 0.2),
+            RecognizedTextLine(text: "hoy a las 18:15", boundingBox: CGRect(x: 0.385, y: 0.304, width: 0.23, height: 0.015)),
+            textLine(text: "Contad conmigo también.", minX: 0.17, minY: 0.324, width: 0.5),
+        ]).map(\.text) == ["Marisol77 hoy a las 18:15\nContad conmigo también."]
+    )
+}
+
+/// 右に寄った吹き出しの短い 2 行目が、その行だけを見ると画面の中央にあっても、発言の続きの行として残すこと
+@Test func centeredLineContinuingMessageIsKept() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Then I will come by tomorrow", minX: 0.33, minY: 0.3, width: 0.6),
+            textLine(text: "after work and dinner", minX: 0.33, minY: 0.324, width: 0.34),
+        ]).map(\.text) == ["Then I will come by tomorrow\nafter work and dinner"]
+    )
+}
+
 /// 「既読」だけの行 (利用者の吹き出しの横の印。人数が付く形を含む) は発言に含めず、「既読」を含む文は発言として残すこと
 @Test func readReceiptLinesAreExcludedButSentencesWithReadAreKept() {
     #expect(

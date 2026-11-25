@@ -10,14 +10,14 @@ nonisolated struct ExtractedMessage: Sendable {
 }
 
 /// 画像から読んだ行を、チャットの発言にまとめる。画面の上から下の順に、発言ごとに 1 つ返す。
-/// 上下のバーと入力欄にあたる帯の行、時刻だけの行、「既読」、スレッドの返信の数、画面の中央にある行 (日付の区切り等) は発言に含めない。
+/// 上下のバーと入力欄にあたる帯の行、時刻だけの行、「既読」、スレッドの返信の数、画面の中央に 1 行だけある行 (日付の区切り等) は発言に含めない。
 /// 同じ段に横に並ぶ行 (名前と、その右の時刻) は 1 行につなぎ、下に続く本文と 1 つの発言にする。
 /// 利用者自身の発言は左右の位置で見分けるため、全員の発言が左に並ぶ画面 (Slack・Discord) では、すべて相手の発言として返す
 nonisolated func extractMessages(lines: [RecognizedTextLine]) -> [ExtractedMessage] {
     linesJoinedInSameRow(
         lines: lines.filter {
             isInsideChatArea(line: $0) && !isTimeOnly(text: $0.text) && !isReadReceipt(text: $0.text)
-                && !isThreadReplyCount(text: $0.text) && !isCentered(line: $0)
+                && !isThreadReplyCount(text: $0.text)
         }
     )
         .sorted { $0.boundingBox.minY < $1.boundingBox.minY }
@@ -28,6 +28,9 @@ nonisolated func extractMessages(lines: [RecognizedTextLine]) -> [ExtractedMessa
                 messageLines.append([line])
             }
         }
+        // 中央にあるかは、段をつなぎ発言にまとめた後で見る: 名前の右の時刻や、右に寄った吹き出しの短い 2 行目は、
+        // その行だけを見ると中央に来ることがあるため (見本の「hoy a las 18:15」の中心のずれは 0.3% 以内だった。CI の実測は isCentered(line:) のコメント)
+        .filter { !($0.count == 1 && isCentered(line: $0[0])) }
         .map { ExtractedMessage(text: $0.map(\.text).joined(separator: "\n"), isFromUser: isShiftedRight(lines: $0)) }
 }
 
@@ -62,7 +65,9 @@ private nonisolated func isCentered(line: RecognizedTextLine) -> Bool {
     // 0.02: 中央に置かれた行の枠の中心は画面の中央に来るため、文字認識の枠のぶれとして画面の幅の 2% までを中央とみなす。
     // 0.25: 発言は左 (アイコンの右。左の余白は約 15%) か右 (右端の近くまで届く) から始まり、左の余白が 25% 以上で中心が中央に来ることは無いため。
     // 画面の幅いっぱいに近い発言の行 (左の余白が小さく、中心がたまたま中央に近い) を除かないための値。
-    // どちらも見本の画像の元の HTML (documents/design/chat-screen-samples/) の配置からの見積もり
+    // どちらも見本の画像の元の HTML (documents/design/chat-screen-samples/) の配置からの見積もり。
+    // 見本の画像を Vision で読んだ実測では、日付の区切り 2 つの中心のずれは 0.3% 以内、1 行だけの発言で左の余白が 25% 以上のものの中心のずれは 12% 以上だった
+    // (CI の実測: https://github.com/bannzai/poppo/actions/runs/45587820896 )
     abs(line.boundingBox.midX - 0.5) <= 0.02 && line.boundingBox.minX >= 0.25
 }
 
@@ -90,7 +95,9 @@ private nonisolated func continuesRow(leftLine: RecognizedTextLine, line: Recogn
     // 0.06: 名前と時刻の間は空白 1〜2 文字ぶん (見本の HTML では 8px の余白と空白 1 文字で約 12px、画面の幅の約 3%)。枠のぶれを見て 2 倍までを続きとみなす。
     // 左右に分かれた吹き出しのように、離れて並ぶ行をつながないための値。
     // -0.02: 枠のぶれで隣の行と少し重なっても続きとみなす。大きく重なる行 (別の段の行) はつながない。
-    // どれも見本の画像の元の HTML (documents/design/chat-screen-samples/) の配置からの見積もり
+    // どれも見本の画像の元の HTML (documents/design/chat-screen-samples/) の配置からの見積もり。
+    // 見本の画像を Vision で読んだ実測では、名前と時刻の 4 組の間は -0.5%〜2.3%、上下の中心のずれは低い方の行の高さの 15% 以内だった
+    // (CI の実測: https://github.com/bannzai/poppo/actions/runs/45587820896 )
     abs(line.boundingBox.midY - leftLine.boundingBox.midY) <= 0.5 * min(leftLine.boundingBox.height, line.boundingBox.height)
         && (-0.02...0.06).contains(line.boundingBox.minX - leftLine.boundingBox.maxX)
 }
