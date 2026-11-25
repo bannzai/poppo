@@ -242,6 +242,29 @@ private func textLine(text: String, minX: Double, minY: Double, width: Double) -
     )
 }
 
+/// 同じ段にあっても、左の行と画面の幅の 1% 重なる行はつなぎ、3% 重なる行はつながず別の発言にすること (重なりの境界 -0.02 の両側)
+@Test func linesInSameRowAreJoinedOnlyWhenOverlapIsWithinTwoPercent() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Overlap is", minX: 0.08, minY: 0.3, width: 0.2),
+            textLine(text: "1 percent", minX: 0.27, minY: 0.3, width: 0.2),
+            textLine(text: "Overlap is", minX: 0.08, minY: 0.5, width: 0.2),
+            textLine(text: "3 percent", minX: 0.25, minY: 0.502, width: 0.2),
+        ]).map(\.text) == ["Overlap is 1 percent", "Overlap is", "3 percent"]
+    )
+}
+
+/// 返信の数の英語の形は、大文字で始まっていても (「3 Replies」「1 Reply」) 発言に含めないこと
+@Test func threadReplyCountLinesAreExcludedWhenCapitalized() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "3 Replies", minX: 0.15, minY: 0.2, width: 0.15),
+            textLine(text: "1 Reply", minX: 0.15, minY: 0.3, width: 0.12),
+            textLine(text: "3 Replies would be nice", minX: 0.15, minY: 0.4, width: 0.5),
+        ]).map(\.text) == ["3 Replies would be nice"]
+    )
+}
+
 /// すぐ右にあっても、上下の中心が行の高さの 4 割ずれた行はつなぎ、6 割ずれた行はつながず別の発言にすること
 /// (上下の中心のずれの境界 0.5 の両側。行の高さは 0.02)
 @Test func adjacentLinesAreJoinedOnlyWhenVerticalCentersAreWithinHalfLineHeight() {
