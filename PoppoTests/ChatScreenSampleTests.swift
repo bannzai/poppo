@@ -26,6 +26,8 @@ nonisolated private struct ChatScreenSample: Decodable, Sendable, CustomTestStri
     let usageTerms: String
     /// 画面に映っている発言。上から下の順。期待する抜き出しの結果
     let messages: [Message]
+    /// 画面に映っているが発言でない行の文字 (日付の区切り・既読・スレッドの返信の数)。抜き出した発言のどの行にも入らないことを確かめる
+    let nonMessageTexts: [String]
     /// 今の実装で抜き出せない見本の、抜き出せない事実と理由。抜き出せる見本には無い
     let knownIssue: String?
 
@@ -55,6 +57,7 @@ nonisolated private func chatScreenSamples() throws -> [ChatScreenSample] {
 
 /// 見本の画像を Vision の実物で読み、抜き出した発言 (文と、利用者自身の発言か) が、記録に書いた画面の発言と一致すること。
 /// 記録に抜き出せない理由 (`knownIssue`) がある見本は既知の不具合として扱い、抜き出せるようになった時に失敗して記録の直し忘れを知らせる。
+/// 発言の数と、発言でない行 (`nonMessageTexts`) が発言に入らないことは、文字の読み違いに左右されないため、既知の不具合がある見本でも確かめる。
 /// simulator で Vision が固まった時に CI の制限時間まで待たないよう、1 分で打ち切る
 @Test(.timeLimit(.minutes(1)), arguments: try chatScreenSamples())
 private func chatScreenSampleGivesRecordedMessages(sample: ChatScreenSample) async throws {
@@ -62,6 +65,11 @@ private func chatScreenSampleGivesRecordedMessages(sample: ChatScreenSample) asy
         lines: try await recognizeTextLines(
             image: try #require(UIImage(data: try chatScreenSampleData(fileName: sample.imageFileName))?.cgImage)
         )
+    )
+
+    #expect(messages.count == sample.messages.count)
+    #expect(
+        messages.flatMap { $0.text.split(separator: "\n").map(String.init) }.filter { sample.nonMessageTexts.contains($0) }.isEmpty
     )
 
     withKnownIssue(sample.knownIssue.map { Comment(rawValue: $0) }) {

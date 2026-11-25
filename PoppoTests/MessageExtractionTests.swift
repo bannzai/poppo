@@ -122,10 +122,114 @@ private func textLine(text: String, minX: Double, minY: Double, width: Double) -
     #expect(messages.map(\.isFromUser) == [false, false])
 }
 
-/// 画面の中央にある行 (日付の区切り等) は、左の余白が広くても利用者の発言にしないこと
-@Test func centeredLineIsNotUserMessage() {
+/// 画面の中央にある行 (日付の区切り) は発言に含めず、上下の発言はそのまま残すこと。区切りの文字が何語でも位置で除く
+@Test func centeredLinesAreExcluded() {
     #expect(
-        extractMessages(lines: [textLine(text: "Today", minX: 0.44, minY: 0.3, width: 0.12)]).map(\.isFromUser) == [false]
+        extractMessages(lines: [
+            textLine(text: "Today", minX: 0.44, minY: 0.2, width: 0.12),
+            textLine(text: "Good morning", minX: 0.08, minY: 0.3, width: 0.3),
+            textLine(text: "今日", minX: 0.46, minY: 0.4, width: 0.08),
+            textLine(text: "Are you there?", minX: 0.08, minY: 0.5, width: 0.3),
+        ]).map(\.text) == ["Good morning", "Are you there?"]
+    )
+}
+
+/// 中心が画面の中央から幅の 1% ずれた行は中央の行として除き、3% ずれた行は発言として残すこと (中心のずれの境界 0.02 の両側)
+@Test func centeredLineNeedsCenterWithinTwoPercent() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Center is off by 1 percent", minX: 0.36, minY: 0.3, width: 0.3),
+            textLine(text: "Center is off by 3 percent", minX: 0.38, minY: 0.5, width: 0.3),
+        ]).map(\.text) == ["Center is off by 3 percent"]
+    )
+}
+
+/// 中心が画面の中央にあっても、左の余白が画面の幅の 24% の行 (幅いっぱいに近い発言) は残し、26% の行は除くこと
+/// (左の余白の境界 0.25 の両側)
+@Test func centeredLineNeedsLeftMarginOfTwentyFivePercent() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Left margin is 24 percent", minX: 0.24, minY: 0.3, width: 0.52),
+            textLine(text: "Left margin is 26 percent", minX: 0.26, minY: 0.5, width: 0.48),
+        ]).map(\.text) == ["Left margin is 24 percent"]
+    )
+}
+
+/// 「既読」だけの行 (利用者の吹き出しの横の印。人数が付く形を含む) は発言に含めず、「既読」を含む文は発言として残すこと
+@Test func readReceiptLinesAreExcludedButSentencesWithReadAreKept() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "既読", minX: 0.3, minY: 0.2, width: 0.06),
+            textLine(text: "既読 2", minX: 0.3, minY: 0.3, width: 0.09),
+            textLine(text: "既読になりました", minX: 0.08, minY: 0.4, width: 0.3),
+            textLine(text: "既読スルーしないで", minX: 0.08, minY: 0.5, width: 0.3),
+        ]).map(\.text) == ["既読になりました", "既読スルーしないで"]
+    )
+}
+
+/// スレッドの返信の数だけの行は発言の最後の行にせず、返信の数を含む文は発言として残すこと。
+/// 返信の数の書き方 (英語の単数と複数、日本語) ごとに、除く行と、似ているが残す文を並べる
+@Test func threadReplyCountLinesAreExcludedButSentencesWithReplyCountAreKept() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Any ideas would help a lot.", minX: 0.15, minY: 0.2, width: 0.5),
+            textLine(text: "3 replies", minX: 0.15, minY: 0.224, width: 0.15),
+            textLine(text: "1 reply", minX: 0.15, minY: 0.3, width: 0.12),
+            textLine(text: "3件の返信", minX: 0.15, minY: 0.4, width: 0.15),
+            textLine(text: "3 replies so far, thanks", minX: 0.15, minY: 0.5, width: 0.5),
+            textLine(text: "1 reply is enough", minX: 0.15, minY: 0.6, width: 0.4),
+            textLine(text: "3件の返信がありました", minX: 0.15, minY: 0.7, width: 0.4),
+        ]).map(\.text) == [
+            "Any ideas would help a lot.",
+            "3 replies so far, thanks",
+            "1 reply is enough",
+            "3件の返信がありました",
+        ]
+    )
+}
+
+/// 名前の行と、同じ段のすぐ右にある時刻の行 (Discord の形。Vision が別の行として返す) は、空白でつないだ見出しの 1 行にし、
+/// 下に続く本文と 1 つの発言にすること。時刻の行が名前の行より先に渡されても、左から順につなぐ
+@Test func nameAndTimeInSameRowAreJoinedWithBodyIntoOneMessage() {
+    let messages = extractMessages(lines: [
+        RecognizedTextLine(text: "hoy a las 18:05", boundingBox: CGRect(x: 0.42, y: 0.204, width: 0.22, height: 0.015)),
+        textLine(text: "luna_verde", minX: 0.17, minY: 0.2, width: 0.22),
+        textLine(text: "¿Alguien quiere jugar esta noche?", minX: 0.17, minY: 0.224, width: 0.6),
+        RecognizedTextLine(text: "hoy a las 18:07", boundingBox: CGRect(x: 0.44, y: 0.304, width: 0.22, height: 0.015)),
+        textLine(text: "ElZorroAzul", minX: 0.17, minY: 0.3, width: 0.24),
+        textLine(text: "Yo puedo después de las nueve.", minX: 0.17, minY: 0.324, width: 0.55),
+    ])
+
+    #expect(
+        messages.map(\.text) == [
+            "luna_verde hoy a las 18:05\n¿Alguien quiere jugar esta noche?",
+            "ElZorroAzul hoy a las 18:07\nYo puedo después de las nueve.",
+        ])
+    #expect(messages.map(\.isFromUser) == [false, false])
+}
+
+/// 同じ段にあっても、間が画面の幅の 5% の行はつなぎ、7% 離れた行はつながず別の発言にすること (間の境界 0.06 の両側)
+@Test func linesInSameRowAreJoinedOnlyWhenGapIsWithinSixPercent() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Gap is", minX: 0.08, minY: 0.3, width: 0.2),
+            textLine(text: "5 percent", minX: 0.33, minY: 0.3, width: 0.2),
+            textLine(text: "Gap is", minX: 0.08, minY: 0.5, width: 0.2),
+            textLine(text: "7 percent", minX: 0.35, minY: 0.502, width: 0.2),
+        ]).map(\.text) == ["Gap is 5 percent", "Gap is", "7 percent"]
+    )
+}
+
+/// すぐ右にあっても、上下の中心が行の高さの 4 割ずれた行はつなぎ、6 割ずれた行はつながず別の発言にすること
+/// (上下の中心のずれの境界 0.5 の両側。行の高さは 0.02)
+@Test func adjacentLinesAreJoinedOnlyWhenVerticalCentersAreWithinHalfLineHeight() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Offset is", minX: 0.08, minY: 0.3, width: 0.2),
+            textLine(text: "40 percent", minX: 0.3, minY: 0.308, width: 0.2),
+            textLine(text: "Offset is", minX: 0.08, minY: 0.5, width: 0.2),
+            textLine(text: "60 percent", minX: 0.3, minY: 0.512, width: 0.2),
+        ]).map(\.text) == ["Offset is 40 percent", "Offset is", "60 percent"]
     )
 }
 
