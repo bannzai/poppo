@@ -37,9 +37,10 @@ simtunnel と webtunnel は、リポジトリの Secrets の `TS_OIDC_CLIENT_ID`
 - 翻訳: Translation は simulator で訳さない (「It doesn't translate text in iOS or iPadOS simulators.」 https://developer.apple.com/documentation/translation/translating-text-within-your-app )
 - 返信案の生成: GitHub-hosted runner の simulator では Foundation Models が使えない見込み。Apple の DTS の回答 (2025-06、macOS 26 の時点) は「An iOS simulator uses the models on macOS 26, and yet, Apple Intelligence currently isn't available on macOS running on a VM」( https://developer.apple.com/forums/thread/790860 ) で、GitHub-hosted runner は仮想マシンである。この 2 つからの推測で、macOS 27 の runner での実測はしていない
 - 画面の取り込み (ScreenCaptureKit): simulator では使えない。Xcode 27.1 の iOS Simulator の SDK には ScreenCaptureKit.framework が無く、simulator 向けビルドで `import ScreenCaptureKit` は「Unable to resolve module dependency: 'ScreenCaptureKit'」になる (CI の実測: https://github.com/bannzai/poppo/actions/runs/44024115556 )。取り込みの実体は `#if canImport(ScreenCaptureKit)` で実機向けだけにコンパイルし、simulator では始める操作にエラーを返す。Apple のサンプルも「This sample requires a device running iOS 27 or later.」と書いている ( https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-on-ios )
-- 文字の読み取り (Vision): simulator で動くかは未確認
 
-そのため、取り込み・読み取り・翻訳・生成に依存しない部分 (読み取った文字から発言を抜き出す処理、読み取り結果の保存と読み出し、画面の表示) は、外から値を渡せる形にしてユニットテストと simtunnel で確かめる。
+そのため、取り込み・翻訳・生成に依存しない部分 (読み取った文字から発言を抜き出す処理、読み取り結果の保存と読み出し、画面の表示) は、外から値を渡せる形にしてユニットテストと simtunnel で確かめる。
+
+文字の読み取り (Vision) は simulator で動く。PR の CI の `make test` で、`PoppoTests/ChatScreenSamples/` のチャットの画面の画像の見本を `recognizeTextLines(image:)` と `extractMessages(lines:)` に通している (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )。実機の Vision と読み取りの結果が同じかは未確認。
 
 ### 開発マシンで実行する時 (最後の手段)
 

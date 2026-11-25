@@ -1,0 +1,17 @@
+/* 見本の画面に共通の枠。iPhone の画面 (393 × 852pt) に、ステータスバー・上のバー・発言の並ぶ範囲・入力欄を縦に並べる */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 393px; height: 852px; overflow: hidden; }
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, "SF Pro Text", "Hiragino Sans", "Apple SD Gothic Neo", sans-serif;
+  font-size: 16px;
+  line-height: 21px;
+  -webkit-font-smoothing: antialiased;
+}
+.status { height: 54px; padding: 18px 32px 0; display: flex; justify-content: space-between; font-weight: 600; font-size: 16px; flex: none; }
+.nav { height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 17px; flex: none; position: relative; }
+.nav .back { position: absolute; left: 14px; font-weight: 400; font-size: 22px; }
+.messages { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; }
+.input { height: 85px; padding: 8px 12px 0; flex: none; }
+.input .field { height: 38px; border-radius: 19px; padding: 0 14px; display: flex; align-items: center; font-size: 16px; }

@@ -128,6 +128,7 @@
 			buildConfigurationList = 7F3CC93257391D7FE098DD2B /* Build configuration list for PBXNativeTarget "PoppoTests" */;
 			buildPhases = (
 				4E09B0C3C69594998EF1623F /* Sources */,
+				6D2A9C4E8B1F3A5D7C9E0B2F /* Resources */,
 			);
 			buildRules = (
 			);
@@ -235,6 +236,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5B7D2E9A41C36F08D2A9E471 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6D2A9C4E8B1F3A5D7C9E0B2F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
