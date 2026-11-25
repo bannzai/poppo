@@ -230,6 +230,18 @@ private func textLine(text: String, minX: Double, minY: Double, width: Double) -
     #expect(messages.map(\.isFromUser) == [false, false])
 }
 
+/// 名前の右の時刻が時刻だけの形 (「10:42 AM」) で別の行として渡された時は、時刻を除き、名前と本文を 1 つの発言にすること。
+/// 時刻だけの行は、吹き出しの横に出る送信時刻と位置で分けられないため、名前の段にあっても除く
+@Test func timeOnlyLineInSameRowAsNameIsExcludedAndNameStaysWithBody() {
+    #expect(
+        extractMessages(lines: [
+            textLine(text: "Alice", minX: 0.15, minY: 0.2, width: 0.12),
+            RecognizedTextLine(text: "10:42 AM", boundingBox: CGRect(x: 0.29, y: 0.204, width: 0.14, height: 0.015)),
+            textLine(text: "Hello", minX: 0.15, minY: 0.224, width: 0.15),
+        ]).map(\.text) == ["Alice\nHello"]
+    )
+}
+
 /// 同じ段にあっても、間が画面の幅の 5% の行はつなぎ、7% 離れた行はつながず別の発言にすること (間の境界 0.06 の両側)
 @Test func linesInSameRowAreJoinedOnlyWhenGapIsWithinSixPercent() {
     #expect(

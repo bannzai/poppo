@@ -20,18 +20,18 @@ nonisolated func extractMessages(lines: [RecognizedTextLine]) -> [ExtractedMessa
                 && !isThreadReplyCount(text: $0.text)
         }
     )
-        .sorted { $0.boundingBox.minY < $1.boundingBox.minY }
-        .reduce(into: [[RecognizedTextLine]]()) { messageLines, line in
-            if let previousLine = messageLines.last?.last, continuesMessage(previousLine: previousLine, line: line) {
-                messageLines[messageLines.count - 1].append(line)
-            } else {
-                messageLines.append([line])
-            }
+    .sorted { $0.boundingBox.minY < $1.boundingBox.minY }
+    .reduce(into: [[RecognizedTextLine]]()) { messageLines, line in
+        if let previousLine = messageLines.last?.last, continuesMessage(previousLine: previousLine, line: line) {
+            messageLines[messageLines.count - 1].append(line)
+        } else {
+            messageLines.append([line])
         }
-        // 中央にあるかは、段をつなぎ発言にまとめた後で見る: 名前の右の時刻や、右に寄った吹き出しの短い 2 行目は、
-        // その行だけを見ると中央に来ることがあるため (見本の「hoy a las 18:15」の中心のずれは 0.3% 以内だった。CI の実測は isCentered(line:) のコメント)
-        .filter { !($0.count == 1 && isCentered(line: $0[0])) }
-        .map { ExtractedMessage(text: $0.map(\.text).joined(separator: "\n"), isFromUser: isShiftedRight(lines: $0)) }
+    }
+    // 中央にあるかは、段をつなぎ発言にまとめた後で見る: 名前の右の時刻や、右に寄った吹き出しの短い 2 行目は、
+    // その行だけを見ると中央に来ることがあるため (見本の「hoy a las 18:15」の中心のずれは 0.3% 以内だった。CI の実測は isCentered(line:) のコメント)
+    .filter { !($0.count == 1 && isCentered(line: $0[0])) }
+    .map { ExtractedMessage(text: $0.map(\.text).joined(separator: "\n"), isFromUser: isShiftedRight(lines: $0)) }
 }
 
 /// 行が、発言の並ぶ範囲 (上のバーと下の入力欄を除いた範囲) に収まっているか
