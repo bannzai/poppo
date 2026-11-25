@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>bubble-time-inside-french</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  body { background: #efe7de; color: #111b21; }
+  .status, .nav { background: #f6f6f6; }
+  .nav { border-bottom: 1px solid #dcdcdc; }
+  .messages { padding: 12px 12px; gap: 10px; }
+  .bubble { max-width: 290px; padding: 6px 10px 4px; border-radius: 10px; font-size: 16px; line-height: 21px; background: #fff; align-self: flex-start; }
+  .bubble.user { background: #d9fdd3; align-self: flex-end; }
+  .time { font-size: 11px; line-height: 15px; color: #667781; text-align: right; }
+  .input { background: #f6f6f6; }
+  .input .field { background: #fff; color: #8696a0; }
+</style>
+</head>
+<body>
+  <div class="status"><span>9:41</span><span>5G</span></div>
+  <div class="nav"><span class="back">‹</span>Atelier Vélo Lumière</div>
+  <div class="messages">
+    <div class="bubble">Bonjour, votre vélo est réparé.<div class="time">14:32</div></div>
+    <div class="bubble user">Merci beaucoup !<br>Combien je vous dois ?<div class="time">14:35</div></div>
+    <div class="bubble">Quarante euros pour les freins<br>et le nouveau pneu.<div class="time">14:36</div></div>
+    <div class="bubble user">Très bien, je passe ce soir.<div class="time">14:40</div></div>
+    <div class="bubble">Parfait, nous fermons à dix-neuf heures.<div class="time">14:41</div></div>
+  </div>
+  <div class="input"><div class="field">Message</div></div>
+</body>
+</html>

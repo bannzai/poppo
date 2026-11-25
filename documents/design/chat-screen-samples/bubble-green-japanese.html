@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>bubble-green-japanese</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  body { background: #8cabd9; color: #111; }
+  .status, .nav { background: #8cabd9; }
+  .messages { padding: 10px 12px; gap: 12px; }
+  .row { display: flex; align-items: flex-end; gap: 6px; }
+  .row.user { flex-direction: row-reverse; }
+  .avatar { width: 34px; height: 34px; border-radius: 17px; background: #f4c7a1; align-self: flex-start; flex: none; }
+  .bubble { max-width: 250px; padding: 8px 12px; border-radius: 18px; font-size: 16px; line-height: 21px; background: #fff; }
+  .row.user .bubble { background: #8de055; }
+  .time { font-size: 11px; line-height: 14px; color: #2c3f5c; text-align: right; }
+  .date { align-self: center; background: rgba(0, 0, 0, 0.2); color: #fff; font-size: 12px; padding: 1px 12px; border-radius: 11px; }
+  .input { background: #fff; }
+  .input .field { background: #f1f1f4; color: #9a9aa0; }
+</style>
+</head>
+<body>
+  <div class="status"><span>9:41</span><span>5G</span></div>
+  <div class="nav"><span class="back">‹</span>ことり文具店</div>
+  <div class="messages">
+    <div class="date">今日</div>
+    <div class="row">
+      <div class="avatar"></div>
+      <div class="bubble">ご注文のノートが入荷しました。</div>
+      <div class="time">12:01</div>
+    </div>
+    <div class="row user">
+      <div class="bubble">ありがとうございます。<br>土曜日に取りに行きます。</div>
+      <div class="time">既読<br>12:04</div>
+    </div>
+    <div class="row">
+      <div class="avatar"></div>
+      <div class="bubble">承知しました。<br>お待ちしております。</div>
+      <div class="time">12:05</div>
+    </div>
+    <div class="row user">
+      <div class="bubble">営業時間は何時までですか？</div>
+      <div class="time">既読<br>12:06</div>
+    </div>
+    <div class="row">
+      <div class="avatar"></div>
+      <div class="bubble">土曜日は18時まで開いています。</div>
+      <div class="time">12:08</div>
+    </div>
+  </div>
+  <div class="input"><div class="field">メッセージを入力</div></div>
+</body>
+</html>
