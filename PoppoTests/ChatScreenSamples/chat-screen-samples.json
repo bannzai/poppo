@@ -5,7 +5,7 @@
     "language": "en",
     "source": "作った画像。documents/design/chat-screen-samples/thread-light-english.html を render.sh で描いた。会話と名前は作ったもの",
     "usageTerms": "このリポジトリで作ったもので、利用の制限は無い",
-    "knownIssue": "日付の区切り「Today」が 1 つの発言として抜き出され、スレッドの返信の数「3 replies」が 3 つ目の発言の最後の行につながる。extractMessages(lines:) は時刻だけの行しか除かず、日付の区切りとスレッドの返信の数を見分けないため (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )",
+    "nonMessageTexts": ["Today", "3 replies"],
     "messages": [
       {
         "text": "Mira Solberg 10:42 AM\nCan someone review the new onboarding\nflow?\nI pushed the draft to the staging build.",
@@ -32,6 +32,7 @@
     "source": "作った画像。documents/design/chat-screen-samples/thread-light-japanese.html を render.sh で描いた。会話と名前は作ったもの",
     "usageTerms": "このリポジトリで作ったもので、利用の制限は無い",
     "knownIssue": "発言の分け方は合っているが、Vision が文字を読み違える。「ログイン」を「ロクイン」、3 つ目の発言の「槙原」を「棋原」と読み、名前の姓と名の間の空白を落とす。recognizeTextLines(image:) は言語を Vision の自動判定に任せていて、読み違いを直す処理が無いため (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )",
+    "nonMessageTexts": [],
     "messages": [
       {
         "text": "水瀬 あおい 14:05\nログイン画面の修正をマージしました。\n確認をお願いします。",
@@ -57,7 +58,8 @@
     "language": "es",
     "source": "作った画像。documents/design/chat-screen-samples/thread-dark-spanish.html を render.sh で描いた。会話と名前は作ったもの",
     "usageTerms": "このリポジトリで作ったもので、利用の制限は無い",
-    "knownIssue": "1 つの発言が、名前・時刻 (「hoy a las 18:05」)・本文の 3 つの発言に分かれ、4 つの発言が 12 個になる。名前と時刻は Vision が別の行として返し、左端がそろわず (時刻は名前の右にある)、extractMessages(lines:) が同じ発言の続きとみなさないため。時刻も「hoy a las」が付くため時刻だけの行として除かれない。あわせて Vision が「Perfecto」を「Pertecto」と読み違える (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )",
+    "knownIssue": "発言の分け方は合っているが、Vision が「Perfecto」を「Pertecto」と読み違える。recognizeTextLines(image:) は Vision が返した文字をそのまま使い、読み違いを直す処理が無いため (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )",
+    "nonMessageTexts": [],
     "messages": [
       {
         "text": "luna_verde hoy a las 18:05\n¿Alguien quiere jugar esta noche?",
@@ -83,6 +85,7 @@
     "language": "en",
     "source": "作った画像。documents/design/chat-screen-samples/bubble-blue-english.html を render.sh で描いた。会話と店の名前は作ったもの",
     "usageTerms": "このリポジトリで作ったもので、利用の制限は無い",
+    "nonMessageTexts": [],
     "messages": [
       { "text": "Hi! Your order is ready for\npickup.", "isFromUser": false },
       { "text": "Great, how late are you open?", "isFromUser": true },
@@ -97,7 +100,8 @@
     "language": "ja",
     "source": "作った画像。documents/design/chat-screen-samples/bubble-green-japanese.html を render.sh で描いた。会話と店の名前は作ったもの",
     "usageTerms": "このリポジトリで作ったもので、利用の制限は無い",
-    "knownIssue": "日付の区切り「今日」と、利用者の吹き出しの横の「既読」2 つが、それぞれ 1 つの発言として抜き出される。extractMessages(lines:) は時刻だけの行しか除かないため。あわせて Vision が「入荷」を「入何」と読み違える (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )",
+    "knownIssue": "発言の分け方と、利用者の発言かの見分けは合っているが、Vision が「入荷」を「入何」と読み違える。recognizeTextLines(image:) は Vision が返した文字をそのまま使い、読み違いを直す処理が無いため (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )",
+    "nonMessageTexts": ["今日", "既読"],
     "messages": [
       { "text": "ご注文のノートが入荷しまし\nた。", "isFromUser": false },
       { "text": "ありがとうございます。\n土曜日に取りに行きます。", "isFromUser": true },
@@ -113,6 +117,7 @@
     "source": "作った画像。documents/design/chat-screen-samples/bubble-time-inside-french.html を render.sh で描いた。会話と店の名前は作ったもの",
     "usageTerms": "このリポジトリで作ったもので、利用の制限は無い",
     "knownIssue": "発言の分け方と、利用者の発言かの見分けは合っているが、Vision が「Merci beaucoup !」の「!」の前の空白を落とす。recognizeTextLines(image:) は Vision が返した文字をそのまま使うため。Vision が空白を落とす理由は未確認 (CI の実測: https://github.com/bannzai/poppo/actions/runs/45577168564 )",
+    "nonMessageTexts": [],
     "messages": [
       { "text": "Bonjour, votre vélo est réparé.", "isFromUser": false },
       { "text": "Merci beaucoup !\nCombien je vous dois ?", "isFromUser": true },
