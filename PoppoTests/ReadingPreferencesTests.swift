@@ -8,6 +8,16 @@ private func makeSuiteName() -> String {
     "ReadingPreferencesTests-\(UUID().uuidString)"
 }
 
+/// 訳す先の言語を選んだ時に読み取りの画面 (@AppStorage) が書くのと同じ形 (maximalIdentifier の文字列) で、userDefaults に保存する
+private func save(selectedTargetLanguage: Locale.Language, userDefaults: UserDefaults) {
+    userDefaults.set(selectedTargetLanguage.maximalIdentifier, forKey: selectedTargetLanguageUserDefaultsKey)
+}
+
+/// 相手との関係を選んだ時に読み取りの画面 (@AppStorage) が書くのと同じ形 (生の値の文字列。nil は消す) で、userDefaults に保存する
+private func save(selectedChatPartnerRelationship: ChatPartnerRelationship?, userDefaults: UserDefaults) {
+    userDefaults.set(selectedChatPartnerRelationship?.rawValue, forKey: selectedChatPartnerRelationshipUserDefaultsKey)
+}
+
 /// 訳す先の言語を選んでいない時は、端末の言語 (利用者が端末で選んだ言語の並びの先頭) が選ばれていること (選べるようにする前の動きを変えない)
 @Test func selectedTargetLanguageIsPreferredLanguageWhenNothingIsSelected() throws {
     let suiteName = makeSuiteName()
@@ -93,73 +103,19 @@ private func makeSuiteName() -> String {
     userDefaults.removePersistentDomain(forName: suiteName)
 }
 
-/// 画面を開いただけ (欄が既定の値 = 端末の言語と未選択のまま) では何も保存しないため、後で端末の言語を変えると訳す先も変わること
-@Test func saveChangedReadingPreferencesSavesNothingWhenOpenedWithDefaults() throws {
-    let suiteName = makeSuiteName()
-    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
-
-    saveChangedReadingPreferences(
-        targetLanguageIdentifier: Locale.Language(identifier: "ja-JP").maximalIdentifier,
-        chatPartnerRelationship: nil,
-        userDefaults: userDefaults,
-        preferredLanguages: ["ja-JP"]
-    )
-
-    #expect(userDefaults.object(forKey: selectedTargetLanguageUserDefaultsKey) == nil)
-    #expect(userDefaults.object(forKey: selectedChatPartnerRelationshipUserDefaultsKey) == nil)
-    #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("ko"))
-    userDefaults.removePersistentDomain(forName: suiteName)
+/// 保存した値が無い (nil) 時と空文字の時は、端末の言語 (利用者が端末で選んだ言語の並びの先頭) になること。
+/// 読み取りの画面は保存した値 (@AppStorage の既定は空文字) をこの関数で言語に直すため、開いただけでは端末の言語に従う
+@Test(arguments: [String?.none, ""])
+func targetLanguageIsPreferredLanguageWhenNothingIsSaved(savedIdentifier: String?) {
+    #expect(targetLanguage(savedIdentifier: savedIdentifier, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("ko"))
 }
 
-/// 欄で既定と違う言語と関係を選ぶと、両方を保存し、端末の言語を変えても選んだ言語と関係のままであること
-@Test func saveChangedReadingPreferencesSavesChosenLanguageAndRelationship() throws {
-    let suiteName = makeSuiteName()
-    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
-
-    saveChangedReadingPreferences(
-        targetLanguageIdentifier: Locale.Language(identifier: "fr").maximalIdentifier,
-        chatPartnerRelationship: .stranger,
-        userDefaults: userDefaults,
-        preferredLanguages: ["ja-JP"]
+/// 保存した値がある時は、端末の言語にかかわらず保存した言語になること
+@Test func targetLanguageIsSavedLanguageWhenSaved() {
+    #expect(
+        targetLanguage(savedIdentifier: Locale.Language(identifier: "fr").maximalIdentifier, preferredLanguages: ["ko-KR"])
+            .languageCode == Locale.LanguageCode("fr")
     )
-
-    #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("fr"))
-    #expect(selectedChatPartnerRelationship(userDefaults: userDefaults) == .stranger)
-    userDefaults.removePersistentDomain(forName: suiteName)
-}
-
-/// 別の言語を保存した後に、欄で端末の言語へ選び直すと、端末の言語を保存すること (保存してある選択と比べて、違えば保存する)
-@Test func saveChangedReadingPreferencesSavesPreferredLanguageWhenReturnedFromAnotherLanguage() throws {
-    let suiteName = makeSuiteName()
-    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
-    save(selectedTargetLanguage: Locale.Language(identifier: "fr"), userDefaults: userDefaults)
-
-    saveChangedReadingPreferences(
-        targetLanguageIdentifier: Locale.Language(identifier: "ja-JP").maximalIdentifier,
-        chatPartnerRelationship: nil,
-        userDefaults: userDefaults,
-        preferredLanguages: ["ja-JP"]
-    )
-
-    #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("ja"))
-    userDefaults.removePersistentDomain(forName: suiteName)
-}
-
-/// 関係を選んだ後に欄で未選択に戻すと、保存してある関係を消すこと
-@Test func saveChangedReadingPreferencesClearsRelationshipWhenReturnedToNotSelected() throws {
-    let suiteName = makeSuiteName()
-    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
-    save(selectedChatPartnerRelationship: .coworker, userDefaults: userDefaults)
-
-    saveChangedReadingPreferences(
-        targetLanguageIdentifier: Locale.Language(identifier: "ja-JP").maximalIdentifier,
-        chatPartnerRelationship: nil,
-        userDefaults: userDefaults,
-        preferredLanguages: ["ja-JP"]
-    )
-
-    #expect(userDefaults.object(forKey: selectedChatPartnerRelationshipUserDefaultsKey) == nil)
-    userDefaults.removePersistentDomain(forName: suiteName)
 }
 
 /// 保存してある訳す先の言語が空文字の時は、何も選んでいない時と同じく端末の言語になること

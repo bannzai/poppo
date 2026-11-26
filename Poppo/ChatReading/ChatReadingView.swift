@@ -122,25 +122,6 @@ func chatReadingPhaseUnlessCancelled(
     return Task.isCancelled ? nil : readPhase
 }
 
-/// 読み取りの画面の欄で選んでいる言語 (targetLanguageIdentifier。maximalIdentifier) と関係 (chatPartnerRelationship。nil は未選択) のうち、
-/// userDefaults に保存してある選択 (何も保存していない時は既定の値) と違うものだけを保存する。preferredLanguages は利用者が端末で選んだ言語の並び。
-/// 画面を開いただけで既定の値 (端末の言語・未選択) を「選んだ値」として保存しないため (保存すると、後で端末の言語を変えても訳す先が変わらなくなる)
-func saveChangedReadingPreferences(
-    targetLanguageIdentifier: String,
-    chatPartnerRelationship: ChatPartnerRelationship?,
-    userDefaults: UserDefaults,
-    preferredLanguages: [String]
-) {
-    if targetLanguageIdentifier
-        != selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: preferredLanguages).maximalIdentifier
-    {
-        save(selectedTargetLanguage: Locale.Language(identifier: targetLanguageIdentifier), userDefaults: userDefaults)
-    }
-    if chatPartnerRelationship != selectedChatPartnerRelationship(userDefaults: userDefaults) {
-        save(selectedChatPartnerRelationship: chatPartnerRelationship, userDefaults: userDefaults)
-    }
-}
-
 /// 読み取りの画面の、読み取りを動かすタスクの id。選んでいる言語・関係・読み直しを頼んだ回数のどれかが変わると、違う id を返す
 /// (id が変わると、SwiftUI が前の読み取りを取りやめて読み直す)
 func chatReadingTaskID(
@@ -173,7 +154,7 @@ func chatPartnerRelationshipText(chatPartnerRelationship: ChatPartnerRelationshi
 }
 
 /// 読み取りの画面。訳す先の言語と相手との関係を選ぶ欄を上に置き、その下に読み取りの状態 (翻訳と返信案など) を出す。
-/// 言語か関係を選び直すと、選んだものを端末に保存して読み取りをやり直す
+/// 言語か関係を選び直すと、選んだものを端末に保存して読み取りをやり直す。選択は端末の保存 (UserDefaults) だけを正として読み書きする
 struct ChatReadingView: View {
     /// 読み取りの処理。発言ごとの翻訳と返信案を返す。訳す先の言語と相手との関係は、処理の中で端末に保存してある選択を読む
     /// (本物は readChat(screenshot:)。開発者メニューは見本の読み取り結果を返す処理を渡す)
@@ -182,18 +163,23 @@ struct ChatReadingView: View {
     @State private var phase = ChatReadingPhase.reading
     /// 言語のダウンロードをシステムに頼むための設定。利用者がダウンロードを選ぶまでは nil
     @State private var languageDownloadConfiguration: TranslationSession.Configuration?
-    /// 訳す先として選んでいる言語の maximalIdentifier。最初は端末に保存してある選択 (無ければ端末の言語)
-    @State private var targetLanguageIdentifier = selectedTargetLanguage(
-        userDefaults: .standard,
-        preferredLanguages: Locale.preferredLanguages
-    ).maximalIdentifier
-    /// 選んでいる相手との関係。nil は未選択。最初は端末に保存してある選択
-    @State private var chatPartnerRelationship = selectedChatPartnerRelationship(userDefaults: .standard)
+    /// 端末に保存してある、訳す先として選んだ言語の maximalIdentifier。選択の正は端末の保存だけに置き、画面に写しを持たない
+    /// (写しを持つと、画面を開き直した時に古い写しで保存を上書きするため)
+    // 既定の空文字は未選択 (targetLanguage(savedIdentifier:preferredLanguages:) が空文字を端末の言語として扱う)。
+    // 画面を開いただけでは書かず、利用者が欄で選んだ時だけ書くため、後で端末の言語を変えると訳す先も変わる
+    @AppStorage(selectedTargetLanguageUserDefaultsKey) private var savedTargetLanguageIdentifier = ""
+    /// 端末に保存してある、選んだ相手との関係。nil は未選択。選択の正は端末の保存だけに置く
+    @AppStorage(selectedChatPartnerRelationshipUserDefaultsKey) private var chatPartnerRelationship: ChatPartnerRelationship?
     /// Translation が端末で訳せる言語。読み出すまでは空
     @State private var supportedLanguages: [Locale.Language] = []
     /// 読み直しを頼んだ回数 (「もう一度試す」と、言語のダウンロードが終わった時に増やす)。
     /// 読み取りを 1 つの .task(id:) だけから始めるために使い、新しい読み取りが前の読み取りを取りやめるようにする
     @State private var readRequestCount = 0
+
+    /// 訳す先として選ばれている言語の maximalIdentifier (保存してある選択。無ければ端末の言語)
+    private var targetLanguageIdentifier: String {
+        targetLanguage(savedIdentifier: savedTargetLanguageIdentifier, preferredLanguages: Locale.preferredLanguages).maximalIdentifier
+    }
 
     var body: some View {
         ChatReadingPhaseView(
@@ -216,7 +202,8 @@ struct ChatReadingView: View {
                     targetLanguageFieldTitle()
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Picker(selection: $targetLanguageIdentifier) {
+                    // 表示は保存してある選択 (無ければ端末の言語) で、利用者が選んだ時だけ保存する
+                    Picker(selection: Binding(get: { targetLanguageIdentifier }, set: { savedTargetLanguageIdentifier = $0 })) {
                         ForEach(
                             targetLanguageOptions(
                                 supportedLanguages: supportedLanguages,
@@ -271,12 +258,6 @@ struct ChatReadingView: View {
                 readRequestCount: readRequestCount
             )
         ) {
-            saveChangedReadingPreferences(
-                targetLanguageIdentifier: targetLanguageIdentifier,
-                chatPartnerRelationship: chatPartnerRelationship,
-                userDefaults: .standard,
-                preferredLanguages: Locale.preferredLanguages
-            )
             phase = .reading
             if let readPhase = await chatReadingPhaseUnlessCancelled(read: readChatContent) {
                 phase = readPhase

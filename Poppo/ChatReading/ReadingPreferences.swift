@@ -23,26 +23,24 @@ let selectedChatPartnerRelationshipUserDefaultsKey = "selectedChatPartnerRelatio
 /// 訳す先の言語として選ばれているものを返す。userDefaults は選んだ言語を保存してある場所、
 /// preferredLanguages は利用者が端末で選んだ言語の並び (Locale.preferredLanguages)
 func selectedTargetLanguage(userDefaults: UserDefaults, preferredLanguages: [String]) -> Locale.Language {
-    // 何も選んでいない時 (保存した値が無い・空文字) は端末の言語: 訳す先を選べるようにする前の動き (端末の言語へ訳す) を変えないため
-    userDefaults.string(forKey: selectedTargetLanguageUserDefaultsKey).flatMap { $0.isEmpty ? nil : Locale.Language(identifier: $0) }
-        ?? userLanguage(preferredLanguages: preferredLanguages)
+    targetLanguage(
+        savedIdentifier: userDefaults.string(forKey: selectedTargetLanguageUserDefaultsKey),
+        preferredLanguages: preferredLanguages
+    )
 }
 
-/// 訳す先の言語として selectedTargetLanguage を選んだことを、userDefaults に保存する。前に選んだ言語は上書きされる
-func save(selectedTargetLanguage: Locale.Language, userDefaults: UserDefaults) {
-    userDefaults.set(selectedTargetLanguage.maximalIdentifier, forKey: selectedTargetLanguageUserDefaultsKey)
+/// 保存してある訳す先の言語の識別子 (savedIdentifier。nil か空文字は未選択) から、訳す先の言語を返す。
+/// preferredLanguages は利用者が端末で選んだ言語の並び
+func targetLanguage(savedIdentifier: String?, preferredLanguages: [String]) -> Locale.Language {
+    // 何も選んでいない時 (保存した値が無い・空文字) は端末の言語: 訳す先を選べるようにする前の動き (端末の言語へ訳す) を変えないため
+    savedIdentifier.flatMap { $0.isEmpty ? nil : Locale.Language(identifier: $0) }
+        ?? userLanguage(preferredLanguages: preferredLanguages)
 }
 
 /// 相手との関係として選ばれているものを返す。userDefaults は選んだ関係を保存してある場所。
 /// 何も選んでいない時と、保存してある値が今の一覧に無い時は nil (未選択) を返す
 func selectedChatPartnerRelationship(userDefaults: UserDefaults) -> ChatPartnerRelationship? {
     userDefaults.string(forKey: selectedChatPartnerRelationshipUserDefaultsKey).flatMap { ChatPartnerRelationship(rawValue: $0) }
-}
-
-/// 相手との関係として selectedChatPartnerRelationship を選んだことを、userDefaults に保存する。前に選んだ関係は上書きされる。
-/// nil (未選択) を渡すと、保存してある関係を消す
-func save(selectedChatPartnerRelationship: ChatPartnerRelationship?, userDefaults: UserDefaults) {
-    userDefaults.set(selectedChatPartnerRelationship?.rawValue, forKey: selectedChatPartnerRelationshipUserDefaultsKey)
 }
 
 /// 文の組 (texts) を、訳す先として選ばれている言語 (selectedTargetLanguage(userDefaults:preferredLanguages:)) へ translate で訳して返す。
