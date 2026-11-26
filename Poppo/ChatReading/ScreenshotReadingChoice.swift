@@ -79,7 +79,10 @@ nonisolated func comparableClueText(text: String) -> String {
 
 /// 新しく読んだスクリーンショットの手がかり (chatTitleReadFromScreen と speakerNames) に最も似ている過去の記録を pastChoices から返す。
 /// 似ているとするのは次の時: 両方でチャットの名前を読めた時はその名前が同じ。どちらかで名前を読めなかった時は、発言した人の名前の半分以上が同じ。
-/// 似ている記録が複数ある時は、チャットの名前が同じものを、その中でも発言した人の名前の重なりが大きいものを、それも同じなら新しいものを返す。
+/// 似ている記録が複数ある時は、チャットの名前が同じものの中で新しいものを返す。チャットの名前が同じものが無い時は、
+/// 発言した人の名前の重なりが大きいものを、それも同じなら新しいものを返す。
+/// チャットの名前が同じものどうしで重なりを比べないのは、同じチャットで利用者が最後に選んだ選択を既定にするため
+/// (選び直した時に書き換わるのはその読み取りの記録だけで、同じチャットの古い記録は前の選択のまま残る)。
 /// 似ている記録が無い時は nil
 nonisolated func mostSimilarScreenshotReadingChoice(
     chatTitleReadFromScreen: String?,
@@ -98,13 +101,13 @@ nonisolated func mostSimilarScreenshotReadingChoice(
 }
 
 /// 2 つの読み取りの手がかりがどれだけ似ているかを返す。大きいほど似ている。似ていない時は nil。
-/// チャットの名前が同じ時は 2 以上、発言した人の名前だけで似ている時は 1 以下にする (名前が同じ記録を先に選ぶため)
+/// チャットの名前が同じ時はどれも 2 (同じ値にして新しさで選ぶ)、発言した人の名前だけで似ている時は 1 以下にする (名前が同じ記録を先に選ぶため)
 private nonisolated func clueSimilarity(chatTitles: (String?, String?), speakerNames: ([String], [String])) -> Double? {
     let namesOverlap = speakerNamesOverlap(speakerNames: speakerNames)
     switch (chatTitles.0.map { comparableClueText(text: $0) }, chatTitles.1.map { comparableClueText(text: $0) }) {
     case (let newTitle?, let pastTitle?):
         // 両方で名前を読めた時は名前で決める: 同じ人がいる別のチャンネルは別のチャットのため
-        return newTitle == pastTitle ? 2 + namesOverlap : nil
+        return newTitle == pastTitle ? 2 : nil
     default:
         // 0.5: 片方だけに出ている人より、両方に出ている人の方が多い時に同じ相手とみなす。
         // 1 人だけが重なる別の会話 (自分の名前だけが同じ等) を同じ相手にしないため
@@ -175,7 +178,9 @@ nonisolated func save(screenshotReadingChoices choices: [ScreenshotReadingChoice
 /// usesMostSimilarChoice が true で、過去の記録に手がかりが似ているもの (mostSimilarScreenshotReadingChoice) がある時は、その記録の言語と関係を既定にする。
 /// 似ているものが無い時と、usesMostSimilarChoice が false の時 (利用者が既に選び直した時) は、今選ばれている言語と関係
 /// (targetLanguageIdentifier・chatPartnerRelationship) を既定にする。
-/// 足す時に、残す期間を過ぎた記録と上限を超えた記録を消す。保存できなかった時はエラーを投げる (既定は返さない)
+/// 足す時に、残す期間を過ぎた記録と上限を超えた記録を消す。保存できなかった時はエラーを投げる (既定は返さない)。
+/// チャットの名前も発言した人の名前も読めなかった時は、記録を足さずに今の選択の記録を返す (どの記録とも似ているとしないため、
+/// 残しても既定に使われず、200 件の枠を使って手がかりのある記録を押し出すだけのため)。返した記録は保存していないため、書き換えても何も起きない
 nonisolated func addScreenshotReadingChoice(
     lines: [RecognizedTextLine],
     targetLanguageIdentifier: String?,
@@ -202,7 +207,9 @@ nonisolated func addScreenshotReadingChoice(
         targetLanguageIdentifier: defaultTargetLanguageIdentifier,
         chatPartnerRelationship: defaultChatPartnerRelationship
     )
-    try save(screenshotReadingChoices: retainedScreenshotReadingChoices(choices: [newChoice] + pastChoices, now: now), fileURL: fileURL)
+    if chatTitle != nil || !names.isEmpty {
+        try save(screenshotReadingChoices: retainedScreenshotReadingChoices(choices: [newChoice] + pastChoices, now: now), fileURL: fileURL)
+    }
     return newChoice
 }
 

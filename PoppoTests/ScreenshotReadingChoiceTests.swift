@@ -477,29 +477,29 @@ private func pastChoice(
     #expect(try JSONDecoder().decode([ScreenshotReadingChoice].self, from: Data(contentsOf: fileURL)) == [choice])
 }
 
-/// 似ている記録が複数ある時: チャットの名前が同じ記録どうしでは、発言した人の名前の重なりが大きい記録を、新しい記録より先に選ぶこと。
-/// チャットの名前を読めない記録どうしでも同じこと
-@Test func mostSimilarChoicePrefersLargerSpeakerOverlapOverNewer() {
-    let largerOverlapOlder = pastChoice(
+/// 似ている記録が複数ある時: チャットの名前が同じ記録どうしでは、発言した人の名前の重なりによらず新しい記録を選ぶこと
+/// (同じチャットで利用者が最後に選んだ選択を既定にするため)。チャットの名前を読めない記録どうしでは、重なりが大きい記録を新しい記録より先に選ぶこと
+@Test func mostSimilarChoicePrefersNewerForSameTitleAndLargerOverlapForNamesOnly() {
+    let newerWithSmallerOverlap = pastChoice(
         chatTitle: "# design-review",
-        speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
-        relationship: .coworker,
-        readAt: testReadAt
+        speakerNames: ["Priya Nakamoto"],
+        relationship: .stranger,
+        readAt: testReadAt.addingTimeInterval(100)
     )
     #expect(
         mostSimilarScreenshotReadingChoice(
             chatTitleReadFromScreen: "# design-review",
             speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
             pastChoices: [
-                largerOverlapOlder,
                 pastChoice(
                     chatTitle: "# design-review",
-                    speakerNames: ["Priya Nakamoto"],
-                    relationship: .stranger,
-                    readAt: testReadAt.addingTimeInterval(100)
+                    speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
+                    relationship: .coworker,
+                    readAt: testReadAt
                 ),
+                newerWithSmallerOverlap,
             ]
-        ) == largerOverlapOlder
+        ) == newerWithSmallerOverlap
     )
 
     let namesOnlyLargerOverlapOlder = pastChoice(
@@ -822,4 +822,80 @@ private func pastChoice(
                 + threadMessageLines(name: "Mira Solberg", time: "10:42 AM", body: "Earlier message", top: 0.2)
         ) == ["Mira Solberg", "Priya Nakamoto"]
     )
+}
+
+/// 同じチャットで、発言した人の重なりが大きい古い記録があっても、後の読み取りで選び直した選択が次の既定になること
+/// ({a, b, c} を P で読む → {b, d} を読んで Q に選び直す → {a, b, c} を読み直すと Q)
+@Test func reselectedChoiceWinsOverOlderRecordWithLargerOverlapInSameChat() throws {
+    let fileURL = makeChoicesFileURL()
+    let threeSpeakers = chatScreenLines(chatTitle: "# general", speakers: ["luna_verde", "ElZorroAzul", "Marisol77"])
+    _ = try addScreenshotReadingChoice(
+        lines: threeSpeakers,
+        targetLanguageIdentifier: "da-Latn-DK",
+        chatPartnerRelationship: .coworker,
+        usesMostSimilarChoice: true,
+        id: UUID(),
+        now: testReadAt,
+        fileURL: fileURL
+    )
+    let secondID = UUID()
+    _ = try addScreenshotReadingChoice(
+        lines: chatScreenLines(chatTitle: "# general", speakers: ["ElZorroAzul", "Kenji Sato"]),
+        targetLanguageIdentifier: "da-Latn-DK",
+        chatPartnerRelationship: .coworker,
+        usesMostSimilarChoice: true,
+        id: secondID,
+        now: testReadAt.addingTimeInterval(60),
+        fileURL: fileURL
+    )
+    try updateScreenshotReadingChoice(
+        id: secondID,
+        targetLanguageIdentifier: "nl-Latn-NL",
+        chatPartnerRelationship: .friendOrFamily,
+        now: testReadAt.addingTimeInterval(70),
+        fileURL: fileURL
+    )
+
+    let third = try addScreenshotReadingChoice(
+        lines: threeSpeakers,
+        targetLanguageIdentifier: "nl-Latn-NL",
+        chatPartnerRelationship: .friendOrFamily,
+        usesMostSimilarChoice: true,
+        id: UUID(),
+        now: testReadAt.addingTimeInterval(120),
+        fileURL: fileURL
+    )
+
+    #expect(third.targetLanguageIdentifier == "nl-Latn-NL")
+    #expect(third.chatPartnerRelationship == .friendOrFamily)
+}
+
+/// チャットの名前も発言した人の名前も読めない読み取りは記録に足さず、今の選択を返すこと。
+/// 手がかりが 1 つでもあれば足すこと (境目の対)
+@Test func addChoiceSkipsRecordWithoutAnyClue() throws {
+    let fileURL = makeChoicesFileURL()
+
+    let noClue = try addScreenshotReadingChoice(
+        lines: chatScreenLines(chatTitle: nil, speakers: []),
+        targetLanguageIdentifier: "da-Latn-DK",
+        chatPartnerRelationship: .coworker,
+        usesMostSimilarChoice: true,
+        id: UUID(),
+        now: testReadAt,
+        fileURL: fileURL
+    )
+    #expect(noClue.targetLanguageIdentifier == "da-Latn-DK")
+    #expect(noClue.chatPartnerRelationship == .coworker)
+    #expect(loadScreenshotReadingChoices(fileURL: fileURL, now: testReadAt).isEmpty)
+
+    _ = try addScreenshotReadingChoice(
+        lines: chatScreenLines(chatTitle: nil, speakers: ["Mira Solberg"]),
+        targetLanguageIdentifier: nil,
+        chatPartnerRelationship: nil,
+        usesMostSimilarChoice: true,
+        id: UUID(),
+        now: testReadAt,
+        fileURL: fileURL
+    )
+    #expect(loadScreenshotReadingChoices(fileURL: fileURL, now: testReadAt).count == 1)
 }
