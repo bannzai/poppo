@@ -103,11 +103,12 @@ private func chatScreenSampleGivesRecordedChatTitle(sample: ChatScreenSample) as
 /// 吹き出しのチャット (時刻が吹き出しの中に付くものを含む) では、本文を名前として読まないこと
 @Test(.timeLimit(.minutes(1)), arguments: try chatScreenSamples())
 private func chatScreenSampleGivesRecordedSpeakerNames(sample: ChatScreenSample) async throws {
+    let lines = try await recognizeTextLines(
+        image: try #require(UIImage(data: try chatScreenSampleData(fileName: sample.imageFileName))?.cgImage)
+    )
+    // 失敗した時に、Vision が読んだ行の文字と枠を出す (名前と時刻が別の行に読めたかを確かめるため)
     #expect(
-        speakerNames(
-            lines: try await recognizeTextLines(
-                image: try #require(UIImage(data: try chatScreenSampleData(fileName: sample.imageFileName))?.cgImage)
-            )
-        ).map { comparableClueText(text: $0) } == sample.speakerNames.map { comparableClueText(text: $0) }
+        speakerNames(lines: lines).map { comparableClueText(text: $0) } == sample.speakerNames.map { comparableClueText(text: $0) },
+        Comment(rawValue: lines.map { "\($0.text) \($0.boundingBox)" }.joined(separator: "\n"))
     )
 }
