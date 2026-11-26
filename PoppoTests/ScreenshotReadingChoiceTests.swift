@@ -477,9 +477,9 @@ private func pastChoice(
     #expect(try JSONDecoder().decode([ScreenshotReadingChoice].self, from: Data(contentsOf: fileURL)) == [choice])
 }
 
-/// 似ている記録が複数ある時: チャットの名前が同じ記録どうしでは、発言した人の名前の重なりによらず新しい記録を選ぶこと
-/// (同じチャットで利用者が最後に選んだ選択を既定にするため)。チャットの名前を読めない記録どうしでは、重なりが大きい記録を新しい記録より先に選ぶこと
-@Test func mostSimilarChoicePrefersNewerForSameTitleAndLargerOverlapForNamesOnly() {
+/// 似ている記録が複数ある時: チャットの名前が同じ記録どうしでも、発言した人の名前だけで似ている記録どうしでも、
+/// 重なりの大きさによらず新しい記録を選ぶこと (同じ相手で利用者が最後に選んだ選択を既定にするため)
+@Test func mostSimilarChoicePrefersNewerRegardlessOfOverlap() {
     let newerWithSmallerOverlap = pastChoice(
         chatTitle: "# design-review",
         speakerNames: ["Priya Nakamoto"],
@@ -502,27 +502,27 @@ private func pastChoice(
         ) == newerWithSmallerOverlap
     )
 
-    let namesOnlyLargerOverlapOlder = pastChoice(
+    // 2 人のうち 1 人が同じ (1/2) で、似ているが重なりが小さい新しい記録
+    let namesOnlySmallerOverlapNewer = pastChoice(
         chatTitle: nil,
-        speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
-        relationship: .coworker,
-        readAt: testReadAt
+        speakerNames: ["Mira Solberg"],
+        relationship: .stranger,
+        readAt: testReadAt.addingTimeInterval(100)
     )
     #expect(
         mostSimilarScreenshotReadingChoice(
             chatTitleReadFromScreen: nil,
             speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
             pastChoices: [
-                namesOnlyLargerOverlapOlder,
-                // 2 人のうち 1 人が同じ (1/2) で、似ているが重なりが小さい新しい記録
                 pastChoice(
                     chatTitle: nil,
-                    speakerNames: ["Mira Solberg"],
-                    relationship: .stranger,
-                    readAt: testReadAt.addingTimeInterval(100)
+                    speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
+                    relationship: .coworker,
+                    readAt: testReadAt
                 ),
+                namesOnlySmallerOverlapNewer,
             ]
-        ) == namesOnlyLargerOverlapOlder
+        ) == namesOnlySmallerOverlapNewer
     )
 }
 
@@ -923,4 +923,63 @@ private func pastChoice(
     )
 
     #expect(try JSONDecoder().decode([ScreenshotReadingChoice].self, from: Data(contentsOf: fileURL)) == [kept])
+}
+
+/// チャットの名前を読めない画面で、発言した人の重なりが大きい古い記録があっても、後の読み取りで選び直した選択が次の既定になること
+/// ({A, B} を P で読む → {A, B, C} を読んで Q に選び直す → {A, B} を読み直すと Q)
+@Test func reselectedChoiceWinsOverOlderRecordWithLargerOverlapWithoutTitle() throws {
+    let fileURL = makeChoicesFileURL()
+    let twoSpeakers = chatScreenLines(chatTitle: nil, speakers: ["luna_verde", "ElZorroAzul"])
+    _ = try addScreenshotReadingChoice(
+        lines: twoSpeakers,
+        targetLanguageIdentifier: "da-Latn-DK",
+        chatPartnerRelationship: .coworker,
+        usesMostSimilarChoice: true,
+        id: UUID(),
+        now: testReadAt,
+        fileURL: fileURL
+    )
+    let secondID = UUID()
+    _ = try addScreenshotReadingChoice(
+        lines: chatScreenLines(chatTitle: nil, speakers: ["luna_verde", "ElZorroAzul", "Marisol77"]),
+        targetLanguageIdentifier: "da-Latn-DK",
+        chatPartnerRelationship: .coworker,
+        usesMostSimilarChoice: true,
+        id: secondID,
+        now: testReadAt.addingTimeInterval(60),
+        fileURL: fileURL
+    )
+    try updateScreenshotReadingChoice(
+        id: secondID,
+        targetLanguageIdentifier: "nl-Latn-NL",
+        chatPartnerRelationship: .friendOrFamily,
+        now: testReadAt.addingTimeInterval(70),
+        fileURL: fileURL
+    )
+
+    let third = try addScreenshotReadingChoice(
+        lines: twoSpeakers,
+        targetLanguageIdentifier: "nl-Latn-NL",
+        chatPartnerRelationship: .friendOrFamily,
+        usesMostSimilarChoice: true,
+        id: UUID(),
+        now: testReadAt.addingTimeInterval(120),
+        fileURL: fileURL
+    )
+
+    #expect(third.targetLanguageIdentifier == "nl-Latn-NL")
+    #expect(third.chatPartnerRelationship == .friendOrFamily)
+}
+
+/// 読んだ時刻が今より後の記録 (端末の時計を戻した時) は残さず、ちょうど今の記録は残すこと (境目の対)
+@Test func retainedChoicesDropRecordsReadInTheFuture() {
+    let now = testReadAt
+    let readNow = pastChoice(chatTitle: "A", speakerNames: [], relationship: nil, readAt: now)
+
+    #expect(
+        retainedScreenshotReadingChoices(
+            choices: [readNow, pastChoice(chatTitle: "B", speakerNames: [], relationship: nil, readAt: now.addingTimeInterval(1))],
+            now: now
+        ) == [readNow]
+    )
 }

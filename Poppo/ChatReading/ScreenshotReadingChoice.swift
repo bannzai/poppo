@@ -80,9 +80,9 @@ nonisolated func comparableClueText(text: String) -> String {
 /// 新しく読んだスクリーンショットの手がかり (chatTitleReadFromScreen と speakerNames) に最も似ている過去の記録を pastChoices から返す。
 /// 似ているとするのは次の時: 両方でチャットの名前を読めた時はその名前が同じ。どちらかで名前を読めなかった時は、発言した人の名前の半分以上が同じ。
 /// 似ている記録が複数ある時は、チャットの名前が同じものの中で新しいものを返す。チャットの名前が同じものが無い時は、
-/// 発言した人の名前の重なりが大きいものを、それも同じなら新しいものを返す。
-/// チャットの名前が同じものどうしで重なりを比べないのは、同じチャットで利用者が最後に選んだ選択を既定にするため
-/// (選び直した時に書き換わるのはその読み取りの記録だけで、同じチャットの古い記録は前の選択のまま残る)。
+/// 発言した人の名前で似ているものの中で新しいものを返す。
+/// 似ているものどうしで重なりの大きさを比べないのは、同じ相手で利用者が最後に選んだ選択を既定にするため
+/// (選び直した時に書き換わるのはその読み取りの記録だけで、同じ相手の古い記録は前の選択のまま残る)。
 /// 似ている記録が無い時は nil
 nonisolated func mostSimilarScreenshotReadingChoice(
     chatTitleReadFromScreen: String?,
@@ -100,10 +100,9 @@ nonisolated func mostSimilarScreenshotReadingChoice(
         .pastChoice
 }
 
-/// 2 つの読み取りの手がかりがどれだけ似ているかを返す。大きいほど似ている。似ていない時は nil。
-/// チャットの名前が同じ時はどれも 2 (同じ値にして新しさで選ぶ)、発言した人の名前だけで似ている時は 1 以下にする (名前が同じ記録を先に選ぶため)
-private nonisolated func clueSimilarity(chatTitles: (String?, String?), speakerNames: ([String], [String])) -> Double? {
-    let namesOverlap = speakerNamesOverlap(speakerNames: speakerNames)
+/// 2 つの読み取りの手がかりが似ているかと、その強さを返す。似ていない時は nil。
+/// チャットの名前が同じ時は 2、発言した人の名前だけで似ている時は 1 (名前が同じ記録を先に選び、同じ強さどうしは新しさで選ぶため)
+private nonisolated func clueSimilarity(chatTitles: (String?, String?), speakerNames: ([String], [String])) -> Int? {
     switch (chatTitles.0.map { comparableClueText(text: $0) }, chatTitles.1.map { comparableClueText(text: $0) }) {
     case (let newTitle?, let pastTitle?):
         // 両方で名前を読めた時は名前で決める: 同じ人がいる別のチャンネルは別のチャットのため
@@ -111,7 +110,7 @@ private nonisolated func clueSimilarity(chatTitles: (String?, String?), speakerN
     default:
         // 0.5: 片方だけに出ている人より、両方に出ている人の方が多い時に同じ相手とみなす。
         // 1 人だけが重なる別の会話 (自分の名前だけが同じ等) を同じ相手にしないため
-        return namesOverlap >= 0.5 ? namesOverlap : nil
+        return speakerNamesOverlap(speakerNames: speakerNames) >= 0.5 ? 1 : nil
     }
 }
 
@@ -123,13 +122,14 @@ private nonisolated func speakerNamesOverlap(speakerNames: ([String], [String]))
     return allNames.isEmpty ? 0 : Double(newNames.intersection(pastNames).count) / Double(allNames.count)
 }
 
-/// 残す記録だけを、新しい順に返す。読んでから 14 日を過ぎた記録と、新しい方から数えて 200 件より後の記録を除く
+/// 残す記録だけを、新しい順に返す。読んでから 14 日を過ぎた記録と、新しい方から数えて 200 件より後の記録を除く。
+/// 読んだ時刻が now より後の記録 (端末の時計を戻した時) も除く (いつ 14 日を過ぎるかを決められず、残り続けるため)
 nonisolated func retainedScreenshotReadingChoices(choices: [ScreenshotReadingChoice], now: Date) -> [ScreenshotReadingChoice] {
     Array(
         choices
             // 14 日: 読み取った時点 (画面の画像と翻訳) を本体アプリの中に残す期間 (documents/DIRECTION.md「決めたこと」の 2026-11-19 の bannzai の行) と同じにする。
             // この記録は後でその一覧の 1 件になるため、残す期間をそろえる
-            .filter { now.timeIntervalSince($0.readAt) < 14 * 24 * 60 * 60 }
+            .filter { (0..<(14 * 24 * 60 * 60)).contains(now.timeIntervalSince($0.readAt)) }
             .sorted { $0.readAt > $1.readAt }
             // 200 件: 無料の利用者の読み取りの上限 (1 日 10 回。2026-11-19 の行) で 14 日に読める 140 件を残せる数。
             // 有料の利用者が多く読んだ時に、記録のファイルが大きくなり続けないための上限
