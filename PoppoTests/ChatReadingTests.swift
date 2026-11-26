@@ -273,6 +273,47 @@ private func phaseName(phase: ChatReadingPhase) -> String {
     }
 }
 
+/// 読み取りの途中で取りやめられなかった時は、読み取りの結果の状態を返すこと (読み取りに失敗した時も、失敗の状態を返すこと)
+@Test func chatReadingPhaseUnlessCancelledReturnsPhaseWhenNotCancelled() async throws {
+    #expect(
+        try phaseName(
+            phase: #require(
+                await chatReadingPhaseUnlessCancelled(read: {
+                    (messages: [TranslatedMessage(originalText: "Hi", translatedText: "やあ")], replySuggestions: [])
+                })
+            )
+        ) == "loaded"
+    )
+    #expect(
+        try phaseName(phase: #require(await chatReadingPhaseUnlessCancelled(read: { throw ChatReadingError.noMessages })))
+            == "noMessages"
+    )
+}
+
+/// 読み取りの途中でタスクが取りやめられた時は、読み取りが結果を返しても、その結果を返さない (nil) こと
+/// (言語か関係を選び直した後の読み取りの結果を、前の読み取りの結果で上書きしないため)
+@Test func chatReadingPhaseUnlessCancelledReturnsNilWhenCancelledDuringReading() async {
+    let (readStarted, readStartedContinuation) = AsyncStream<Void>.makeStream()
+    let (cancelled, cancelledContinuation) = AsyncStream<Void>.makeStream()
+    let readingTask = Task { @MainActor in
+        await chatReadingPhaseUnlessCancelled(read: {
+            readStartedContinuation.yield()
+            // 取りやめられるまで待ってから結果を返す (Task.sleep は取りやめで throw するため使わず、取りやめても結果を返す読み取りにする)
+            for await _ in cancelled {
+                break
+            }
+            return (messages: [TranslatedMessage(originalText: "Hi", translatedText: "やあ")], replySuggestions: [])
+        })
+    }
+    for await _ in readStarted {
+        break
+    }
+    readingTask.cancel()
+    cancelledContinuation.yield()
+
+    #expect(await readingTask.value == nil)
+}
+
 /// 画像から発言を読み取れなかった時は、画面の状態が、チャットの文字が見つからなかったことを出す状態になること
 @Test func phaseIsNoMessagesWhenNoChatTextIsFound() async {
     #expect(phaseName(phase: await chatReadingPhase(read: { throw ChatReadingError.noMessages })) == "noMessages")

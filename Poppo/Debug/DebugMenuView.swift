@@ -181,8 +181,22 @@ struct DebugMenuView: View {
                 }
                 .accessibilityIdentifier("debug_open_sample_result_without_replies")
                 NavigationLink {
-                    // 訳す先の言語と相手との関係を選ぶ欄を、simulator (翻訳が動かない) で確かめるため、読み取りの処理の代わりに見本の読み取り結果を返す
-                    ChatReadingView(readChatContent: { (messages: debugSampleMessages, replySuggestions: debugSampleReplySuggestions) })
+                    // 訳す先の言語と相手との関係を選ぶ欄を、simulator (翻訳が動かない) で確かめるため、読み取りの処理の代わりに見本の読み取り結果を返す。
+                    // 選び直した時に読み直したことを画面で確かめるため、読み取った時に保存してあった言語と関係を、返信案の先頭の行に出す
+                    ChatReadingView(readChatContent: {
+                        (
+                            messages: debugSampleMessages,
+                            replySuggestions: [
+                                ReplySuggestion(
+                                    text: "読み取った時の選択: "
+                                        + selectedTargetLanguage(userDefaults: .standard, preferredLanguages: Locale.preferredLanguages)
+                                        .maximalIdentifier + " / "
+                                        + (selectedChatPartnerRelationship(userDefaults: .standard)?.rawValue ?? "未選択"),
+                                    meaning: ""
+                                )
+                            ] + debugSampleReplySuggestions
+                        )
+                    })
                 } label: {
                     Text(verbatim: "見本の読み取り結果で読み取りの画面を開く (言語と相手との関係を選ぶ欄つき)")
                 }

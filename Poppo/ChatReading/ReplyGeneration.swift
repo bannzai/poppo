@@ -212,9 +212,9 @@ func generateReplyTexts(
             model: SystemLanguageModel.default,
             instructions: replyInstructions(chatPartnerRelationship: chatPartnerRelationship)
         )
-            .respond(to: replyPrompt(messages: messages), generating: GeneratedReplyTexts.self)
-            .content
-            .texts
+        .respond(to: replyPrompt(messages: messages), generating: GeneratedReplyTexts.self)
+        .content
+        .texts
     case .privateCloudCompute, .openAI, .gemini, .claude:
         throw ReplyModelNotInSDKError()
     }

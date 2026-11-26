@@ -69,6 +69,54 @@ private func makeSuiteName() -> String {
     try #require(UserDefaults(suiteName: suiteName)).removePersistentDomain(forName: suiteName)
 }
 
+/// 返信の文を作る処理には、保存してある相手との関係を渡し、その処理が返した文を返すこと。何も選んでいない時は未選択 (nil) を渡すこと
+@Test func generateReplyTextsForSelectedRelationshipPassesSavedRelationship() async throws {
+    let suiteName = makeSuiteName()
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    var receivedRelationships: [ChatPartnerRelationship?] = []
+    let generate: ([ExtractedMessage], ChatPartnerRelationship?) async throws -> [String] = { messages, chatPartnerRelationship in
+        receivedRelationships.append(chatPartnerRelationship)
+        return messages.map { "返信: " + $0.text }
+    }
+
+    #expect(
+        try await generateReplyTextsForSelectedRelationship(
+            messages: [ExtractedMessage(text: "Are you free?", isFromUser: false)],
+            userDefaults: userDefaults,
+            generate: generate
+        ) == ["返信: Are you free?"]
+    )
+    save(selectedChatPartnerRelationship: .superiorOrClient, userDefaults: userDefaults)
+    _ = try await generateReplyTextsForSelectedRelationship(messages: [], userDefaults: userDefaults, generate: generate)
+
+    #expect(receivedRelationships == [nil, .superiorOrClient])
+    userDefaults.removePersistentDomain(forName: suiteName)
+}
+
+/// 選んでいる値が保存してある値と同じ時 (画面を開いただけで何も選び直していない時) は保存しないこと。違う時だけ、選んでいる値を保存すること
+@Test func saveIfChangedSavesOnlyWhenSelectedValueDiffers() {
+    var savedValues: [String] = []
+
+    saveIfChanged(selectedValue: "ja-Jpan-JP", savedValue: "ja-Jpan-JP", save: { savedValues.append($0) })
+    saveIfChanged(selectedValue: "en-Latn-US", savedValue: "ja-Jpan-JP", save: { savedValues.append($0) })
+
+    #expect(savedValues == ["en-Latn-US"])
+}
+
+/// 画面を開いただけ (端末の言語のまま) では訳す先の言語を保存しないため、後で端末の言語を変えると訳す先も変わること
+@Test func targetLanguageFollowsPreferredLanguageWhenOpenedWithoutChoosing() throws {
+    let suiteName = makeSuiteName()
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    saveIfChanged(
+        selectedValue: selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ja-JP"]).maximalIdentifier,
+        savedValue: selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ja-JP"]).maximalIdentifier,
+        save: { save(selectedTargetLanguage: Locale.Language(identifier: $0), userDefaults: userDefaults) }
+    )
+
+    #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("ko"))
+    userDefaults.removePersistentDomain(forName: suiteName)
+}
+
 /// 選べる相手との関係は、友人・家族、仕事の仲間、目上・取引先、初めての相手の 4 つで、保存に書く生の値がこの 4 つの文字列であること
 /// (生の値を変えると、保存してある選択を読めなくなる)
 @Test func chatPartnerRelationshipsAreFriendOrFamilyCoworkerSuperiorOrClientAndStranger() {
@@ -113,6 +161,27 @@ func selectedChatPartnerRelationshipIsKeptAfterSaving(chatPartnerRelationship: C
     userDefaults.set(["coworker"], forKey: selectedChatPartnerRelationshipUserDefaultsKey)
     #expect(selectedChatPartnerRelationship(userDefaults: userDefaults) == nil)
     userDefaults.removePersistentDomain(forName: suiteName)
+}
+
+/// 訳す先として選べる言語の一覧は、渡した順に関係なく、言語の名前の順に並ぶこと
+@Test func targetLanguageOptionsAreSortedByLanguageName() {
+    let names = targetLanguageOptions(
+        supportedLanguages: [
+            Locale.Language(identifier: "ko"), Locale.Language(identifier: "fr"), Locale.Language(identifier: "de"),
+        ],
+        selectedLanguage: Locale.Language(identifier: "es")
+    ).map { languageName(language: $0) }
+
+    #expect(names.count == 4)
+    #expect(zip(names, names.dropFirst()).allSatisfy { $0.localizedStandardCompare($1) == .orderedAscending })
+}
+
+/// 端末で訳せる言語をまだ読み出していない時 (一覧が空) は、今選んでいる言語だけを並べること
+@Test func targetLanguageOptionsContainOnlySelectedLanguageBeforeSupportedLanguagesAreLoaded() {
+    #expect(
+        targetLanguageOptions(supportedLanguages: [], selectedLanguage: Locale.Language(identifier: "ja-JP")).map(\.maximalIdentifier)
+            == ["ja-Jpan-JP"]
+    )
 }
 
 /// 訳す先として選べる言語の一覧は、端末で訳せる言語に、今選んでいる言語を (一覧に無くても) 1 つだけ含めること

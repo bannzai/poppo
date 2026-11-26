@@ -46,8 +46,7 @@ func save(selectedChatPartnerRelationship: ChatPartnerRelationship?, userDefault
 }
 
 /// 文の組 (texts) を、訳す先として選ばれている言語 (selectedTargetLanguage(userDefaults:preferredLanguages:)) へ translate で訳して返す。
-/// translate は、文の組と訳す先の言語を受け取って訳文を返す処理 (本物は translateOnDevice(texts:targetLanguage:))。
-/// スクリーンショットからの読み取りと、取り込んだ画面の読み取りの両方が、訳す先の言語をこの関数で決める
+/// translate は、文の組と訳す先の言語を受け取って訳文を返す処理 (本物は translateOnDevice(texts:targetLanguage:))
 func translateIntoSelectedLanguage(
     texts: [String],
     userDefaults: UserDefaults,
@@ -57,8 +56,7 @@ func translateIntoSelectedLanguage(
     try await translate(texts, selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: preferredLanguages))
 }
 
-/// 文の組 (texts) を、アプリに保存してある訳す先の言語へ端末内で訳して返す。
-/// スクリーンショットからの読み取りと、取り込んだ画面の読み取りの両方が使う、本物の翻訳の処理
+/// 文の組 (texts) を、アプリに保存してある訳す先の言語へ端末内で訳して返す
 func translateIntoSelectedLanguageOnDevice(texts: [String]) async throws -> [String] {
     try await translateIntoSelectedLanguage(
         texts: texts,
@@ -68,12 +66,21 @@ func translateIntoSelectedLanguageOnDevice(texts: [String]) async throws -> [Str
     )
 }
 
-/// replyModel のモデルで、アプリに保存してある相手との関係に合う口調の返信の文を作る。
-/// スクリーンショットからの読み取りと、取り込んだ画面の読み取りの両方が使う、本物の返信の文を作る処理
+/// 発言 (messages) に続く返信の文を、相手との関係として選ばれているもの (selectedChatPartnerRelationship(userDefaults:)。nil は未選択) を
+/// generate に渡して作って返す。generate は、発言と相手との関係を受け取って返信の文を返す処理 (本物は generateReplyTexts(messages:replyModel:chatPartnerRelationship:))
+func generateReplyTextsForSelectedRelationship(
+    messages: [ExtractedMessage],
+    userDefaults: UserDefaults,
+    generate: (_ messages: [ExtractedMessage], _ chatPartnerRelationship: ChatPartnerRelationship?) async throws -> [String]
+) async throws -> [String] {
+    try await generate(messages, selectedChatPartnerRelationship(userDefaults: userDefaults))
+}
+
+/// replyModel のモデルで、アプリに保存してある相手との関係に合う口調の返信の文を作る
 func generateReplyTextsForSelectedRelationship(messages: [ExtractedMessage], replyModel: ReplyModel) async throws -> [String] {
-    try await generateReplyTexts(
+    try await generateReplyTextsForSelectedRelationship(
         messages: messages,
-        replyModel: replyModel,
-        chatPartnerRelationship: selectedChatPartnerRelationship(userDefaults: .standard)
+        userDefaults: .standard,
+        generate: { try await generateReplyTexts(messages: $0, replyModel: replyModel, chatPartnerRelationship: $1) }
     )
 }

@@ -94,9 +94,40 @@ func targetLanguageOptions(supportedLanguages: [Locale.Language], selectedLangua
     await LanguageAvailability().supportedLanguages
 }
 
-/// 言語を、利用者が読める名前 (アプリが動いている言語での言語の名前) にして返す。名前を引けない言語は識別子を返す
+/// 言語を、利用者が読める名前 (アプリが動いている言語での言語の名前) にして返す
 func languageName(language: Locale.Language) -> String {
+    // 名前を引けない言語でも、言語の一覧で空の行にせず、ほかの言語と見分けられるようにするため、識別子を出す
     Locale.current.localizedString(forIdentifier: language.minimalIdentifier) ?? language.minimalIdentifier
+}
+
+/// 訳す先の言語の欄の見出し。欄の上に出す見出しと、読み上げに使う Picker のラベルの両方に使う
+func targetLanguageFieldTitle() -> Text {
+    // ja: 訳す言語
+    Text("Translate into")
+}
+
+/// 相手との関係の欄の見出し。欄の上に出す見出しと、読み上げに使う Picker のラベルの両方に使う
+func chatPartnerRelationshipFieldTitle() -> Text {
+    // ja: 相手との関係
+    Text("Relationship")
+}
+
+/// 読み取りの処理 (read) を実行して、画面の状態 (読み取りの結果か失敗) を返す。
+/// 読み取りの途中でこの関数を動かすタスクが取りやめられた時は nil を返す (後から始めた読み取りの結果を、前の読み取りの結果で上書きしないため)
+func chatReadingPhaseUnlessCancelled(
+    read: @MainActor () async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
+) async -> ChatReadingPhase? {
+    // 取りやめを確かめる前に読み取りを終えるため、結果を変数に置く (式のまま畳むと、取りやめの確かめが読み取りより先に評価される)
+    let readPhase = await chatReadingPhase(read: read)
+    return Task.isCancelled ? nil : readPhase
+}
+
+/// 選ぶ欄で選んでいる値 (selectedValue) を、保存してある値 (savedValue。何も保存していない時は既定の値) と違う時だけ save で保存する。
+/// 画面を開いただけで既定の値 (端末の言語・未選択) を「選んだ値」として保存しないため (保存すると、後で端末の言語を変えても訳す先が変わらなくなる)
+func saveIfChanged<Value: Equatable>(selectedValue: Value, savedValue: Value, save: (Value) -> Void) {
+    if selectedValue != savedValue {
+        save(selectedValue)
+    }
 }
 
 /// 相手との関係 (nil は未選択) の、選ぶ画面に出す名前
@@ -161,8 +192,7 @@ struct ChatReadingView: View {
         .safeAreaInset(edge: .top) {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    // ja: 訳す言語
-                    Text("Translate into")
+                    targetLanguageFieldTitle()
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Picker(selection: $targetLanguageIdentifier) {
@@ -177,15 +207,13 @@ struct ChatReadingView: View {
                                 .tag(language.maximalIdentifier)
                         }
                     } label: {
-                        // ja: 訳す言語
-                        Text("Translate into")
+                        targetLanguageFieldTitle()
                     }
                     .labelsHidden()
                     .accessibilityIdentifier("target_language_picker")
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    // ja: 相手との関係
-                    Text("Relationship")
+                    chatPartnerRelationshipFieldTitle()
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Picker(selection: $chatPartnerRelationship) {
@@ -196,8 +224,7 @@ struct ChatReadingView: View {
                                 .tag(Optional(relationship))
                         }
                     } label: {
-                        // ja: 相手との関係
-                        Text("Relationship")
+                        chatPartnerRelationshipFieldTitle()
                     }
                     .labelsHidden()
                     .accessibilityIdentifier("chat_partner_relationship_picker")
@@ -217,9 +244,20 @@ struct ChatReadingView: View {
         }
         // 最初に開いた時、言語か関係を選び直した時、読み直しを頼んだ時に読み取る。どの時も、途中の前の読み取りを取りやめて読み直す
         .task(id: [targetLanguageIdentifier, chatPartnerRelationship?.rawValue, String(readRequestCount)]) {
-            save(selectedTargetLanguage: Locale.Language(identifier: targetLanguageIdentifier), userDefaults: .standard)
-            save(selectedChatPartnerRelationship: chatPartnerRelationship, userDefaults: .standard)
-            await read()
+            saveIfChanged(
+                selectedValue: targetLanguageIdentifier,
+                savedValue: selectedTargetLanguage(userDefaults: .standard, preferredLanguages: Locale.preferredLanguages).maximalIdentifier,
+                save: { save(selectedTargetLanguage: Locale.Language(identifier: $0), userDefaults: .standard) }
+            )
+            saveIfChanged(
+                selectedValue: chatPartnerRelationship,
+                savedValue: selectedChatPartnerRelationship(userDefaults: .standard),
+                save: { save(selectedChatPartnerRelationship: $0, userDefaults: .standard) }
+            )
+            phase = .reading
+            if let readPhase = await chatReadingPhaseUnlessCancelled(read: readChatContent) {
+                phase = readPhase
+            }
         }
         .translationTask(languageDownloadConfiguration) { session in
             // TranslationSession は Sendable でなく、prepareTranslation() は呼び出し元の actor の外で動く宣言のため、
@@ -231,18 +269,6 @@ struct ChatReadingView: View {
                 readRequestCount += 1
             }
         }
-    }
-
-    /// 読み取りの処理を実行し、結果を画面の状態に入れる。
-    /// 読み取りの途中で取りやめた時 (言語か関係を選び直した時・読み直しを頼んだ時) は、結果を画面に入れない (後から始めた読み取りの結果を、前の結果で上書きしないため)
-    private func read() async {
-        phase = .reading
-        // 取りやめを確かめる前に読み取りを終えるため、結果を変数に置く (式のまま畳むと、取りやめの確かめが読み取りより先に評価される)
-        let readPhase = await chatReadingPhase(read: readChatContent)
-        guard !Task.isCancelled else {
-            return
-        }
-        phase = readPhase
     }
 }
 
