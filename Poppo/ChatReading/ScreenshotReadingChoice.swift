@@ -123,15 +123,23 @@ func screenshotReadingChoicesFileURL() -> URL? {
 /// 保存していない時と、記録として読めない中身の時は空を返す
 nonisolated func loadScreenshotReadingChoices(fileURL: URL, now: Date) -> [ScreenshotReadingChoice] {
     retainedScreenshotReadingChoices(
+        // 空: 記録は既定を選ぶための手がかりで、読めない時は前に読んだ相手が無い時と同じに扱えば足りる (直前の選択が既定になる)。
+        // 読めない中身は次に記録を足した時に上書きされる
         choices: (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([ScreenshotReadingChoice].self, from: $0) } ?? [],
         now: now
     )
 }
 
-/// 記録 (choices) を fileURL に保存する。前に保存した記録は上書きされる。書き込めない時はエラーを投げる
+/// 記録 (choices) を fileURL に保存し、そのファイルを端末のバックアップ (iCloud・パソコンへのバックアップ) から外す。
+/// 前に保存した記録は上書きされる。書き込めない時と、バックアップから外せない時はエラーを投げる
 nonisolated func save(screenshotReadingChoices choices: [ScreenshotReadingChoice], fileURL: URL) throws {
     // atomic: 書いている途中で本体アプリが終了しても、前の記録を壊さないため
     try JSONEncoder().encode(choices).write(to: fileURL, options: .atomic)
+    // バックアップから外す: 記録には相手の名前が入り、端末の外へ出さないと決めているため。Application Support はそのままではバックアップされる
+    // (「the contents of the Library directory (with the exception of the Caches subdirectory) are backed up by iTunes and iCloud」
+    // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html )。
+    // atomic の書き込みはファイルを置き換えるため、書くたびに付け直す
+    try (fileURL as NSURL).setResourceValue(true, forKey: .isExcludedFromBackupKey)
 }
 
 /// スクリーンショットから読んだ行 (lines) の手がかりと、この読み取りの既定にする言語と関係を、新しい記録として fileURL に足して返す。

@@ -137,6 +137,35 @@ func chatReadingTaskID(
     [targetLanguageIdentifier, chatPartnerRelationship?.rawValue, String(readRequestCount)]
 }
 
+/// 過去の読み取りの記録の既定 (defaultChoice) を今の選択 (savedTargetLanguageIdentifier・chatPartnerRelationship) に当てると、
+/// 読み取りの画面が読み取りを始め直すか (読み取りのタスクの id chatReadingTaskID が変わるか) を返す。
+/// savedTargetLanguageIdentifier は端末に保存してある書き方のまま (未選択は空文字) で受け取る。訳す先の言語は保存の書き方ではなく、
+/// 未選択の時に端末の言語 (preferredLanguages) へ置き換えた後の言語で比べる (タスクの id がその言語から作られるため)
+func defaultChoiceRestartsChatReading(
+    defaultChoice: ScreenshotReadingChoice,
+    savedTargetLanguageIdentifier: String,
+    chatPartnerRelationship: ChatPartnerRelationship?,
+    preferredLanguages: [String]
+) -> Bool {
+    // 0: 既定を当てても読み直しを頼んだ回数は変わらないため、両方に同じ値を渡す
+    chatReadingTaskID(
+        targetLanguageIdentifier: targetLanguage(
+            savedIdentifier: defaultChoice.targetLanguageIdentifier,
+            preferredLanguages: preferredLanguages
+        ).maximalIdentifier,
+        chatPartnerRelationship: defaultChoice.chatPartnerRelationship,
+        readRequestCount: 0
+    )
+        != chatReadingTaskID(
+            targetLanguageIdentifier: targetLanguage(
+                savedIdentifier: savedTargetLanguageIdentifier,
+                preferredLanguages: preferredLanguages
+            ).maximalIdentifier,
+            chatPartnerRelationship: chatPartnerRelationship,
+            readRequestCount: 0
+        )
+}
+
 /// 相手との関係 (nil は未選択) の、選ぶ画面に出す名前
 func chatPartnerRelationshipText(chatPartnerRelationship: ChatPartnerRelationship?) -> Text {
     switch chatPartnerRelationship {
@@ -337,7 +366,7 @@ struct ChatReadingView: View {
 
     /// この画面の読み取りに使う文字の行を返す。画面を開いて最初の 1 回だけ文字を読み、読み取りを記録して、
     /// 前に読んだ同じ相手のスクリーンショットで選ばれていた言語と関係を既定として選ぶ (この画面で利用者が既に選び直していた時は選ばない)。
-    /// 既定を選んで選択が変わった時 (選択が変わると、.task(id:) がその選択で読み取りを始め直すため) と、読んでいる途中で取りやめられた時は nil を返す。
+    /// 既定を選んで、読み取りのタスクの id (chatReadingTaskID) が変わった時 (.task(id:) がその選択で読み取りを始め直すため) と、読んでいる途中で取りやめられた時は nil を返す。
     /// 文字を読めなかった時は、画面を失敗の状態にして nil を返す
     private func linesForReading() async -> [RecognizedTextLine]? {
         if let recognizedLines {
@@ -373,16 +402,18 @@ struct ChatReadingView: View {
             return lines
         }
         screenshotReadingChoiceID = defaultChoice.id
-        guard
-            defaultChoice.targetLanguageIdentifier != selectedTargetLanguageIdentifier
-                || defaultChoice.chatPartnerRelationship != chatPartnerRelationship
-        else {
-            return lines
-        }
+        // 先に比べる: 書き換えた後は、今の選択が既定と同じになり比べられないため
+        let restartsReading = defaultChoiceRestartsChatReading(
+            defaultChoice: defaultChoice,
+            savedTargetLanguageIdentifier: savedTargetLanguageIdentifier,
+            chatPartnerRelationship: chatPartnerRelationship,
+            preferredLanguages: Locale.preferredLanguages
+        )
+        // 保存の書き方が違うだけで訳す先の言語が同じ時 (記録は未選択で、今は端末の言語と同じ言語を選んでいる等) も、記録のとおりに書き換える。
         // 空文字: 記録で何も選んでいなかった (nil) 時は、この保存の「未選択」(端末の言語へ訳す) の書き方に戻すため
         savedTargetLanguageIdentifier = defaultChoice.targetLanguageIdentifier ?? ""
         chatPartnerRelationship = defaultChoice.chatPartnerRelationship
-        return nil
+        return restartsReading ? nil : lines
     }
 
     /// 利用者が言語か関係を選び直したことを覚え、この画面の読み取りの記録の言語と関係を、選び直したものに書き換える

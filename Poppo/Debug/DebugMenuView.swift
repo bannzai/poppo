@@ -62,6 +62,7 @@ struct DebugMenuView: View {
 
     /// 残っているスクリーンショットからの読み取りの記録の数を読み直す
     private func reloadScreenshotReadingChoiceCount() {
+        // 0: 記録の場所を作れない時は、読み取りの画面も記録を残せず (addScreenshotReadingChoice を呼べない) 記録が 1 件も無いのと同じため
         screenshotReadingChoiceCount = screenshotReadingChoicesFileURL().map { loadScreenshotReadingChoices(fileURL: $0, now: Date()).count } ?? 0
     }
 

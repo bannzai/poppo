@@ -447,3 +447,156 @@ private func pastChoice(
     #expect(choice.chatPartnerRelationship == .stranger)
     #expect(try JSONDecoder().decode([ScreenshotReadingChoice].self, from: Data(contentsOf: fileURL)) == [choice])
 }
+
+/// 似ている記録が複数ある時: チャットの名前が同じ記録どうしでは、発言した人の名前の重なりが大きい記録を、新しい記録より先に選ぶこと。
+/// チャットの名前を読めない記録どうしでも同じこと
+@Test func mostSimilarChoicePrefersLargerSpeakerOverlapOverNewer() {
+    let largerOverlapOlder = pastChoice(
+        chatTitle: "# design-review",
+        speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
+        relationship: .coworker,
+        readAt: Date(timeIntervalSinceReferenceDate: 800_000_000)
+    )
+    #expect(
+        mostSimilarScreenshotReadingChoice(
+            chatTitleReadFromScreen: "# design-review",
+            speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
+            pastChoices: [
+                largerOverlapOlder,
+                pastChoice(
+                    chatTitle: "# design-review",
+                    speakerNames: ["Priya Nakamoto"],
+                    relationship: .stranger,
+                    readAt: Date(timeIntervalSinceReferenceDate: 800_000_100)
+                ),
+            ]
+        ) == largerOverlapOlder
+    )
+
+    let namesOnlyLargerOverlapOlder = pastChoice(
+        chatTitle: nil,
+        speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
+        relationship: .coworker,
+        readAt: Date(timeIntervalSinceReferenceDate: 800_000_000)
+    )
+    #expect(
+        mostSimilarScreenshotReadingChoice(
+            chatTitleReadFromScreen: nil,
+            speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
+            pastChoices: [
+                namesOnlyLargerOverlapOlder,
+                // 2 人のうち 1 人が同じ (1/2) で、似ているが重なりが小さい新しい記録
+                pastChoice(
+                    chatTitle: nil,
+                    speakerNames: ["Mira Solberg"],
+                    relationship: .stranger,
+                    readAt: Date(timeIntervalSinceReferenceDate: 800_000_100)
+                ),
+            ]
+        ) == namesOnlyLargerOverlapOlder
+    )
+}
+
+/// 新しい読み取りでチャットの名前を読めず、過去の記録だけに名前がある時も、発言した人の名前で比べること
+@Test func mostSimilarChoiceUsesSpeakersWhenOnlyPastChoiceHasTitle() {
+    let pastWithTitle = pastChoice(chatTitle: "# design-review", speakerNames: ["Mira Solberg", "Tobias Lindqvist"], relationship: .coworker)
+
+    #expect(
+        mostSimilarScreenshotReadingChoice(
+            chatTitleReadFromScreen: nil,
+            speakerNames: ["Mira Solberg", "Tobias Lindqvist"],
+            pastChoices: [pastWithTitle]
+        ) == pastWithTitle
+    )
+    #expect(
+        mostSimilarScreenshotReadingChoice(chatTitleReadFromScreen: nil, speakerNames: ["Priya Nakamoto"], pastChoices: [pastWithTitle]) == nil
+    )
+}
+
+/// 手がかりの文字は数字も残すこと (数字だけが違うチャンネルを同じ相手にしないため)
+@Test func comparableClueTextKeepsDigits() {
+    #expect(comparableClueText(text: "# team-1") != comparableClueText(text: "# team-2"))
+    #expect(comparableClueText(text: "# team-1") == "team1")
+}
+
+/// 記録を書き込めない場所 (無いディレクトリの下) では、記録を足す時と保存する時にエラーを投げること
+@Test func choicesThrowWhenFileCannotBeWritten() {
+    let unwritableFileURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ScreenshotReadingChoiceTests-missing-\(UUID().uuidString)")
+        .appendingPathComponent("screenshot-reading-choices.json")
+
+    #expect(throws: (any Error).self) {
+        try addScreenshotReadingChoice(
+            lines: chatScreenLines(chatTitle: "# design-review", headers: []),
+            targetLanguageIdentifier: nil,
+            chatPartnerRelationship: nil,
+            usesMostSimilarChoice: true,
+            id: UUID(),
+            now: Date(),
+            fileURL: unwritableFileURL
+        )
+    }
+    #expect(throws: (any Error).self) {
+        try save(screenshotReadingChoices: [], fileURL: unwritableFileURL)
+    }
+}
+
+/// 保存したファイルは、端末のバックアップから外れていること (記録には相手の名前が入り、端末の外へ出さないため)
+@Test func savedChoicesFileIsExcludedFromBackup() throws {
+    let fileURL = makeChoicesFileURL()
+
+    try save(screenshotReadingChoices: [], fileURL: fileURL)
+
+    #expect(try fileURL.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+}
+
+/// 過去の記録の既定を当てた時に読み取りを始め直すか: 言語だけが違う時・関係だけが違う時・両方違う時は始め直し、
+/// どちらも同じ時は始め直さないこと
+@Test func defaultChoiceRestartsReadingWhenLanguageOrRelationshipDiffers() {
+    // 既定は es-Latn-ES と仕事の仲間 (pastChoice の言語)
+    let restarts = { (savedTargetLanguageIdentifier: String, chatPartnerRelationship: ChatPartnerRelationship?) in
+        defaultChoiceRestartsChatReading(
+            defaultChoice: pastChoice(chatTitle: "# design-review", speakerNames: [], relationship: .coworker),
+            savedTargetLanguageIdentifier: savedTargetLanguageIdentifier,
+            chatPartnerRelationship: chatPartnerRelationship,
+            preferredLanguages: ["ja-JP"]
+        )
+    }
+
+    #expect(restarts("fr-Latn-FR", .coworker))
+    #expect(restarts("es-Latn-ES", .stranger))
+    #expect(restarts("fr-Latn-FR", .stranger))
+    #expect(!restarts("es-Latn-ES", .coworker))
+}
+
+/// 保存の書き方だけが違い、訳す先の言語が同じ時は始め直さないこと: 記録は未選択 (端末の言語へ訳す) で、今は端末の言語と同じ言語を選んでいる時と、
+/// その逆の時。始め直すと見込んで読み取りを止めると、.task(id:) が動き直さず画面が読み取り中のまま止まるため
+@Test func defaultChoiceDoesNotRestartReadingWhenOnlySavedFormDiffers() {
+    let unselectedChoice = ScreenshotReadingChoice(
+        id: UUID(),
+        readAt: Date(timeIntervalSinceReferenceDate: 800_000_000),
+        chatTitleReadFromScreen: "# design-review",
+        speakerNames: [],
+        targetLanguageIdentifier: nil,
+        chatPartnerRelationship: nil
+    )
+    #expect(
+        !defaultChoiceRestartsChatReading(
+            defaultChoice: unselectedChoice,
+            savedTargetLanguageIdentifier: "en-Latn-US",
+            chatPartnerRelationship: nil,
+            preferredLanguages: ["en-US"]
+        )
+    )
+
+    var deviceLanguageChoice = unselectedChoice
+    deviceLanguageChoice.targetLanguageIdentifier = "en-Latn-US"
+    #expect(
+        !defaultChoiceRestartsChatReading(
+            defaultChoice: deviceLanguageChoice,
+            savedTargetLanguageIdentifier: "",
+            chatPartnerRelationship: nil,
+            preferredLanguages: ["en-US"]
+        )
+    )
+}
