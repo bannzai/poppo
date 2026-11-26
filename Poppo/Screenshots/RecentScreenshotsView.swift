@@ -205,6 +205,9 @@ struct ScreenshotThumbnailFrame: View {
                 }
             }
             .clipShape(.rect(cornerRadius: 8))
+            // scaledToFill の画像は枠より横長の時に左右へはみ出し、clipShape は見た目だけを切るため、タップを受ける範囲が隣のセルまで広がる。
+            // タップを受ける範囲を枠に揃える (simtunnel の simulator で、横長の 2 枚目が幅 558pt の範囲でタップを受け、1 枚目を押すと 2 枚目が開いた)
+            .contentShape(.rect(cornerRadius: 8))
     }
 }
 
