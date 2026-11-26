@@ -983,3 +983,31 @@ private func pastChoice(
         ) == [readNow]
     )
 }
+
+/// チャットの名前が同じ古い記録と、チャットの名前が無く発言した人が同じ新しい記録がある時: チャットの名前を読めた読み取りは古い記録を選び、
+/// チャットの名前を読めなかった読み取りは新しい記録を選ぶこと (名前を読めなかった記録が同じチャットか別のチャットかを見分けられないため。
+/// documents/DIRECTION.md の 2026-11-27 の行)
+@Test func titleMatchBeatsNewerNamesOnlyRecordOnlyWhenTitleIsRead() {
+    let sameTitleOlder = pastChoice(chatTitle: "# general", speakerNames: ["luna_verde", "ElZorroAzul"], relationship: .coworker, readAt: testReadAt)
+    let namesOnlyNewer = pastChoice(
+        chatTitle: nil,
+        speakerNames: ["luna_verde", "ElZorroAzul"],
+        relationship: .friendOrFamily,
+        readAt: testReadAt.addingTimeInterval(100)
+    )
+
+    #expect(
+        mostSimilarScreenshotReadingChoice(
+            chatTitleReadFromScreen: "# general",
+            speakerNames: ["luna_verde", "ElZorroAzul"],
+            pastChoices: [sameTitleOlder, namesOnlyNewer]
+        ) == sameTitleOlder
+    )
+    #expect(
+        mostSimilarScreenshotReadingChoice(
+            chatTitleReadFromScreen: nil,
+            speakerNames: ["luna_verde", "ElZorroAzul"],
+            pastChoices: [sameTitleOlder, namesOnlyNewer]
+        ) == namesOnlyNewer
+    )
+}
