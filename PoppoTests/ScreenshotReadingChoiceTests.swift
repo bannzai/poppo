@@ -107,14 +107,9 @@ private func pastChoice(
     )
 }
 
-/// ほかの見出しと並べるための、画面の下の方の 2 つの発言 (otherSpeakerNames の 2 人の見出しと本文)。見出しの形の行が 2 つ以上ある時だけ名前を読むため、
-/// 1 つの行を見出しにするかを確かめるテストに足し、その行を見出しにしなくても名前を読める入力にする
-private let otherHeaderMessageLines =
-    threadMessageLines(name: "Priya Nakamoto", time: "11:02 AM", body: "Other message", top: 0.6)
-    + threadMessageLines(name: "Kenji Sato", time: "11:05 AM", body: "Another message", top: 0.7)
-
-/// otherHeaderMessageLines から読む発言した人の名前 (画面の上から下の順)
-private let otherSpeakerNames = ["Priya Nakamoto", "Kenji Sato"]
+/// ほかの見出しと並べるための、画面の下の方の発言 (Priya Nakamoto の見出しと本文)。見出しの形の行が 2 つ以上ある時だけ名前を読むため、
+/// 1 つの行の扱いを確かめるテストに足す
+private let otherHeaderMessageLines = threadMessageLines(name: "Priya Nakamoto", time: "11:02 AM", body: "Other message", top: 0.6)
 
 /// 名前と時刻を Vision が 1 つの行に読んだ見出し (「Mira Solberg 10:42 AM」「水瀬あおい 14:05」「Bob 午後 3:41」) から、時刻を除いた名前を読むこと
 @Test func speakerNamesAreReadFromSingleLineHeaders() {
@@ -137,12 +132,10 @@ private let otherSpeakerNames = ["Priya Nakamoto", "Kenji Sato"]
     let line = { (text: String, x: CGFloat, y: CGFloat) in RecognizedTextLine(text: text, boundingBox: CGRect(x: x, y: y, width: 0.25, height: 0.02)) }
 
     #expect(speakerNames(lines: [line("Meet me at 10:42", 0.16, 0.2), line("See you", 0.16, 0.23)]).isEmpty)
-    #expect(speakerNames(lines: threadMessageLines(name: "Mira Solberg", time: "10:42 AM", body: "Body", top: 0.2)).isEmpty)
+    #expect(speakerNames(lines: otherHeaderMessageLines).isEmpty)
     #expect(
-        speakerNames(
-            lines: threadMessageLines(name: "Mira Solberg", time: "10:42 AM", body: "Body", top: 0.2)
-                + threadMessageLines(name: "Priya Nakamoto", time: "11:02 AM", body: "Other message", top: 0.6)
-        ) == ["Mira Solberg", "Priya Nakamoto"]
+        speakerNames(lines: threadMessageLines(name: "Mira Solberg", time: "10:42 AM", body: "Body", top: 0.2) + otherHeaderMessageLines)
+            == ["Mira Solberg", "Priya Nakamoto"]
     )
 }
 
@@ -152,24 +145,24 @@ private let otherSpeakerNames = ["Priya Nakamoto", "Kenji Sato"]
     let line = { (text: String, x: CGFloat, y: CGFloat) in RecognizedTextLine(text: text, boundingBox: CGRect(x: x, y: y, width: 0.25, height: 0.02)) }
 
     // 吹き出しの最後の行の右に時刻 (下に本文が続かない)
-    #expect(speakerNames(lines: [line("Bonjour", 0.16, 0.2), line("10:42", 0.43, 0.2)] + otherHeaderMessageLines) == otherSpeakerNames)
+    #expect(speakerNames(lines: [line("Bonjour", 0.16, 0.2), line("10:42", 0.43, 0.2)] + otherHeaderMessageLines) == ["Priya Nakamoto"])
     // 右の行が 4 語以上の文で時刻で終わる (時刻の行ではない)
     #expect(
         speakerNames(
             lines: [line("Mira Solberg", 0.16, 0.2), line("we can meet at 10:42", 0.43, 0.2), line("Body", 0.16, 0.23)] + otherHeaderMessageLines
-        ) == otherSpeakerNames
+        ) == ["Priya Nakamoto"]
     )
     // 時刻の前の語が 3 語なら時刻の行として読む (上の 4 語の場合と対になる境目)
     #expect(
         speakerNames(
             lines: [line("luna_verde", 0.16, 0.2), line("hoy a las 18:05", 0.43, 0.2), line("Body", 0.16, 0.23)] + otherHeaderMessageLines
-        ) == ["luna_verde"] + otherSpeakerNames
+        ) == ["luna_verde", "Priya Nakamoto"]
     )
     // 発言の 2 行目が時刻で終わり、下に 3 行目が続く
     #expect(
         speakerNames(
             lines: [line("Let's talk", 0.16, 0.2), line("Meet me at 10:42", 0.16, 0.23), line("See you", 0.16, 0.26)] + otherHeaderMessageLines
-        ) == otherSpeakerNames
+        ) == ["Priya Nakamoto"]
     )
 }
 
@@ -179,14 +172,14 @@ private let otherSpeakerNames = ["Priya Nakamoto", "Kenji Sato"]
 
     #expect(
         speakerNames(lines: [line("Sure thing", 0.5, 0.2), line("10:42", 0.72, 0.2), line("See you", 0.5, 0.23)] + otherHeaderMessageLines)
-            == otherSpeakerNames
+            == ["Priya Nakamoto"]
     )
     #expect(
-        speakerNames(lines: [line("Sure thing 10:42", 0.6, 0.2), line("See you", 0.6, 0.23)] + otherHeaderMessageLines) == otherSpeakerNames
+        speakerNames(lines: [line("Sure thing 10:42", 0.6, 0.2), line("See you", 0.6, 0.23)] + otherHeaderMessageLines) == ["Priya Nakamoto"]
     )
     #expect(
         speakerNames(lines: [line("Mira Solberg", 0.16, 0.07), line("10:42", 0.38, 0.07), line("Body", 0.16, 0.1)] + otherHeaderMessageLines)
-            == otherSpeakerNames
+            == ["Priya Nakamoto"]
     )
 }
 
@@ -832,11 +825,11 @@ private let otherSpeakerNames = ["Priya Nakamoto", "Kenji Sato"]
     let header = [line("Mira Solberg", 0.16, 0.2), line("10:42 AM", 0.43, 0.2)]
 
     // 行間 0.05 (行の高さ 0.02 の 0.75 倍を超える)
-    #expect(speakerNames(lines: header + [line("Body", 0.16, 0.27)] + otherHeaderMessageLines) == otherSpeakerNames)
+    #expect(speakerNames(lines: header + [line("Body", 0.16, 0.27)] + otherHeaderMessageLines) == ["Priya Nakamoto"])
     // 左端が 0.1 ずれる (0.04 を超える)
-    #expect(speakerNames(lines: header + [line("Body", 0.26, 0.23)] + otherHeaderMessageLines) == otherSpeakerNames)
+    #expect(speakerNames(lines: header + [line("Body", 0.26, 0.23)] + otherHeaderMessageLines) == ["Priya Nakamoto"])
     // 行間 0.01・左端が同じ
-    #expect(speakerNames(lines: header + [line("Body", 0.16, 0.23)] + otherHeaderMessageLines) == ["Mira Solberg"] + otherSpeakerNames)
+    #expect(speakerNames(lines: header + [line("Body", 0.16, 0.23)] + otherHeaderMessageLines) == ["Mira Solberg", "Priya Nakamoto"])
 }
 
 /// 端末に保存してある訳す先の言語を記録に残す形: 空文字 (未選択) は nil、選んだ言語はそのまま
