@@ -101,6 +101,16 @@
         }
       }
     },
+    "Couldn't load" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込めません"
+          }
+        }
+      }
+    },
     "Couldn't read this screenshot" : {
       "localizations" : {
         "ja" : {
@@ -157,6 +167,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットがまだありません"
+          }
+        }
+      }
+    },
+    "Not on this iPhone" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この iPhone にありません"
           }
         }
       }

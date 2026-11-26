@@ -246,6 +246,27 @@ struct DebugMenuView: View {
                     Text(verbatim: "見本だけの一覧を開く")
                 }
                 .accessibilityIdentifier("debug_open_sample_screenshot_grid")
+                NavigationLink {
+                    ScrollView {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                            ForEach(
+                                [
+                                    ScreenshotImageUnavailableReason.inCloudOnly,
+                                    .cancelled,
+                                    .failed(errorDescription: "PHPhotosErrorDomain 3164: 見本のエラーの内容"),
+                                    .unknown,
+                                ],
+                                id: \.self
+                            ) { reason in
+                                ScreenshotThumbnailFrame(loadResult: .failure(reason))
+                            }
+                        }
+                        .padding()
+                    }
+                } label: {
+                    Text(verbatim: "読み出せない縮小画像の見本を開く")
+                }
+                .accessibilityIdentifier("debug_open_unavailable_thumbnails")
                 if let sampleScreenshotError {
                     Text(verbatim: sampleScreenshotError)
                         .foregroundStyle(.red)

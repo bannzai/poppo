@@ -167,24 +167,14 @@ struct ScreenshotGrid: View {
 struct ScreenshotThumbnail: View {
     /// 表示するスクリーンショット
     let screenshot: PHAsset
-    /// 読み出した縮小画像。読み出すまでは nil
-    @State private var image: UIImage?
+    /// 縮小画像を読み出した結果。読み出すまでは nil
+    @State private var loadResult: Result<UIImage, ScreenshotImageUnavailableReason>?
 
     var body: some View {
-        Color(uiColor: .secondarySystemBackground)
-            // 9:19.5 はホームボタンの無い iPhone の画面の縦横比。iPhone 専用で作るため (documents/DIRECTION.md「決めたこと」)、枠をこの比で取る
-            .aspectRatio(9 / 19.5, contentMode: .fit)
-            .overlay {
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .clipShape(.rect(cornerRadius: 8))
+        ScreenshotThumbnailFrame(loadResult: loadResult)
             .task(id: screenshot.localIdentifier) {
                 // 幅 440・高さ 960: 3 列の一覧の 1 枚は画面の幅の約 1/3 で、幅 440pt・3 倍の解像度の機種で約 440px になるため
-                image = await loadScreenshotImage(
+                loadResult = await loadScreenshotImage(
                     asset: screenshot,
                     targetSize: CGSize(width: 440, height: 960),
                     contentMode: .aspectFit
@@ -192,3 +182,73 @@ struct ScreenshotThumbnail: View {
             }
     }
 }
+
+/// 一覧の 1 枚の枠。読み出す前は枠だけ、読み出せた時は縮小画像、読み出せなかった時は読み出せないことを出す
+struct ScreenshotThumbnailFrame: View {
+    /// 縮小画像を読み出した結果。読み出す前は nil
+    let loadResult: Result<UIImage, ScreenshotImageUnavailableReason>?
+
+    var body: some View {
+        Color(uiColor: .secondarySystemBackground)
+            // 9:19.5 はホームボタンの無い iPhone の画面の縦横比。iPhone 専用で作るため (documents/DIRECTION.md「決めたこと」)、枠をこの比で取る
+            .aspectRatio(9 / 19.5, contentMode: .fit)
+            .overlay {
+                switch loadResult {
+                case .success(let image):
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                case .failure(let reason):
+                    ScreenshotUnavailableLabel(reason: reason)
+                case nil:
+                    EmptyView()
+                }
+            }
+            .clipShape(.rect(cornerRadius: 8))
+    }
+}
+
+/// 縮小画像を読み出せなかった時に枠の中に出す表示。端末に無い (iCloud にだけある) 時と、ほかの理由の時で文を分ける
+struct ScreenshotUnavailableLabel: View {
+    /// 読み出せなかった理由
+    let reason: ScreenshotImageUnavailableReason
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: reason == .inCloudOnly ? "icloud.slash" : "exclamationmark.triangle")
+                .font(.title3)
+            if reason == .inCloudOnly {
+                // ja: この iPhone にありません
+                Text("Not on this iPhone")
+            } else {
+                // ja: 読み込めません
+                Text("Couldn't load")
+            }
+            #if DEBUG
+            // 実機で読み出せない原因を開発者メニューのあるビルドで見分けるため、写真ライブラリが返した理由をそのまま出す
+            Text(verbatim: debugText(screenshotImageUnavailableReason: reason))
+                .accessibilityIdentifier("debug_screenshot_unavailable_reason")
+            #endif
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .padding(4)
+    }
+}
+
+#if DEBUG
+/// 縮小画像を読み出せなかった理由を、開発者メニューのあるビルドで枠の中に出す文にして返す
+func debugText(screenshotImageUnavailableReason: ScreenshotImageUnavailableReason) -> String {
+    switch screenshotImageUnavailableReason {
+    case .inCloudOnly:
+        "iCloud にだけある"
+    case .cancelled:
+        "取り消された"
+    case .failed(let errorDescription):
+        errorDescription
+    case .unknown:
+        "理由なし"
+    }
+}
+#endif

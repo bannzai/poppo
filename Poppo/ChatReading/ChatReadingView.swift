@@ -127,11 +127,12 @@ struct ChatReadingView: View {
         phase = .reading
         phase = await chatReadingPhase {
             guard
-                let image = await loadScreenshotImage(
+                case .success(let loadedImage) = await loadScreenshotImage(
                     asset: screenshot,
                     targetSize: PHImageManagerMaximumSize,
                     contentMode: .default
-                )?.cgImage
+                ),
+                let image = loadedImage.cgImage
             else {
                 throw ChatReadingError.imageUnavailable
             }

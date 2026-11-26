@@ -31,6 +31,48 @@ import Testing
     #expect(recentScreenshotFetchOptions(limit: 30).fetchLimit == 30)
 }
 
+/// 端末に無く iCloud にだけある時は、エラーが添えられていても iCloud にだけある理由にすること (一覧で「この iPhone にありません」と出すため)
+@Test func screenshotImageUnavailableReasonIsInCloudOnlyWhenInCloud() {
+    #expect(screenshotImageUnavailableReason(info: [PHImageResultIsInCloudKey: NSNumber(value: true)]) == .inCloudOnly)
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: true),
+            PHImageErrorKey: NSError(domain: "PHPhotosErrorDomain", code: 3164),
+        ]) == .inCloudOnly
+    )
+}
+
+/// 取り消された時は取り消しの理由にし、iCloud の印が false の時は iCloud にだけある理由にしないこと
+@Test func screenshotImageUnavailableReasonIsCancelledWhenCancelled() {
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: false),
+            PHImageCancelledKey: NSNumber(value: true),
+        ]) == .cancelled
+    )
+}
+
+/// エラーだけが添えられた時は、エラーのドメインとコードを含む失敗の理由にすること
+@Test func screenshotImageUnavailableReasonIsFailedWithErrorDescription() {
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageErrorKey: NSError(domain: "PHPhotosErrorDomain", code: 3164, userInfo: [NSLocalizedDescriptionKey: "network"])
+        ]) == .failed(errorDescription: "PHPhotosErrorDomain 3164: network")
+    )
+}
+
+/// info が無い時と、印がどれも false の時は、理由なしにすること
+@Test func screenshotImageUnavailableReasonIsUnknownWithoutReason() {
+    #expect(screenshotImageUnavailableReason(info: nil) == .unknown)
+    #expect(screenshotImageUnavailableReason(info: [:]) == .unknown)
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: false),
+            PHImageCancelledKey: NSNumber(value: false),
+        ]) == .unknown
+    )
+}
+
 /// 利用者が写真へのアクセスの許可をまだ選んでいない時は、許可を求める導線を出す状態になること
 @Test func screenshotAccessIsNotRequestedBeforeUserChooses() {
     #expect(screenshotAccess(authorizationStatus: .notDetermined) == .notRequested)
