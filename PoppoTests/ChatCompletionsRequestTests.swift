@@ -144,6 +144,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
                     ExtractedMessage(text: "Let me check", isFromUser: true),
                 ],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             ) == ["Sure", "After lunch works", "Sorry, not today"]
         )
@@ -169,6 +170,36 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
         #expect(((jsonSchema["schema"] as? [String: Any])?["properties"] as? [String: Any])?.keys.sorted() == ["texts"])
     }
 
+    /// 相手との関係を選ぶと、モデルへ送る指示の文 (system) が、その関係を入れた指示の文になること。
+    /// 未選択の時は、関係を選べるようにする前と同じ指示の文になること
+    @Test(arguments: [ChatPartnerRelationship?.none, .superiorOrClient])
+    func requestCarriesInstructionsForSelectedRelationship(chatPartnerRelationship: ChatPartnerRelationship?) async throws {
+        defer {
+            deleteAPIKeys()
+        }
+        try save(apiKey: "test-openai-key", replyModel: .openAI, keychainService: keychainService)
+        try ChatCompletionsStubURLProtocol.state.withLock {
+            $0.responses["api.openai.com"] = StubbedChatCompletionsResponse(
+                statusCode: 200,
+                body: try chatCompletionsResponseBody(content: #"{"texts":["Sure","After lunch works","Sorry, not today"]}"#)
+            )
+        }
+
+        _ = try await generateReplyTexts(
+            messages: [ExtractedMessage(text: "Are you free today?", isFromUser: false)],
+            replyModel: .openAI,
+            chatPartnerRelationship: chatPartnerRelationship,
+            apiKeyKeychainService: keychainService
+        )
+        let messages = try #require(
+            (try JSONSerialization.jsonObject(
+                with: try #require(ChatCompletionsStubURLProtocol.state.withLock { $0.receivedRequests }["api.openai.com"]?.last).body
+            ) as? [String: Any])?["messages"] as? [[String: String]]
+        )
+        #expect(messages[0]["content"] == replyInstructions(chatPartnerRelationship: chatPartnerRelationship))
+        #expect(messages[0]["content"]?.contains("superiors or business clients") == (chatPartnerRelationship == .superiorOrClient))
+    }
+
     /// Gemini を選ぶと、Gemini の OpenAI 互換の接続先へ、Gemini のキーと Gemini のモデルの名前で要求を送り (OpenAI へは送らない)、
     /// 応答の JSON の文 3 つが戻り値になること
     @Test func geminiRequestGoesToGeminiEndpointWithOwnKeyAndModel() async throws {
@@ -188,6 +219,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .gemini,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             ) == ["Yes", "Maybe", "No"]
         )
@@ -222,6 +254,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             )
         }
@@ -250,6 +283,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             ) == ["A", "B", "C"]
         )
@@ -273,6 +307,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             )
         }
@@ -289,6 +324,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             )
         }
@@ -311,6 +347,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             )
         }
@@ -338,6 +375,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             ) == ["First 1", "First 2", "First 3"]
         )
@@ -361,6 +399,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .openAI,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             )
         }
@@ -372,6 +411,7 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             try await generateReplyTexts(
                 messages: [ExtractedMessage(text: "Coming?", isFromUser: false)],
                 replyModel: .gemini,
+                chatPartnerRelationship: nil,
                 apiKeyKeychainService: keychainService
             )
         }
