@@ -31,7 +31,6 @@
     "imageFileName": "chat-screen-sample-thread-light-japanese.png",
     "chatTitle": "# 開発",
     "speakerNames": ["水瀬 あおい", "槙原 そうた"],
-    "speakerNamesKnownIssue": "Vision が 3 つ目の見出しの「槙原」を「棋原」と読み違え、別の人として 3 人目の名前が出る (CI の実測: https://github.com/bannzai/poppo/actions/runs/45881931854 )",
     "appearance": "全員の発言が左に並ぶ明るい画面 (Slack に似せた形)",
     "language": "ja",
     "source": "作った画像。documents/design/chat-screen-samples/thread-light-japanese.html を render.sh で描いた。会話と名前は作ったもの",

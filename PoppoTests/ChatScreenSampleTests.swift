@@ -21,8 +21,6 @@ nonisolated private struct ChatScreenSample: Decodable, Sendable, CustomTestStri
     /// 発言の見出し (名前と時刻) に出ている、発言した人の名前。画面の上から下の順で、同じ名前は 1 つ。
     /// 見出しの無い吹き出しのチャットは空 (本文を名前として読まないことを確かめる)
     let speakerNames: [String]
-    /// 発言した人の名前を記録どおりに読めない理由 (Vision の読み違い等)。読める見本は nil (JSON にキーを書かない)
-    let speakerNamesKnownIssue: String?
     /// 画面の見た目 (どのチャットアプリに似せたか、何が映っているか)
     let appearance: String
     /// 発言の言語 (BCP 47 の言語コード)
@@ -108,14 +106,9 @@ private func chatScreenSampleGivesRecordedSpeakerNames(sample: ChatScreenSample)
     let lines = try await recognizeTextLines(
         image: try #require(UIImage(data: try chatScreenSampleData(fileName: sample.imageFileName))?.cgImage)
     )
-    // 読み違いの理由 (speakerNamesKnownIssue) がある見本は既知の不具合として扱い、読めるようになった時に失敗して記録の直し忘れを知らせる
-    withKnownIssue(sample.speakerNamesKnownIssue.map { Comment(rawValue: $0) }) {
-        // 失敗した時に、Vision が読んだ行の文字と枠を出す (名前と時刻をどう分けて読んだかを確かめるため)
-        #expect(
-            speakerNames(lines: lines).map { comparableClueText(text: $0) } == sample.speakerNames.map { comparableClueText(text: $0) },
-            Comment(rawValue: lines.map { "\($0.text) \($0.boundingBox)" }.joined(separator: "\n"))
-        )
-    } when: {
-        sample.speakerNamesKnownIssue != nil
-    }
+    // 失敗した時に、Vision が読んだ行の文字と枠を出す (名前と時刻が別の行に読めたかを確かめるため)
+    #expect(
+        speakerNames(lines: lines).map { comparableClueText(text: $0) } == sample.speakerNames.map { comparableClueText(text: $0) },
+        Comment(rawValue: lines.map { "\($0.text) \($0.boundingBox)" }.joined(separator: "\n"))
+    )
 }
