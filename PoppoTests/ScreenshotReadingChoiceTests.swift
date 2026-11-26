@@ -788,3 +788,25 @@ private func pastChoice(
     #expect(recordedTargetLanguageIdentifier(savedIdentifier: "") == nil)
     #expect(recordedTargetLanguageIdentifier(savedIdentifier: "da-Latn-DK") == "da-Latn-DK")
 }
+
+/// 上部の段の題名は左右の中央の行から読むこと: 中央の短い名前 (「Bob」) を、左の長い戻るボタンのラベル (「‹ Messages」) より先に選ぶこと。
+/// 題名の下に出る補助の行 (「online」) より上の題名を選ぶこと。中央に行が無い (名前を左に寄せる) 画面では読まないこと
+@Test func chatTitleIsCenteredTopmostNavigationLine() {
+    let line = { (text: String, x: CGFloat, y: CGFloat, width: CGFloat) in
+        RecognizedTextLine(text: text, boundingBox: CGRect(x: x, y: y, width: width, height: 0.02))
+    }
+
+    #expect(chatTitleReadFromScreen(lines: [line("‹ Messages", 0.03, 0.07, 0.25), line("Bob", 0.46, 0.07, 0.08)]) == "Bob")
+    #expect(chatTitleReadFromScreen(lines: [line("online", 0.44, 0.095, 0.12), line("Bob", 0.46, 0.07, 0.08)]) == "Bob")
+    #expect(chatTitleReadFromScreen(lines: [line("‹", 0.03, 0.07, 0.03), line("Bob Smith", 0.15, 0.07, 0.2)]) == nil)
+}
+
+/// 中央とみなす範囲の境目: 行の枠の中心が画面の中央から 0.15 以内なら題名にし、それより外なら題名にしないこと
+@Test func chatTitleCenterBoundary() {
+    let line = { (midX: CGFloat) in RecognizedTextLine(text: "Harbor Books", boundingBox: CGRect(x: midX - 0.1, y: 0.07, width: 0.2, height: 0.02)) }
+
+    #expect(chatTitleReadFromScreen(lines: [line(0.649)]) == "Harbor Books")
+    #expect(chatTitleReadFromScreen(lines: [line(0.651)]) == nil)
+    #expect(chatTitleReadFromScreen(lines: [line(0.351)]) == "Harbor Books")
+    #expect(chatTitleReadFromScreen(lines: [line(0.349)]) == nil)
+}

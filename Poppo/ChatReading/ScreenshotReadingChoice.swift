@@ -19,17 +19,24 @@ nonisolated struct ScreenshotReadingChoice: Codable, Equatable, Identifiable, Se
     var chatPartnerRelationship: ChatPartnerRelationship?
 }
 
-/// 行から、画面の上部 (ナビゲーションバー) に出ているチャットの名前を読んで返す。読めない時は nil
+/// 行から、画面の上部 (ナビゲーションバー) の左右の中央に出ているチャットの名前を読んで返す。
+/// 中央に行が無い時 (名前を左に寄せて出すアプリ) は読まない (nil)。戻るボタンのラベル (「‹ Messages」) や右のボタンを名前にして、
+/// 同じラベルを出す別の相手を同じチャットとみなさないため
 nonisolated func chatTitleReadFromScreen(lines: [RecognizedTextLine]) -> String? {
     // 0.06: ステータスバー (時刻・電波・電池) の文字をチャットの名前にしないため、行の上下の中心がこれより下の行だけを見る。
     // ステータスバーの高さは Dynamic Island のある iPhone で 54pt (画面の高さ 874pt の 6.2%)、ノッチの iPhone で 47pt (844pt の 5.6%) で、
     // 文字の中心はその半分ほどの所に来る。見本の画像 (PoppoTests/ChatScreenSamples/) ではステータスバーの文字の中心が 3.3%、チャットの名前の中心が 8.8% にある
     lines
-        .filter { $0.boundingBox.midY >= 0.06 && $0.boundingBox.minY < chatAreaTopEdge && !isTimeOnly(text: $0.text) }
-        // 戻るボタンの「‹」や未読の数より、チャットの名前の方が長いため、最も長い行を名前とする
-        .max { $0.text.count < $1.text.count }
+        .filter {
+            $0.boundingBox.midY >= 0.06 && $0.boundingBox.minY < chatAreaTopEdge && !isTimeOnly(text: $0.text)
+                // 0.15: ナビゲーションバーの題名は左右の中央に置かれ、行の枠の中心は幅によらず画面の中央に来る。
+                // 左端の戻るボタン (中心は画面の幅の 2 割より左) と右端のボタン (8 割より右) を外し、枠のぶれを見込んで中央から 15% までを題名とみなす
+                && abs($0.boundingBox.midX - 0.5) <= 0.15
+                && !comparableClueText(text: $0.text).isEmpty
+        }
+        // 題名の下に小さく出る補助の行 (「オンライン」「3 人」) より、題名の方が上にあるため、最も上の行を名前とする
+        .min { $0.boundingBox.minY < $1.boundingBox.minY }
         .map(\.text)
-        .flatMap { comparableClueText(text: $0).isEmpty ? nil : $0 }
 }
 
 /// 行から、発言の見出し (名前と、そのすぐ右に別の行として並ぶ時刻) の名前を読んで、画面の上から下の順に返す。同じ名前は 1 つにまとめる。
