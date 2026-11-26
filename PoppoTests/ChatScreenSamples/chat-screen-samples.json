@@ -2,6 +2,7 @@
   {
     "imageFileName": "chat-screen-sample-thread-light-english.png",
     "chatTitle": "# design-review",
+    "speakerNames": ["Mira Solberg", "Tobias Lindqvist", "Priya Nakamoto"],
     "appearance": "全員の発言が左に並ぶ明るい画面 (Slack に似せた形。日付の区切り・リアクション・スレッドの返信の数がある)",
     "language": "en",
     "source": "作った画像。documents/design/chat-screen-samples/thread-light-english.html を render.sh で描いた。会話と名前は作ったもの",
@@ -29,6 +30,7 @@
   {
     "imageFileName": "chat-screen-sample-thread-light-japanese.png",
     "chatTitle": "# 開発",
+    "speakerNames": ["水瀬 あおい", "槙原 そうた"],
     "appearance": "全員の発言が左に並ぶ明るい画面 (Slack に似せた形)",
     "language": "ja",
     "source": "作った画像。documents/design/chat-screen-samples/thread-light-japanese.html を render.sh で描いた。会話と名前は作ったもの",
@@ -57,6 +59,7 @@
   {
     "imageFileName": "chat-screen-sample-thread-dark-spanish.png",
     "chatTitle": "# general",
+    "speakerNames": ["luna_verde", "ElZorroAzul", "Marisol77"],
     "appearance": "全員の発言が左に並ぶ暗い画面 (Discord に似せた形。名前に色が付く)",
     "language": "es",
     "source": "作った画像。documents/design/chat-screen-samples/thread-dark-spanish.html を render.sh で描いた。会話と名前は作ったもの",
@@ -85,6 +88,7 @@
   {
     "imageFileName": "chat-screen-sample-bubble-blue-english.png",
     "chatTitle": "Harbor Books",
+    "speakerNames": [],
     "appearance": "吹き出しが左右に並ぶ画面 (iOS のメッセージに似せた形。時刻が出ない)",
     "language": "en",
     "source": "作った画像。documents/design/chat-screen-samples/bubble-blue-english.html を render.sh で描いた。会話と店の名前は作ったもの",
@@ -101,6 +105,7 @@
   {
     "imageFileName": "chat-screen-sample-bubble-green-japanese.png",
     "chatTitle": "ことり文具店",
+    "speakerNames": [],
     "appearance": "吹き出しが左右に並ぶ画面 (LINE に似せた形。吹き出しの横に時刻と既読、上に日付の区切りがある)",
     "language": "ja",
     "source": "作った画像。documents/design/chat-screen-samples/bubble-green-japanese.html を render.sh で描いた。会話と店の名前は作ったもの",
@@ -118,6 +123,7 @@
   {
     "imageFileName": "chat-screen-sample-bubble-time-inside-french.png",
     "chatTitle": "Atelier Vélo Lumière",
+    "speakerNames": [],
     "appearance": "吹き出しが左右に並ぶ画面 (WhatsApp に似せた形。吹き出しの中の右下に時刻がある)",
     "language": "fr",
     "source": "作った画像。documents/design/chat-screen-samples/bubble-time-inside-french.html を render.sh で描いた。会話と店の名前は作ったもの",

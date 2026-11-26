@@ -385,35 +385,25 @@ struct ChatReadingView: View {
             return nil
         }
         recognizedLines = lines
-        guard
-            let defaultChoice = screenshotReadingChoicesFileURL().flatMap({
-                try? addScreenshotReadingChoice(
-                    lines: lines,
-                    targetLanguageIdentifier: selectedTargetLanguageIdentifier,
-                    chatPartnerRelationship: chatPartnerRelationship,
-                    usesMostSimilarChoice: !hasUserChangedChoice,
-                    id: UUID(),
-                    now: Date(),
-                    fileURL: $0
-                )
-            })
-        else {
-            // 記録を残せない時は、過去の記録を当てずに今の選択のまま読む。既定を選べないだけで、翻訳と返信案は出せるため
+        let reading = recordScreenshotReading(
+            lines: lines,
+            savedTargetLanguageIdentifier: savedTargetLanguageIdentifier,
+            chatPartnerRelationship: chatPartnerRelationship,
+            hasUserChangedChoice: hasUserChangedChoice,
+            preferredLanguages: Locale.preferredLanguages,
+            id: UUID(),
+            now: Date(),
+            fileURL: screenshotReadingChoicesFileURL()
+        )
+        guard let defaultChoice = reading.choice else {
             return lines
         }
         screenshotReadingChoiceID = defaultChoice.id
-        // 先に比べる: 書き換えた後は、今の選択が既定と同じになり比べられないため
-        let restartsReading = defaultChoiceRestartsChatReading(
-            defaultChoice: defaultChoice,
-            savedTargetLanguageIdentifier: savedTargetLanguageIdentifier,
-            chatPartnerRelationship: chatPartnerRelationship,
-            preferredLanguages: Locale.preferredLanguages
-        )
         // 保存の書き方が違うだけで訳す先の言語が同じ時 (記録は未選択で、今は端末の言語と同じ言語を選んでいる等) も、記録のとおりに書き換える。
         // 空文字: 記録で何も選んでいなかった (nil) 時は、この保存の「未選択」(端末の言語へ訳す) の書き方に戻すため
         savedTargetLanguageIdentifier = defaultChoice.targetLanguageIdentifier ?? ""
         chatPartnerRelationship = defaultChoice.chatPartnerRelationship
-        return restartsReading ? nil : lines
+        return reading.restartsReading ? nil : lines
     }
 
     /// 利用者が言語か関係を選び直したことを覚え、この画面の読み取りの記録の言語と関係を、選び直したものに書き換える

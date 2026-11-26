@@ -32,15 +32,28 @@ nonisolated func chatTitleReadFromScreen(lines: [RecognizedTextLine]) -> String?
         .flatMap { comparableClueText(text: $0).isEmpty ? nil : $0 }
 }
 
-/// 発言から、見出し行 (先頭の行で、名前の後に時刻が並ぶ行) の名前を読んで、画面の上から下の順に返す。同じ名前は 1 つにまとめる。
-/// 見出し行の無い発言 (吹き出しのチャット) からは読まない。時刻の前に「hoy a las」のような語が付く画面では、その語も名前に含めて返す
-nonisolated func speakerNames(messages: [ExtractedMessage]) -> [String] {
-    messages
-        .compactMap { message in
-            message.text.split(separator: "\n").first.flatMap {
-                String($0).firstMatch(of: #/^(?<name>.+?)\s+((午前|午後)\s?)?\d{1,2}:\d{2}(\s?[AaPp][Mm])?$/#).map { String($0.name) }
+/// 行から、発言の見出し (名前と、そのすぐ右に別の行として並ぶ時刻) の名前を読んで、画面の上から下の順に返す。同じ名前は 1 つにまとめる。
+/// 見出しとするのは、発言の並ぶ範囲の左寄りの行で、すぐ右に時刻で終わる行 (「10:42 AM」「hoy a las 18:05」) が並び、すぐ下に同じ左端の本文の行が続く行だけ。
+/// 発言の本文を名前として残さないため、次の行は見出しにしない: 時刻で終わる 1 つの行 (「Meet me at 10:42」)、
+/// 吹き出しの中で最後の行の右に時刻が付く行 (下に本文が続かない)、右に寄った利用者の発言の行。
+/// 名前と時刻を Vision が 1 つの行として読んだ画面では、名前を読まない (本文の文と見分けられないため)
+nonisolated func speakerNames(lines: [RecognizedTextLine]) -> [String] {
+    let chatAreaLines = lines.filter { isInsideChatArea(line: $0) }
+    return
+        chatAreaLines
+        .filter { nameLine in
+            chatAreaLines.contains { timeLine in
+                continuesRow(leftLine: nameLine, line: timeLine)
+                    // 時刻の前の語は 3 語まで: 「hoy a las 18:05」のような時刻の書き方を通し、本文の文を時刻の行にしないため
+                    && timeLine.text.wholeMatch(of: #/(\S+\s+){0,3}((午前|午後)\s?)?\d{1,2}:\d{2}(\s?[AaPp][Mm])?/#) != nil
+                    && !isShiftedRight(lines: [nameLine, timeLine])
             }
+                && chatAreaLines.contains { bodyLine in
+                    bodyLine.boundingBox.minY > nameLine.boundingBox.maxY && continuesMessage(previousLine: nameLine, line: bodyLine)
+                }
         }
+        .sorted { $0.boundingBox.minY < $1.boundingBox.minY }
+        .map(\.text)
         .reduce(into: [String]()) { names, name in
             if !names.contains(where: { comparableClueText(text: $0) == comparableClueText(text: name) }) {
                 names.append(name)
@@ -158,7 +171,7 @@ nonisolated func addScreenshotReadingChoice(
 ) throws -> ScreenshotReadingChoice {
     let pastChoices = loadScreenshotReadingChoices(fileURL: fileURL, now: now)
     let chatTitle = chatTitleReadFromScreen(lines: lines)
-    let names = speakerNames(messages: extractMessages(lines: lines))
+    let names = speakerNames(lines: lines)
     // 似ている記録の言語と関係は、未選択 (nil) もそのまま既定にする (その相手では何も選んでいなかったため)
     let (defaultTargetLanguageIdentifier, defaultChatPartnerRelationship) =
         (usesMostSimilarChoice
@@ -175,6 +188,47 @@ nonisolated func addScreenshotReadingChoice(
     )
     try save(screenshotReadingChoices: retainedScreenshotReadingChoices(choices: [newChoice] + pastChoices, now: now), fileURL: fileURL)
     return newChoice
+}
+
+/// 読み取りの画面が文字を読み終えた時に、読み取りを記録し、その画面で既定にする記録 (言語と関係) と、読み取りを始め直すかを返す。
+/// fileURL が nil (記録の場所を作れない) の時と、記録を保存できなかった時は、記録 nil と「始め直さない」を返す (今の選択のまま読む。既定を選べないだけで翻訳と返信案は出せるため)。
+/// hasUserChangedChoice が true (利用者がこの画面で既に選び直した) の時は、過去の記録を当てない。
+/// 始め直すのは、記録の言語と関係が今の選択 (savedTargetLanguageIdentifier は端末に保存してある書き方のまま。未選択は空文字) と違い、
+/// 読み取りのタスクの id が変わる時 (defaultChoiceRestartsChatReading)
+func recordScreenshotReading(
+    lines: [RecognizedTextLine],
+    savedTargetLanguageIdentifier: String,
+    chatPartnerRelationship: ChatPartnerRelationship?,
+    hasUserChangedChoice: Bool,
+    preferredLanguages: [String],
+    id: UUID,
+    now: Date,
+    fileURL: URL?
+) -> (choice: ScreenshotReadingChoice?, restartsReading: Bool) {
+    guard
+        let choice = fileURL.flatMap({
+            try? addScreenshotReadingChoice(
+                lines: lines,
+                targetLanguageIdentifier: savedTargetLanguageIdentifier.isEmpty ? nil : savedTargetLanguageIdentifier,
+                chatPartnerRelationship: chatPartnerRelationship,
+                usesMostSimilarChoice: !hasUserChangedChoice,
+                id: id,
+                now: now,
+                fileURL: $0
+            )
+        })
+    else {
+        return (choice: nil, restartsReading: false)
+    }
+    return (
+        choice: choice,
+        restartsReading: defaultChoiceRestartsChatReading(
+            defaultChoice: choice,
+            savedTargetLanguageIdentifier: savedTargetLanguageIdentifier,
+            chatPartnerRelationship: chatPartnerRelationship,
+            preferredLanguages: preferredLanguages
+        )
+    )
 }
 
 /// fileURL の記録のうち id の記録の言語と関係を、利用者が選び直した targetLanguageIdentifier・chatPartnerRelationship に書き換える

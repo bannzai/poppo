@@ -18,6 +18,9 @@ nonisolated private struct ChatScreenSample: Decodable, Sendable, CustomTestStri
     let imageFileName: String
     /// 画面の上部 (ナビゲーションバー) に出ているチャットの名前。期待するチャットの名前の読み取りの結果
     let chatTitle: String
+    /// 発言の見出し (名前と時刻) に出ている、発言した人の名前。画面の上から下の順で、同じ名前は 1 つ。
+    /// 見出しの無い吹き出しのチャットは空 (本文を名前として読まないことを確かめる)
+    let speakerNames: [String]
     /// 画面の見た目 (どのチャットアプリに似せたか、何が映っているか)
     let appearance: String
     /// 発言の言語 (BCP 47 の言語コード)
@@ -93,5 +96,18 @@ private func chatScreenSampleGivesRecordedChatTitle(sample: ChatScreenSample) as
                 image: try #require(UIImage(data: try chatScreenSampleData(fileName: sample.imageFileName))?.cgImage)
             )
         ).map { comparableClueText(text: $0) } == comparableClueText(text: sample.chatTitle)
+    )
+}
+
+/// 見本の画像を Vision の実物で読み、見出しから読んだ発言した人の名前が、記録に書いた名前と同じ人を指すこと (comparableClueText(text:) の形で比べる)。
+/// 吹き出しのチャット (時刻が吹き出しの中に付くものを含む) では、本文を名前として読まないこと
+@Test(.timeLimit(.minutes(1)), arguments: try chatScreenSamples())
+private func chatScreenSampleGivesRecordedSpeakerNames(sample: ChatScreenSample) async throws {
+    #expect(
+        speakerNames(
+            lines: try await recognizeTextLines(
+                image: try #require(UIImage(data: try chatScreenSampleData(fileName: sample.imageFileName))?.cgImage)
+            )
+        ).map { comparableClueText(text: $0) } == sample.speakerNames.map { comparableClueText(text: $0) }
     )
 }

@@ -40,7 +40,7 @@ nonisolated func extractMessages(lines: [RecognizedTextLine]) -> [ExtractedMessa
 nonisolated let chatAreaTopEdge: CGFloat = 0.12
 
 /// 行が、発言の並ぶ範囲 (上のバーと下の入力欄を除いた範囲) に収まっているか
-private nonisolated func isInsideChatArea(line: RecognizedTextLine) -> Bool {
+nonisolated func isInsideChatArea(line: RecognizedTextLine) -> Bool {
     // 下の 0.9: 入力欄の文言 (「メッセージを入力」等) を最後の発言として読まないため。
     // iPhone の画面の高さ (約 870pt) に対する入力欄の高さ (約 85pt) からの見積もりで、実際のスクリーンショットでは測っていない
     line.boundingBox.minY >= chatAreaTopEdge && line.boundingBox.maxY <= 0.9
@@ -92,7 +92,7 @@ private nonisolated func linesJoinedInSameRow(lines: [RecognizedTextLine]) -> [R
 }
 
 /// 行が、左にある行と同じ段の続き (すぐ右に並ぶ) か
-private nonisolated func continuesRow(leftLine: RecognizedTextLine, line: RecognizedTextLine) -> Bool {
+nonisolated func continuesRow(leftLine: RecognizedTextLine, line: RecognizedTextLine) -> Bool {
     // 0.5: 名前と時刻は文字の大きさが違っても同じ段に並び、枠の上下の中心が近い。次の段の行は中心が行の高さ以上ずれるため、
     // 低い方の行の高さの半分までを同じ段とみなす。
     // 0.06: 名前と時刻の間は空白 1〜2 文字ぶん (見本の HTML では 8px の余白と空白 1 文字で約 12px、画面の幅の約 3%)。枠のぶれを見て 2 倍までを続きとみなす。
@@ -106,7 +106,7 @@ private nonisolated func continuesRow(leftLine: RecognizedTextLine, line: Recogn
 }
 
 /// 上下に続く 2 行が、同じ発言の続きか
-private nonisolated func continuesMessage(previousLine: RecognizedTextLine, line: RecognizedTextLine) -> Bool {
+nonisolated func continuesMessage(previousLine: RecognizedTextLine, line: RecognizedTextLine) -> Bool {
     // 0.75: 同じ発言の中の行間は行の高さより十分小さく、発言の間は吹き出しの余白ぶん (行の高さと同じくらい) 空くため、その間の値で分ける。
     // 0.04: 同じ発言の行は左端がそろうため、文字認識の枠のぶれとして画面の幅の 4% までを同じ左端とみなす。
     // どちらも見積もりで、実際のスクリーンショットでは測っていない
@@ -115,7 +115,7 @@ private nonisolated func continuesMessage(previousLine: RecognizedTextLine, line
 }
 
 /// 1 つの発言の行が、画面の右に寄っているか。吹き出しで並ぶチャットでは、利用者自身の発言が右に寄る
-private nonisolated func isShiftedRight(lines: [RecognizedTextLine]) -> Bool {
+nonisolated func isShiftedRight(lines: [RecognizedTextLine]) -> Bool {
     guard let minX = lines.map(\.boundingBox.minX).min(), let maxX = lines.map(\.boundingBox.maxX).max() else {
         return false
     }
