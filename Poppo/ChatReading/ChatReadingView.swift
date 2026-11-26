@@ -139,6 +139,9 @@ struct ChatReadingView: View {
     @State private var chatPartnerRelationship = selectedChatPartnerRelationship(userDefaults: .standard)
     /// Translation が端末で訳せる言語。読み出すまでは空
     @State private var supportedLanguages: [Locale.Language] = []
+    /// 読み直しを頼んだ回数 (「もう一度試す」と、言語のダウンロードが終わった時に増やす)。
+    /// 読み取りを 1 つの .task(id:) だけから始めるために使い、新しい読み取りが前の読み取りを取りやめるようにする
+    @State private var readRequestCount = 0
 
     var body: some View {
         ChatReadingPhaseView(
@@ -151,9 +154,7 @@ struct ChatReadingView: View {
                 )
             },
             retry: {
-                Task {
-                    await read()
-                }
+                readRequestCount += 1
             }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -214,8 +215,8 @@ struct ChatReadingView: View {
         .task {
             supportedLanguages = await translationSupportedLanguages()
         }
-        // 最初に開いた時と、言語か関係を選び直した時に読み取る。選び直した時は、前の読み取りを取りやめて読み直す
-        .task(id: [targetLanguageIdentifier, chatPartnerRelationship?.rawValue]) {
+        // 最初に開いた時、言語か関係を選び直した時、読み直しを頼んだ時に読み取る。どの時も、途中の前の読み取りを取りやめて読み直す
+        .task(id: [targetLanguageIdentifier, chatPartnerRelationship?.rawValue, String(readRequestCount)]) {
             save(selectedTargetLanguage: Locale.Language(identifier: targetLanguageIdentifier), userDefaults: .standard)
             save(selectedChatPartnerRelationship: chatPartnerRelationship, userDefaults: .standard)
             await read()
@@ -227,13 +228,13 @@ struct ChatReadingView: View {
             nonisolated(unsafe) let downloadSession = session
             // ダウンロードを利用者が取りやめた時は、促す表示のまま残す
             if (try? await downloadSession.prepareTranslation()) != nil {
-                await read()
+                readRequestCount += 1
             }
         }
     }
 
     /// 読み取りの処理を実行し、結果を画面の状態に入れる。
-    /// 読み取りの途中で取りやめた時 (言語か関係を選び直した時) は、結果を画面に入れない (選び直した後の読み取りの結果を、前の結果で上書きしないため)
+    /// 読み取りの途中で取りやめた時 (言語か関係を選び直した時・読み直しを頼んだ時) は、結果を画面に入れない (後から始めた読み取りの結果を、前の結果で上書きしないため)
     private func read() async {
         phase = .reading
         // 取りやめを確かめる前に読み取りを終えるため、結果を変数に置く (式のまま畳むと、取りやめの確かめが読み取りより先に評価される)
