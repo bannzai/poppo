@@ -53,10 +53,9 @@ func nextLanguageDownloadConfiguration(
     return configuration
 }
 
-/// スクリーンショット (screenshot) から、発言ごとの翻訳と返信案を作って返す。
-/// 訳す先の言語・相手との関係・返信案を作るモデルは、端末に保存してある選択を使う。
-/// スクリーンショットを読み出せない時は ChatReadingError.imageUnavailable を、ほかは readChat(image:...) と同じエラーを投げる
-func readChat(screenshot: PHAsset) async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion]) {
+/// スクリーンショット (screenshot) の画像を読み出し、写っている文字を行ごとに読んで返す。
+/// スクリーンショットを読み出せない時は ChatReadingError.imageUnavailable を、ほかは recognizeTextLines(image:) と同じエラーを投げる
+func recognizeTextLines(screenshot: PHAsset) async throws -> [RecognizedTextLine] {
     guard
         case .success(let loadedImage) = await loadScreenshotImage(
             asset: screenshot,
@@ -67,9 +66,14 @@ func readChat(screenshot: PHAsset) async throws -> (messages: [TranslatedMessage
     else {
         throw ChatReadingError.imageUnavailable
     }
-    return try await readChat(
-        image: image,
-        recognizeTextLines: { try await recognizeTextLines(image: $0) },
+    return try await recognizeTextLines(image: image)
+}
+
+/// スクリーンショットから読んだ行 (lines) から、発言ごとの翻訳と返信案を作って返す。
+/// 訳す先の言語・相手との関係・返信案を作るモデルは、端末に保存してある選択を使う。readChat(lines:...) と同じエラーを投げる
+func readChat(lines: [RecognizedTextLine]) async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion]) {
+    try await readChat(
+        lines: lines,
         translateTexts: { try await translateIntoSelectedLanguageOnDevice(texts: $0) },
         replyModel: selectedReplyModel(userDefaults: .standard),
         canGenerateReplies: { canGenerateReplies(replyModel: $0) },
@@ -155,21 +159,33 @@ func chatPartnerRelationshipText(chatPartnerRelationship: ChatPartnerRelationshi
 }
 
 /// 読み取りの画面。訳す先の言語と相手との関係を選ぶ欄を上に置き、その下に読み取りの状態 (翻訳と返信案など) を出す。
+/// 画面を開いて文字を読んだ時に、前に読んだ同じ相手のスクリーンショットで選ばれていた言語と関係を既定として選ぶ (addScreenshotReadingChoice)。
 /// 言語か関係を選び直すと、選んだものを端末に保存して読み取りをやり直す。選択は端末の保存 (UserDefaults) だけを正として読み書きする
 struct ChatReadingView: View {
     /// 読んでいるスクリーンショット。開発者メニューのあるビルドで撮影日時を出すのに使う。開発者メニューの見本から開いた時は nil
     let screenshot: PHAsset?
-    /// 読み取りの処理。発言ごとの翻訳と返信案を返す。訳す先の言語と相手との関係は、処理の中で端末に保存してある選択を読む
-    /// (本物は readChat(screenshot:)。開発者メニューは見本の読み取り結果を返す処理を渡す)
-    let readChatContent: @MainActor () async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
+    /// 画像に写っている文字を行ごとに読む処理 (本物は recognizeTextLines(screenshot:))。画面を開いて最初の読み取りで 1 度だけ呼び、
+    /// 読めなかった時は読み直しを頼んだ時にもう一度呼ぶ
+    let recognizeTextLines: @MainActor () async throws -> [RecognizedTextLine]
+    /// 読み取りの処理。読んだ行を受け取り、発言ごとの翻訳と返信案を返す。訳す先の言語と相手との関係は、処理の中で端末に保存してある選択を読む
+    /// (本物は readChat(lines:)。開発者メニューは見本の読み取り結果を返す処理を渡す)
+    let readChatContent: @MainActor (_ lines: [RecognizedTextLine]) async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
     /// 画面の状態
     @State private var phase = ChatReadingPhase.reading
+    /// 画面を開いてから読んだ文字の行。まだ読んでいない時と、読めなかった時は nil
+    @State private var recognizedLines: [RecognizedTextLine]?
+    /// この画面の読み取りを残した記録 (ScreenshotReadingChoice) の id。利用者が選び直した時に、この記録の言語と関係を書き換える。
+    /// まだ文字を読んでいない時と、記録を残せなかった時は nil
+    @State private var screenshotReadingChoiceID: UUID?
+    /// この画面で利用者が言語か関係を選び直したか。選び直した後に文字を読み終えた時は、過去の記録の選択で上書きしないために使う
+    @State private var hasUserChangedChoice = false
     /// 言語のダウンロードをシステムに頼むための設定。利用者がダウンロードを選ぶまでは nil
     @State private var languageDownloadConfiguration: TranslationSession.Configuration?
     /// 端末に保存してある、訳す先として選んだ言語の maximalIdentifier。選択の正は端末の保存だけに置き、画面に写しを持たない
     /// (写しを持つと、画面を開き直した時に古い写しで保存を上書きするため)
     // 既定の空文字は未選択 (targetLanguage(savedIdentifier:preferredLanguages:) が空文字を端末の言語として扱う)。
-    // 画面を開いただけでは書かず、利用者が欄で選んだ時だけ書くため、後で端末の言語を変えると訳す先も変わる
+    // 画面を開いただけでは書かず、利用者が欄で選んだ時と、前に読んだ同じ相手の選択を既定にした時だけ書くため、
+    // どちらも無いまま後で端末の言語を変えると訳す先も変わる
     @AppStorage(selectedTargetLanguageUserDefaultsKey) private var savedTargetLanguageIdentifier = ""
     /// 端末に保存してある、選んだ相手との関係。nil は未選択。選択の正は端末の保存だけに置く
     @AppStorage(selectedChatPartnerRelationshipUserDefaultsKey) private var chatPartnerRelationship: ChatPartnerRelationship?
@@ -210,7 +226,15 @@ struct ChatReadingView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     // 表示は保存してある選択 (無ければ端末の言語) で、利用者が選んだ時だけ保存する
-                    Picker(selection: Binding(get: { targetLanguageIdentifier }, set: { savedTargetLanguageIdentifier = $0 })) {
+                    Picker(
+                        selection: Binding(
+                            get: { targetLanguageIdentifier },
+                            set: {
+                                savedTargetLanguageIdentifier = $0
+                                recordUserChoice()
+                            }
+                        )
+                    ) {
                         ForEach(
                             targetLanguageOptions(
                                 supportedLanguages: supportedLanguages,
@@ -231,7 +255,15 @@ struct ChatReadingView: View {
                     chatPartnerRelationshipFieldTitle()
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Picker(selection: $chatPartnerRelationship) {
+                    Picker(
+                        selection: Binding(
+                            get: { chatPartnerRelationship },
+                            set: {
+                                chatPartnerRelationship = $0
+                                recordUserChoice()
+                            }
+                        )
+                    ) {
                         chatPartnerRelationshipText(chatPartnerRelationship: nil)
                             .tag(ChatPartnerRelationship?.none)
                         ForEach(ChatPartnerRelationship.allCases, id: \.self) { relationship in
@@ -279,7 +311,10 @@ struct ChatReadingView: View {
             )
         ) {
             phase = .reading
-            if let readPhase = await chatReadingPhaseUnlessCancelled(read: readChatContent) {
+            guard let lines = await linesForReading() else {
+                return
+            }
+            if let readPhase = await chatReadingPhaseUnlessCancelled(read: { try await readChatContent(lines) }) {
                 phase = readPhase
             }
         }
@@ -293,6 +328,78 @@ struct ChatReadingView: View {
                 readRequestCount += 1
             }
         }
+    }
+
+    /// 端末に保存してある、訳す先として選んだ言語の maximalIdentifier。何も選んでいない (端末の言語へ訳す) 時は nil
+    private var selectedTargetLanguageIdentifier: String? {
+        savedTargetLanguageIdentifier.isEmpty ? nil : savedTargetLanguageIdentifier
+    }
+
+    /// この画面の読み取りに使う文字の行を返す。画面を開いて最初の 1 回だけ文字を読み、読み取りを記録して、
+    /// 前に読んだ同じ相手のスクリーンショットで選ばれていた言語と関係を既定として選ぶ (この画面で利用者が既に選び直していた時は選ばない)。
+    /// 既定を選んで選択が変わった時 (選択が変わると、.task(id:) がその選択で読み取りを始め直すため) と、読んでいる途中で取りやめられた時は nil を返す。
+    /// 文字を読めなかった時は、画面を失敗の状態にして nil を返す
+    private func linesForReading() async -> [RecognizedTextLine]? {
+        if let recognizedLines {
+            return recognizedLines
+        }
+        let lines: [RecognizedTextLine]
+        do {
+            lines = try await recognizeTextLines()
+        } catch {
+            if let failedPhase = await chatReadingPhaseUnlessCancelled(read: { throw error }) {
+                phase = failedPhase
+            }
+            return nil
+        }
+        guard !Task.isCancelled else {
+            return nil
+        }
+        recognizedLines = lines
+        guard
+            let defaultChoice = screenshotReadingChoicesFileURL().flatMap({
+                try? addScreenshotReadingChoice(
+                    lines: lines,
+                    targetLanguageIdentifier: selectedTargetLanguageIdentifier,
+                    chatPartnerRelationship: chatPartnerRelationship,
+                    usesMostSimilarChoice: !hasUserChangedChoice,
+                    id: UUID(),
+                    now: Date(),
+                    fileURL: $0
+                )
+            })
+        else {
+            // 記録を残せない時は、過去の記録を当てずに今の選択のまま読む。既定を選べないだけで、翻訳と返信案は出せるため
+            return lines
+        }
+        screenshotReadingChoiceID = defaultChoice.id
+        guard
+            defaultChoice.targetLanguageIdentifier != selectedTargetLanguageIdentifier
+                || defaultChoice.chatPartnerRelationship != chatPartnerRelationship
+        else {
+            return lines
+        }
+        // 空文字: 記録で何も選んでいなかった (nil) 時は、この保存の「未選択」(端末の言語へ訳す) の書き方に戻すため
+        savedTargetLanguageIdentifier = defaultChoice.targetLanguageIdentifier ?? ""
+        chatPartnerRelationship = defaultChoice.chatPartnerRelationship
+        return nil
+    }
+
+    /// 利用者が言語か関係を選び直したことを覚え、この画面の読み取りの記録の言語と関係を、選び直したものに書き換える
+    /// (次に同じ相手のスクリーンショットを読んだ時の既定にするため)。まだ文字を読んでいない時は、読み終えた時に今の選択で記録する
+    private func recordUserChoice() {
+        hasUserChangedChoice = true
+        guard let screenshotReadingChoiceID, let fileURL = screenshotReadingChoicesFileURL() else {
+            return
+        }
+        // 書き換えられない時は、次に同じ相手を読んだ時の既定が前の選択のままになるだけで、この画面の読み取りには関わらないため、読み取りを止めない
+        try? updateScreenshotReadingChoice(
+            id: screenshotReadingChoiceID,
+            targetLanguageIdentifier: selectedTargetLanguageIdentifier,
+            chatPartnerRelationship: chatPartnerRelationship,
+            now: Date(),
+            fileURL: fileURL
+        )
     }
 
     #if DEBUG

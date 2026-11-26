@@ -34,17 +34,20 @@ nonisolated func extractMessages(lines: [RecognizedTextLine]) -> [ExtractedMessa
     .map { ExtractedMessage(text: $0.map(\.text).joined(separator: "\n"), isFromUser: isShiftedRight(lines: $0)) }
 }
 
+/// 発言の並ぶ範囲の上端 (画像の高さを 1 とした位置)。これより上はステータスバーとナビゲーションバー (相手やチャンネルの名前) の段
+// 0.12: ステータスバーとナビゲーションバーを発言に混ぜないため。iPhone の画面の高さ (約 870pt) に対する
+// 上のバーの高さ (約 100pt) からの見積もりで、実際のスクリーンショットでは測っていない
+nonisolated let chatAreaTopEdge: CGFloat = 0.12
+
 /// 行が、発言の並ぶ範囲 (上のバーと下の入力欄を除いた範囲) に収まっているか
 private nonisolated func isInsideChatArea(line: RecognizedTextLine) -> Bool {
-    // 上の 0.12: ステータスバーとナビゲーションバー (相手やチャンネルの名前) を発言に混ぜないため。
     // 下の 0.9: 入力欄の文言 (「メッセージを入力」等) を最後の発言として読まないため。
-    // どちらも iPhone の画面の高さ (約 870pt) に対するバーの高さ (上は約 100pt、下は約 85pt) からの見積もりで、
-    // 実際のスクリーンショットでは測っていない
-    line.boundingBox.minY >= 0.12 && line.boundingBox.maxY <= 0.9
+    // iPhone の画面の高さ (約 870pt) に対する入力欄の高さ (約 85pt) からの見積もりで、実際のスクリーンショットでは測っていない
+    line.boundingBox.minY >= chatAreaTopEdge && line.boundingBox.maxY <= 0.9
 }
 
 /// 文字が時刻だけ (例: 「10:42」「10:42 AM」「午後3:41」) か。発言の横や下に出る送信時刻を発言に含めないために使う
-private nonisolated func isTimeOnly(text: String) -> Bool {
+nonisolated func isTimeOnly(text: String) -> Bool {
     text.trimmingCharacters(in: .whitespaces).wholeMatch(of: #/((午前|午後)\s?)?\d{1,2}:\d{2}(\s?[AaPp][Mm])?/#) != nil
 }
 

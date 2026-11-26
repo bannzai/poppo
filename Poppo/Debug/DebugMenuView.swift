@@ -5,7 +5,8 @@ import SwiftUI
 /// 開発者メニュー。simulator では動かない処理 (翻訳・返信案の生成・言語のダウンロード・画面の取り込み) を通さずに、その先の画面を確かめるための入口。
 /// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除)、返信案を作るモデルの選択、
 /// 返信案を作るモデルの API キー (端末の Keychain)、写真ライブラリ (見本のスクリーンショットを足す。消さない)、
-/// 見本の読み取りの画面で選び直した訳す先の言語と相手との関係 (本物の読み取りと取り込みでも使う選択) だけ
+/// 見本の読み取りの画面で選び直した訳す先の言語と相手との関係 (本物の読み取りと取り込みでも使う選択)、
+/// スクリーンショットからの読み取りの記録 (見本のチャットを読むと足し、消す操作ですべて消す。本物の読み取りの記録と同じ場所) だけ
 struct DebugMenuView: View {
     /// 取り込みの状態。診断の記録を出すのに使う
     @Environment(ScreenCaptureController.self) private var screenCaptureController
@@ -37,6 +38,32 @@ struct DebugMenuView: View {
     @State private var sampleScreenshotError: String?
     /// 見本のスクリーンショットを足している間は true。足し終わるまで次の追加を始めず、見本が 2 組入らないようにする
     @State private var isAddingSampleScreenshots = false
+
+    /// 残っているスクリーンショットからの読み取りの記録の数。この画面の操作の後と、画面を開いた時に読み直す
+    @State private var screenshotReadingChoiceCount = 0
+    /// 直前のスクリーンショットからの読み取りの記録の削除が失敗した時のエラーの説明。成功した時と、まだ操作していない時は nil
+    @State private var screenshotReadingChoicesError: String?
+
+    /// スクリーンショットからの読み取りの記録をすべて消す。記録が無い時に実行しても何も起きない。
+    /// 消せなかった時は、エラーの説明を screenshotReadingChoicesError に入れる
+    private func deleteScreenshotReadingChoices() {
+        guard let fileURL = screenshotReadingChoicesFileURL() else {
+            screenshotReadingChoicesError = "Application Support の場所を作れない"
+            return
+        }
+        do {
+            try save(screenshotReadingChoices: [], fileURL: fileURL)
+            screenshotReadingChoicesError = nil
+        } catch {
+            screenshotReadingChoicesError = error.localizedDescription
+        }
+        reloadScreenshotReadingChoiceCount()
+    }
+
+    /// 残っているスクリーンショットからの読み取りの記録の数を読み直す
+    private func reloadScreenshotReadingChoiceCount() {
+        screenshotReadingChoiceCount = screenshotReadingChoicesFileURL().map { loadScreenshotReadingChoices(fileURL: $0, now: Date()).count } ?? 0
+    }
 
     /// 写真ライブラリへのアクセスの許可を (まだ選んでいなければ) 求めてから、見本のスクリーンショットを足す。
     /// 足せなかった時は、エラーの説明を sampleScreenshotError に入れる。足している途中に呼ばれた時は何もしない
@@ -221,28 +248,43 @@ struct DebugMenuView: View {
                 .accessibilityIdentifier("debug_open_sample_result_without_replies")
                 NavigationLink {
                     // 訳す先の言語と相手との関係を選ぶ欄を、simulator (翻訳が動かない) で確かめるため、読み取りの処理の代わりに見本の読み取り結果を返す。
-                    // 選び直した時に読み直したことを画面で確かめるため、読み取った時に保存してあった言語と関係を、返信案の先頭の行に出す
-                    ChatReadingView(
-                        screenshot: nil,
-                        readChatContent: {
-                            (
-                                messages: debugSampleMessages,
-                                replySuggestions: [
-                                    ReplySuggestion(
-                                        text: "読み取った時の選択: "
-                                            + selectedTargetLanguage(userDefaults: .standard, preferredLanguages: Locale.preferredLanguages)
-                                            .maximalIdentifier + " / "
-                                            + (selectedChatPartnerRelationship(userDefaults: .standard)?.rawValue ?? "未選択"),
-                                        meaning: ""
-                                    )
-                                ] + debugSampleReplySuggestions
-                            )
-                        }
-                    )
+                    // 文字を読まない (行が無い) ため、前に読んだ相手の選択は既定にならない
+                    ChatReadingView(screenshot: nil, recognizeTextLines: { [] }, readChatContent: { _ in debugSampleChatReadingContent() })
                 } label: {
                     Text(verbatim: "見本の読み取り結果で読み取りの画面を開く (言語と相手との関係を選ぶ欄つき)")
                 }
                 .accessibilityIdentifier("debug_open_sample_chat_reading")
+                ForEach(Array(DebugSampleChat.allCases.enumerated()), id: \.offset) { index, sampleChat in
+                    NavigationLink {
+                        // 前に読んだ同じ相手の選択が既定になるかを simulator で確かめるため、見本のチャットの画面を描いた画像を文字の読み取り (Vision) で読む。
+                        // 翻訳は simulator で動かないため、翻訳と返信案は見本の読み取り結果を返す
+                        ChatReadingView(
+                            screenshot: nil,
+                            recognizeTextLines: { try await recognizeTextLines(image: try debugSampleChatScreenImage(sampleChat: sampleChat)) },
+                            readChatContent: { _ in debugSampleChatReadingContent() }
+                        )
+                    } label: {
+                        Text(verbatim: "見本のチャット「\(sampleChat.title)」の画面を読んで読み取りの画面を開く")
+                    }
+                    .accessibilityIdentifier("debug_open_sample_chat_screen_\(index + 1)")
+                }
+                Button(role: .destructive) {
+                    deleteScreenshotReadingChoices()
+                } label: {
+                    Text(verbatim: "スクリーンショットからの読み取りの記録を消す")
+                }
+                .accessibilityIdentifier("debug_delete_screenshot_reading_choices")
+                LabeledContent {
+                    Text(verbatim: "\(screenshotReadingChoiceCount) 件")
+                } label: {
+                    Text(verbatim: "スクリーンショットからの読み取りの記録")
+                }
+                .accessibilityIdentifier("debug_screenshot_reading_choices_state")
+                if let screenshotReadingChoicesError {
+                    Text(verbatim: screenshotReadingChoicesError)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("debug_screenshot_reading_choices_error")
+                }
                 NavigationLink {
                     ChatReadingPhaseView(
                         phase: .needsLanguageDownload(
@@ -258,6 +300,8 @@ struct DebugMenuView: View {
                 .accessibilityIdentifier("debug_open_language_download")
             } header: {
                 Text(verbatim: "スクリーンショットからの読み取り")
+            } footer: {
+                Text(verbatim: "見本のチャットを読むと、読み取りの記録 (画面の上部のチャットの名前・発言した人の名前・選ばれていた言語と関係) が 1 件増える。同じチャットを読み直すと、前に読んだ時の言語と関係が最初から選ばれる。記録の件数はこの画面を開き直した時に読み直す")
             }
             Section {
                 Button {
@@ -429,6 +473,7 @@ struct DebugMenuView: View {
             replyModel = selectedReplyModel(userDefaults: .standard)
             reloadReplyModelsWithSavedAPIKey()
             reloadSampleScreenshotCounts()
+            reloadScreenshotReadingChoiceCount()
         }
         .alert(
             Text(verbatim: "発言を端末の外へ送る"),
@@ -694,6 +739,23 @@ private let debugSampleMessages = [
         translatedText: "金曜日までにリリースの計画を確認しておきたいです。"
     ),
 ]
+
+/// 開発者メニューの読み取りの画面で、読み取りの処理の代わりに返す見本の読み取り結果。
+/// 選び直した時と、前に読んだ相手の選択が既定になった時に、その選択で読み直したことを画面で確かめるため、
+/// 読み取った時に保存してあった言語と関係を返信案の先頭の行に出す
+@MainActor private func debugSampleChatReadingContent() -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion]) {
+    (
+        messages: debugSampleMessages,
+        replySuggestions: [
+            ReplySuggestion(
+                text: "読み取った時の選択: "
+                    + selectedTargetLanguage(userDefaults: .standard, preferredLanguages: Locale.preferredLanguages).maximalIdentifier
+                    + " / " + (selectedChatPartnerRelationship(userDefaults: .standard)?.rawValue ?? "未選択"),
+                meaning: ""
+            )
+        ] + debugSampleReplySuggestions
+    )
+}
 
 /// 開発者メニューで結果の画面を開く時と、見本の読み取り結果を保存する時に使う、見本の返信案
 private let debugSampleReplySuggestions = [

@@ -359,8 +359,7 @@ final class ScreenCaptureController {
         let reading: (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
         do {
             reading = try await readChat(
-                image: image,
-                recognizeTextLines: { _ in lines },
+                lines: lines,
                 translateTexts: { texts in
                     guard didTranslateMessages else {
                         didTranslateMessages = true

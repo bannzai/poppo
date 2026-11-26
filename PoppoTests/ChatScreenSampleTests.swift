@@ -16,6 +16,8 @@ nonisolated private struct ChatScreenSample: Decodable, Sendable, CustomTestStri
 
     /// 見本の画像のファイル名
     let imageFileName: String
+    /// 画面の上部 (ナビゲーションバー) に出ているチャットの名前。期待するチャットの名前の読み取りの結果
+    let chatTitle: String
     /// 画面の見た目 (どのチャットアプリに似せたか、何が映っているか)
     let appearance: String
     /// 発言の言語 (BCP 47 の言語コード)
@@ -78,4 +80,18 @@ private func chatScreenSampleGivesRecordedMessages(sample: ChatScreenSample) asy
     } when: {
         sample.knownIssue != nil
     }
+}
+
+/// 見本の画像を Vision の実物で読み、画面の上部から読んだチャットの名前が、記録に書いたチャットの名前と同じ相手を指すこと
+/// (別のスクリーンショットの名前と比べる形 comparableClueText(text:) で比べる。戻るボタンの「‹」や空白の読み違いで名前が変わらないことも確かめる)。
+/// ステータスバーの時刻・電波の文字 (「9:41」「5G」) を名前にしないことも、この比較で確かめる
+@Test(.timeLimit(.minutes(1)), arguments: try chatScreenSamples())
+private func chatScreenSampleGivesRecordedChatTitle(sample: ChatScreenSample) async throws {
+    #expect(
+        chatTitleReadFromScreen(
+            lines: try await recognizeTextLines(
+                image: try #require(UIImage(data: try chatScreenSampleData(fileName: sample.imageFileName))?.cgImage)
+            )
+        ).map { comparableClueText(text: $0) } == comparableClueText(text: sample.chatTitle)
+    )
 }
