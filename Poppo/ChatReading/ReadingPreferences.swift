@@ -23,8 +23,8 @@ let selectedChatPartnerRelationshipUserDefaultsKey = "selectedChatPartnerRelatio
 /// 訳す先の言語として選ばれているものを返す。userDefaults は選んだ言語を保存してある場所、
 /// preferredLanguages は利用者が端末で選んだ言語の並び (Locale.preferredLanguages)
 func selectedTargetLanguage(userDefaults: UserDefaults, preferredLanguages: [String]) -> Locale.Language {
-    // 何も選んでいない時は端末の言語: 訳す先を選べるようにする前の動き (端末の言語へ訳す) を変えないため
-    userDefaults.string(forKey: selectedTargetLanguageUserDefaultsKey).map { Locale.Language(identifier: $0) }
+    // 何も選んでいない時 (保存した値が無い・空文字) は端末の言語: 訳す先を選べるようにする前の動き (端末の言語へ訳す) を変えないため
+    userDefaults.string(forKey: selectedTargetLanguageUserDefaultsKey).flatMap { $0.isEmpty ? nil : Locale.Language(identifier: $0) }
         ?? userLanguage(preferredLanguages: preferredLanguages)
 }
 

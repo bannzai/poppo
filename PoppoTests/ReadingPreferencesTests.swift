@@ -93,28 +93,77 @@ private func makeSuiteName() -> String {
     userDefaults.removePersistentDomain(forName: suiteName)
 }
 
-/// 選んでいる値が保存してある値と同じ時 (画面を開いただけで何も選び直していない時) は保存しないこと。違う時だけ、選んでいる値を保存すること
-@Test func saveIfChangedSavesOnlyWhenSelectedValueDiffers() {
-    var savedValues: [String] = []
-
-    saveIfChanged(selectedValue: "ja-Jpan-JP", savedValue: "ja-Jpan-JP", save: { savedValues.append($0) })
-    saveIfChanged(selectedValue: "en-Latn-US", savedValue: "ja-Jpan-JP", save: { savedValues.append($0) })
-
-    #expect(savedValues == ["en-Latn-US"])
-}
-
-/// 画面を開いただけ (端末の言語のまま) では訳す先の言語を保存しないため、後で端末の言語を変えると訳す先も変わること
-@Test func targetLanguageFollowsPreferredLanguageWhenOpenedWithoutChoosing() throws {
+/// 画面を開いただけ (欄が既定の値 = 端末の言語と未選択のまま) では何も保存しないため、後で端末の言語を変えると訳す先も変わること
+@Test func saveChangedReadingPreferencesSavesNothingWhenOpenedWithDefaults() throws {
     let suiteName = makeSuiteName()
     let userDefaults = try #require(UserDefaults(suiteName: suiteName))
-    saveIfChanged(
-        selectedValue: selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ja-JP"]).maximalIdentifier,
-        savedValue: selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ja-JP"]).maximalIdentifier,
-        save: { save(selectedTargetLanguage: Locale.Language(identifier: $0), userDefaults: userDefaults) }
+
+    saveChangedReadingPreferences(
+        targetLanguageIdentifier: Locale.Language(identifier: "ja-JP").maximalIdentifier,
+        chatPartnerRelationship: nil,
+        userDefaults: userDefaults,
+        preferredLanguages: ["ja-JP"]
     )
+
+    #expect(userDefaults.object(forKey: selectedTargetLanguageUserDefaultsKey) == nil)
+    #expect(userDefaults.object(forKey: selectedChatPartnerRelationshipUserDefaultsKey) == nil)
+    #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("ko"))
+    userDefaults.removePersistentDomain(forName: suiteName)
+}
+
+/// 欄で既定と違う言語と関係を選ぶと、両方を保存し、端末の言語を変えても選んだ言語と関係のままであること
+@Test func saveChangedReadingPreferencesSavesChosenLanguageAndRelationship() throws {
+    let suiteName = makeSuiteName()
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+
+    saveChangedReadingPreferences(
+        targetLanguageIdentifier: Locale.Language(identifier: "fr").maximalIdentifier,
+        chatPartnerRelationship: .stranger,
+        userDefaults: userDefaults,
+        preferredLanguages: ["ja-JP"]
+    )
+
+    #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("fr"))
+    #expect(selectedChatPartnerRelationship(userDefaults: userDefaults) == .stranger)
+    userDefaults.removePersistentDomain(forName: suiteName)
+}
+
+/// 関係を選んだ後に欄で未選択に戻すと、保存してある関係を消すこと
+@Test func saveChangedReadingPreferencesClearsRelationshipWhenReturnedToNotSelected() throws {
+    let suiteName = makeSuiteName()
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    save(selectedChatPartnerRelationship: .coworker, userDefaults: userDefaults)
+
+    saveChangedReadingPreferences(
+        targetLanguageIdentifier: Locale.Language(identifier: "ja-JP").maximalIdentifier,
+        chatPartnerRelationship: nil,
+        userDefaults: userDefaults,
+        preferredLanguages: ["ja-JP"]
+    )
+
+    #expect(userDefaults.object(forKey: selectedChatPartnerRelationshipUserDefaultsKey) == nil)
+    userDefaults.removePersistentDomain(forName: suiteName)
+}
+
+/// 保存してある訳す先の言語が空文字の時は、何も選んでいない時と同じく端末の言語になること
+@Test func selectedTargetLanguageIsPreferredLanguageWhenSavedValueIsEmpty() throws {
+    let suiteName = makeSuiteName()
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    userDefaults.set("", forKey: selectedTargetLanguageUserDefaultsKey)
 
     #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("ko"))
     userDefaults.removePersistentDomain(forName: suiteName)
+}
+
+/// 読み取りのタスクの id は、言語だけ・関係だけ・読み直しを頼んだ回数だけが変わった時のどれでも変わり、どれも変わらなければ同じであること
+/// (id が変わった時だけ読み直すため)
+@Test func chatReadingTaskIDChangesWhenAnyOfLanguageRelationshipOrReadRequestChanges() {
+    let base = chatReadingTaskID(targetLanguageIdentifier: "ja-Jpan-JP", chatPartnerRelationship: nil, readRequestCount: 0)
+
+    #expect(chatReadingTaskID(targetLanguageIdentifier: "ja-Jpan-JP", chatPartnerRelationship: nil, readRequestCount: 0) == base)
+    #expect(chatReadingTaskID(targetLanguageIdentifier: "en-Latn-US", chatPartnerRelationship: nil, readRequestCount: 0) != base)
+    #expect(chatReadingTaskID(targetLanguageIdentifier: "ja-Jpan-JP", chatPartnerRelationship: .coworker, readRequestCount: 0) != base)
+    #expect(chatReadingTaskID(targetLanguageIdentifier: "ja-Jpan-JP", chatPartnerRelationship: nil, readRequestCount: 1) != base)
 }
 
 /// 選べる相手との関係は、友人・家族、仕事の仲間、目上・取引先、初めての相手の 4 つで、保存に書く生の値がこの 4 つの文字列であること

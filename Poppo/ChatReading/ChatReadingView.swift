@@ -122,12 +122,33 @@ func chatReadingPhaseUnlessCancelled(
     return Task.isCancelled ? nil : readPhase
 }
 
-/// 選ぶ欄で選んでいる値 (selectedValue) を、保存してある値 (savedValue。何も保存していない時は既定の値) と違う時だけ save で保存する。
+/// 読み取りの画面の欄で選んでいる言語 (targetLanguageIdentifier。maximalIdentifier) と関係 (chatPartnerRelationship。nil は未選択) のうち、
+/// userDefaults に保存してある選択 (何も保存していない時は既定の値) と違うものだけを保存する。preferredLanguages は利用者が端末で選んだ言語の並び。
 /// 画面を開いただけで既定の値 (端末の言語・未選択) を「選んだ値」として保存しないため (保存すると、後で端末の言語を変えても訳す先が変わらなくなる)
-func saveIfChanged<Value: Equatable>(selectedValue: Value, savedValue: Value, save: (Value) -> Void) {
-    if selectedValue != savedValue {
-        save(selectedValue)
+func saveChangedReadingPreferences(
+    targetLanguageIdentifier: String,
+    chatPartnerRelationship: ChatPartnerRelationship?,
+    userDefaults: UserDefaults,
+    preferredLanguages: [String]
+) {
+    if targetLanguageIdentifier
+        != selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: preferredLanguages).maximalIdentifier
+    {
+        save(selectedTargetLanguage: Locale.Language(identifier: targetLanguageIdentifier), userDefaults: userDefaults)
     }
+    if chatPartnerRelationship != selectedChatPartnerRelationship(userDefaults: userDefaults) {
+        save(selectedChatPartnerRelationship: chatPartnerRelationship, userDefaults: userDefaults)
+    }
+}
+
+/// 読み取りの画面の、読み取りを動かすタスクの id。選んでいる言語・関係・読み直しを頼んだ回数のどれかが変わると、違う id を返す
+/// (id が変わると、SwiftUI が前の読み取りを取りやめて読み直す)
+func chatReadingTaskID(
+    targetLanguageIdentifier: String,
+    chatPartnerRelationship: ChatPartnerRelationship?,
+    readRequestCount: Int
+) -> [String?] {
+    [targetLanguageIdentifier, chatPartnerRelationship?.rawValue, String(readRequestCount)]
 }
 
 /// 相手との関係 (nil は未選択) の、選ぶ画面に出す名前
@@ -243,16 +264,18 @@ struct ChatReadingView: View {
             supportedLanguages = await translationSupportedLanguages()
         }
         // 最初に開いた時、言語か関係を選び直した時、読み直しを頼んだ時に読み取る。どの時も、途中の前の読み取りを取りやめて読み直す
-        .task(id: [targetLanguageIdentifier, chatPartnerRelationship?.rawValue, String(readRequestCount)]) {
-            saveIfChanged(
-                selectedValue: targetLanguageIdentifier,
-                savedValue: selectedTargetLanguage(userDefaults: .standard, preferredLanguages: Locale.preferredLanguages).maximalIdentifier,
-                save: { save(selectedTargetLanguage: Locale.Language(identifier: $0), userDefaults: .standard) }
+        .task(
+            id: chatReadingTaskID(
+                targetLanguageIdentifier: targetLanguageIdentifier,
+                chatPartnerRelationship: chatPartnerRelationship,
+                readRequestCount: readRequestCount
             )
-            saveIfChanged(
-                selectedValue: chatPartnerRelationship,
-                savedValue: selectedChatPartnerRelationship(userDefaults: .standard),
-                save: { save(selectedChatPartnerRelationship: $0, userDefaults: .standard) }
+        ) {
+            saveChangedReadingPreferences(
+                targetLanguageIdentifier: targetLanguageIdentifier,
+                chatPartnerRelationship: chatPartnerRelationship,
+                userDefaults: .standard,
+                preferredLanguages: Locale.preferredLanguages
             )
             phase = .reading
             if let readPhase = await chatReadingPhaseUnlessCancelled(read: readChatContent) {

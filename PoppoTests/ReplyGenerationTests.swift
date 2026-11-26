@@ -99,10 +99,10 @@ import Testing
 
 /// 相手との関係を選んだ時は、関係を選ばない時の指示の文に続けて、その関係と、関係に合う口調を求める文が入ること
 @Test(arguments: [
-    (ChatPartnerRelationship.friendOrFamily, "friends or family", "casual"),
-    (.coworker, "coworkers", "friendly but professional"),
-    (.superiorOrClient, "superiors or business clients", "polite, respectful"),
-    (.stranger, "for the first time", "polite"),
+    (ChatPartnerRelationship.friendOrFamily, "friends or family", "casual, friendly tone."),
+    (.coworker, "coworkers", "friendly but professional tone."),
+    (.superiorOrClient, "superiors or business clients", "polite, respectful tone."),
+    (.stranger, "for the first time", "polite tone."),
 ])
 func replyInstructionsWithRelationshipNameRelationshipAndTone(
     chatPartnerRelationship: ChatPartnerRelationship,
