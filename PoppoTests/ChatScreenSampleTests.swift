@@ -18,8 +18,9 @@ nonisolated private struct ChatScreenSample: Decodable, Sendable, CustomTestStri
     let imageFileName: String
     /// 画面の上部 (ナビゲーションバー) に出ているチャットの名前。期待するチャットの名前の読み取りの結果
     let chatTitle: String
-    /// 発言の見出し (名前と時刻) に出ている、発言した人の名前。画面の上から下の順で、同じ名前は 1 つ。
-    /// 見出しの無い吹き出しのチャットは空 (本文を名前として読まないことを確かめる)
+    /// speakerNames(lines:) が読むべき発言した人の名前。画面の上から下の順で、同じ名前は 1 つ。
+    /// 見出しの無い吹き出しのチャットと、Vision が見出しの名前と時刻を 1 つの行に読む見本は空
+    /// (本文を名前として読まないことを確かめる。空にする条件は ChatScreenSamples/README.md)
     let speakerNames: [String]
     /// 画面の見た目 (どのチャットアプリに似せたか、何が映っているか)
     let appearance: String
