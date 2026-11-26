@@ -128,6 +128,23 @@ private func makeSuiteName() -> String {
     userDefaults.removePersistentDomain(forName: suiteName)
 }
 
+/// 別の言語を保存した後に、欄で端末の言語へ選び直すと、端末の言語を保存すること (保存してある選択と比べて、違えば保存する)
+@Test func saveChangedReadingPreferencesSavesPreferredLanguageWhenReturnedFromAnotherLanguage() throws {
+    let suiteName = makeSuiteName()
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    save(selectedTargetLanguage: Locale.Language(identifier: "fr"), userDefaults: userDefaults)
+
+    saveChangedReadingPreferences(
+        targetLanguageIdentifier: Locale.Language(identifier: "ja-JP").maximalIdentifier,
+        chatPartnerRelationship: nil,
+        userDefaults: userDefaults,
+        preferredLanguages: ["ja-JP"]
+    )
+
+    #expect(selectedTargetLanguage(userDefaults: userDefaults, preferredLanguages: ["ko-KR"]).languageCode == Locale.LanguageCode("ja"))
+    userDefaults.removePersistentDomain(forName: suiteName)
+}
+
 /// 関係を選んだ後に欄で未選択に戻すと、保存してある関係を消すこと
 @Test func saveChangedReadingPreferencesClearsRelationshipWhenReturnedToNotSelected() throws {
     let suiteName = makeSuiteName()

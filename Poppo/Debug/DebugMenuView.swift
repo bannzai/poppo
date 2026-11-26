@@ -3,7 +3,8 @@ import SwiftUI
 
 /// 開発者メニュー。simulator では動かない処理 (翻訳・返信案の生成・言語のダウンロード・画面の取り込み) を通さずに、その先の画面を確かめるための入口。
 /// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除)、返信案を作るモデルの選択、
-/// 返信案を作るモデルの API キー (端末の Keychain) だけ
+/// 返信案を作るモデルの API キー (端末の Keychain)、見本の読み取りの画面で選び直した訳す先の言語と相手との関係
+/// (本物の読み取りと取り込みでも使う選択) だけ
 struct DebugMenuView: View {
     /// 取り込みの状態。診断の記録を出すのに使う
     @Environment(ScreenCaptureController.self) private var screenCaptureController
