@@ -33,7 +33,7 @@ let replyInstructions = """
 
 /// 返信の文を作るモデルへの指示の文。chatPartnerRelationship は、利用者が選んだ相手との関係 (nil は未選択)。
 /// 未選択の時は replyInstructions をそのまま返し、関係を選んだ時は、その関係と合う口調を求める文を後ろに足す。どのモデルでも同じ文を使う
-nonisolated func replyInstructions(chatPartnerRelationship: ChatPartnerRelationship?) -> String {
+func replyInstructions(chatPartnerRelationship: ChatPartnerRelationship?) -> String {
     switch chatPartnerRelationship {
     case nil:
         replyInstructions

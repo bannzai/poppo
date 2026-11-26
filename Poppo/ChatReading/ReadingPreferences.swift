@@ -22,33 +22,33 @@ let selectedChatPartnerRelationshipUserDefaultsKey = "selectedChatPartnerRelatio
 
 /// 訳す先の言語として選ばれているものを返す。userDefaults は選んだ言語を保存してある場所、
 /// preferredLanguages は利用者が端末で選んだ言語の並び (Locale.preferredLanguages)
-nonisolated func selectedTargetLanguage(userDefaults: UserDefaults, preferredLanguages: [String]) -> Locale.Language {
+func selectedTargetLanguage(userDefaults: UserDefaults, preferredLanguages: [String]) -> Locale.Language {
     // 何も選んでいない時は端末の言語: 訳す先を選べるようにする前の動き (端末の言語へ訳す) を変えないため
     userDefaults.string(forKey: selectedTargetLanguageUserDefaultsKey).map { Locale.Language(identifier: $0) }
         ?? userLanguage(preferredLanguages: preferredLanguages)
 }
 
 /// 訳す先の言語として selectedTargetLanguage を選んだことを、userDefaults に保存する。前に選んだ言語は上書きされる
-nonisolated func save(selectedTargetLanguage: Locale.Language, userDefaults: UserDefaults) {
+func save(selectedTargetLanguage: Locale.Language, userDefaults: UserDefaults) {
     userDefaults.set(selectedTargetLanguage.maximalIdentifier, forKey: selectedTargetLanguageUserDefaultsKey)
 }
 
 /// 相手との関係として選ばれているものを返す。userDefaults は選んだ関係を保存してある場所。
 /// 何も選んでいない時と、保存してある値が今の一覧に無い時は nil (未選択) を返す
-nonisolated func selectedChatPartnerRelationship(userDefaults: UserDefaults) -> ChatPartnerRelationship? {
+func selectedChatPartnerRelationship(userDefaults: UserDefaults) -> ChatPartnerRelationship? {
     userDefaults.string(forKey: selectedChatPartnerRelationshipUserDefaultsKey).flatMap { ChatPartnerRelationship(rawValue: $0) }
 }
 
 /// 相手との関係として selectedChatPartnerRelationship を選んだことを、userDefaults に保存する。前に選んだ関係は上書きされる。
 /// nil (未選択) を渡すと、保存してある関係を消す
-nonisolated func save(selectedChatPartnerRelationship: ChatPartnerRelationship?, userDefaults: UserDefaults) {
+func save(selectedChatPartnerRelationship: ChatPartnerRelationship?, userDefaults: UserDefaults) {
     userDefaults.set(selectedChatPartnerRelationship?.rawValue, forKey: selectedChatPartnerRelationshipUserDefaultsKey)
 }
 
 /// 文の組 (texts) を、訳す先として選ばれている言語 (selectedTargetLanguage(userDefaults:preferredLanguages:)) へ translate で訳して返す。
 /// translate は、文の組と訳す先の言語を受け取って訳文を返す処理 (本物は translateOnDevice(texts:targetLanguage:))。
 /// スクリーンショットからの読み取りと、取り込んだ画面の読み取りの両方が、訳す先の言語をこの関数で決める
-nonisolated func translateIntoSelectedLanguage(
+func translateIntoSelectedLanguage(
     texts: [String],
     userDefaults: UserDefaults,
     preferredLanguages: [String],
