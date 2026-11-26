@@ -56,7 +56,7 @@ struct RecentScreenshotsView: View {
                         Text("Take a screenshot of a chat and open this app again")
                     }
                 } else {
-                    screenshotGrid
+                    ScreenshotGrid(screenshots: screenshots)
                 }
             case .limited:
                 VStack(spacing: 0) {
@@ -75,7 +75,7 @@ struct RecentScreenshotsView: View {
                     if screenshots.isEmpty {
                         Spacer()
                     } else {
-                        screenshotGrid
+                        ScreenshotGrid(screenshots: screenshots)
                     }
                 }
             }
@@ -104,14 +104,46 @@ struct RecentScreenshotsView: View {
         }
     }
 
-    /// 取れたスクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
-    private var screenshotGrid: some View {
+    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近のスクリーンショットを取り直す。
+    /// 許可を選ぶ前には取らない。許可が要る操作を初めて行うとシステムが許可の確認を出すため、利用者が許可の導線を押す前に確認を出さない
+    /// (Apple の文書: 「The first time your app performs an operation that requires authorization, the system automatically and
+    /// asynchronously prompts the user for it.」
+    /// https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app )
+    private func loadScreenshots() {
+        switch screenshotAccess(authorizationStatus: authorizationStatus) {
+        case .allowed, .limited:
+            screenshots = fetchRecentScreenshots(limit: recentScreenshotsLimit)
+        case .notRequested, .denied:
+            return
+        }
+    }
+}
+
+/// 直近のスクリーンショットの一覧に並べる枚数の上限。
+/// 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
+nonisolated let recentScreenshotsLimit = 30
+
+/// スクリーンショットの一覧のセルどうしの間隔 (列と行で揃える)。8pt は、3 列でも縮小画像から何の画面かが分かる幅を残しつつ、隣のセルと見分けられる間にするため
+let screenshotGridSpacing: CGFloat = 8
+
+/// スクリーンショットの一覧の列。3 列は、iPhone の幅で縮小画像から何の画面かが分かる大きさにするため
+let screenshotGridColumns = Array(repeating: GridItem(.flexible(), spacing: screenshotGridSpacing), count: 3)
+
+/// 一覧の縮小画像の枠の形。見た目を切る形とタップを受ける形を同じにするため 1 か所に置く。角丸 8pt はセルの間隔と揃える
+let screenshotThumbnailShape = RoundedRectangle(cornerRadius: screenshotGridSpacing)
+
+/// スクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
+struct ScreenshotGrid: View {
+    /// 並べるスクリーンショット。渡した順に左上から並べる
+    let screenshots: [PHAsset]
+
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 // ja: 直近のスクリーンショット
                 Text("Recent screenshots")
                     .font(.headline)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridSpacing) {
                     ForEach(screenshots, id: \.localIdentifier) { screenshot in
                         NavigationLink {
                             ChatReadingView(screenshot: screenshot)
@@ -119,6 +151,15 @@ struct RecentScreenshotsView: View {
                             ScreenshotThumbnail(screenshot: screenshot)
                         }
                         .buttonStyle(.plain)
+                        #if DEBUG
+                        // タップしてから読み取りの画面が出るまでの時間を開発者メニューのあるビルドで測るため、タップした時刻を控える。
+                        // 同時に認識させるジェスチャーで、NavigationLink の遷移とタップを受ける範囲は変えない
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                debugLastScreenshotTapUptime = ProcessInfo.processInfo.systemUptime
+                            }
+                        )
+                        #endif
                         .accessibilityLabel(
                             screenshot.creationDate.map {
                                 Text($0, format: Date.FormatStyle(date: .abbreviated, time: .shortened))
@@ -132,45 +173,20 @@ struct RecentScreenshotsView: View {
             .padding()
         }
     }
-
-    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近のスクリーンショットを取り直す。
-    /// 許可を選ぶ前には取らない。許可が要る操作を初めて行うとシステムが許可の確認を出すため、利用者が許可の導線を押す前に確認を出さない
-    /// (Apple の文書: 「The first time your app performs an operation that requires authorization, the system automatically and
-    /// asynchronously prompts the user for it.」
-    /// https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app )
-    private func loadScreenshots() {
-        switch screenshotAccess(authorizationStatus: authorizationStatus) {
-        case .allowed, .limited:
-            // 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
-            screenshots = fetchRecentScreenshots(limit: 30)
-        case .notRequested, .denied:
-            return
-        }
-    }
 }
 
 /// 一覧に並べるスクリーンショット 1 枚の縮小画像
 struct ScreenshotThumbnail: View {
     /// 表示するスクリーンショット
     let screenshot: PHAsset
-    /// 読み出した縮小画像。読み出すまでは nil
-    @State private var image: UIImage?
+    /// 縮小画像を読み出した結果。読み出すまでは nil
+    @State private var loadResult: Result<UIImage, ScreenshotImageUnavailableReason>?
 
     var body: some View {
-        Color(uiColor: .secondarySystemBackground)
-            // 9:19.5 はホームボタンの無い iPhone の画面の縦横比。iPhone 専用で作るため (documents/DIRECTION.md「決めたこと」)、枠をこの比で取る
-            .aspectRatio(9 / 19.5, contentMode: .fit)
-            .overlay {
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .clipShape(.rect(cornerRadius: 8))
+        ScreenshotThumbnailFrame(loadResult: loadResult)
             .task(id: screenshot.localIdentifier) {
                 // 幅 440・高さ 960: 3 列の一覧の 1 枚は画面の幅の約 1/3 で、幅 440pt・3 倍の解像度の機種で約 440px になるため
-                image = await loadScreenshotImage(
+                loadResult = await loadScreenshotImage(
                     asset: screenshot,
                     targetSize: CGSize(width: 440, height: 960),
                     contentMode: .aspectFit
@@ -178,3 +194,87 @@ struct ScreenshotThumbnail: View {
             }
     }
 }
+
+/// 一覧の 1 枚の枠。読み出す前は枠だけ、読み出せた時は縮小画像、読み出せなかった時は読み出せないことを出す
+struct ScreenshotThumbnailFrame: View {
+    /// 縮小画像を読み出した結果。読み出す前は nil
+    let loadResult: Result<UIImage, ScreenshotImageUnavailableReason>?
+
+    var body: some View {
+        Color(uiColor: .secondarySystemBackground)
+            // 9:19.5 はホームボタンの無い iPhone の画面の縦横比。iPhone 専用で作るため (documents/DIRECTION.md「決めたこと」)、枠をこの比で取る
+            .aspectRatio(9 / 19.5, contentMode: .fit)
+            .overlay {
+                switch loadResult {
+                case .success(let image):
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                case .failure(let reason):
+                    ScreenshotUnavailableLabel(reason: reason)
+                case nil:
+                    EmptyView()
+                }
+            }
+            .clipShape(screenshotThumbnailShape)
+            // scaledToFill の画像は枠より横長の時に左右へはみ出し、clipShape は見た目だけを切るため、タップを受ける範囲が隣のセルまで広がる。
+            // タップを受ける範囲を枠に揃える (simtunnel の simulator で、横長の 2 枚目が幅 558pt の範囲でタップを受け、1 枚目を押すと 2 枚目が開いた)
+            .contentShape(screenshotThumbnailShape)
+    }
+}
+
+/// 縮小画像を読み出せなかった時に枠の中に出すアイコン (SF Symbols の名前)。端末に無い (iCloud にだけある) 時は雲、ほかの理由の時は注意の印
+nonisolated func screenshotUnavailableSymbolName(reason: ScreenshotImageUnavailableReason) -> String {
+    reason == .inCloudOnly ? "icloud.slash" : "exclamationmark.triangle"
+}
+
+/// 縮小画像を読み出せなかった時に枠の中に出す文。端末に無い (iCloud にだけある) 時は、取りに行かないため読めないことが分かる文にする
+nonisolated func screenshotUnavailableMessage(reason: ScreenshotImageUnavailableReason) -> LocalizedStringResource {
+    if reason == .inCloudOnly {
+        // ja: この iPhone にありません
+        "Not on this iPhone"
+    } else {
+        // ja: 読み込めません
+        "Couldn't load"
+    }
+}
+
+/// 縮小画像を読み出せなかった時に枠の中に出す表示。端末に無い (iCloud にだけある) 時と、ほかの理由の時で文とアイコンを分ける
+struct ScreenshotUnavailableLabel: View {
+    /// 読み出せなかった理由
+    let reason: ScreenshotImageUnavailableReason
+
+    var body: some View {
+        // 4pt: 幅 約 118pt の枠の中でアイコンと 2〜3 行の文を詰めて収めるための、間隔と余白の小さい値
+        VStack(spacing: 4) {
+            Image(systemName: screenshotUnavailableSymbolName(reason: reason))
+                .font(.title3)
+            Text(screenshotUnavailableMessage(reason: reason))
+            #if DEBUG
+            // 実機で読み出せない原因を開発者メニューのあるビルドで見分けるため、写真ライブラリが返した理由をそのまま出す
+            Text(verbatim: debugText(screenshotImageUnavailableReason: reason))
+                .accessibilityIdentifier("debug_screenshot_unavailable_reason")
+            #endif
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .padding(4)
+    }
+}
+
+#if DEBUG
+/// 縮小画像を読み出せなかった理由を、開発者メニューのあるビルドで枠の中に出す文にして返す
+nonisolated func debugText(screenshotImageUnavailableReason: ScreenshotImageUnavailableReason) -> String {
+    switch screenshotImageUnavailableReason {
+    case .inCloudOnly:
+        "iCloud にだけある"
+    case .cancelled:
+        "取り消された"
+    case .failed(let errorDescription):
+        errorDescription
+    case .unknown:
+        "理由なし"
+    }
+}
+#endif

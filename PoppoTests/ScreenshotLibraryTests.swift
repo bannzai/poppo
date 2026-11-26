@@ -31,6 +31,81 @@ import Testing
     #expect(recentScreenshotFetchOptions(limit: 30).fetchLimit == 30)
 }
 
+/// 端末に無く iCloud にだけある時は、エラーが添えられていても iCloud にだけある理由にすること (一覧で「この iPhone にありません」と出すため)
+@Test func screenshotImageUnavailableReasonIsInCloudOnlyWhenInCloud() {
+    #expect(screenshotImageUnavailableReason(info: [PHImageResultIsInCloudKey: NSNumber(value: true)]) == .inCloudOnly)
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: true),
+            PHImageErrorKey: NSError(domain: "PHPhotosErrorDomain", code: 3164),
+        ]) == .inCloudOnly
+    )
+}
+
+/// 取り消された時は取り消しの理由にし、iCloud の印が false の時は iCloud にだけある理由にしないこと
+@Test func screenshotImageUnavailableReasonIsCancelledWhenCancelled() {
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: false),
+            PHImageCancelledKey: NSNumber(value: true),
+        ]) == .cancelled
+    )
+}
+
+/// iCloud・取り消し・エラーの印が重なった時は、iCloud・取り消し・エラーの順で先に当たった理由にすること
+@Test func screenshotImageUnavailableReasonFollowsInCloudCancelledErrorOrder() {
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: true),
+            PHImageCancelledKey: NSNumber(value: true),
+        ]) == .inCloudOnly
+    )
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageCancelledKey: NSNumber(value: true),
+            PHImageErrorKey: NSError(domain: "PHPhotosErrorDomain", code: 3072),
+        ]) == .cancelled
+    )
+}
+
+/// 端末に無く iCloud にだけある時は、雲のアイコンと「この iPhone にありません」を出すこと (取りに行かないため、読めない理由が分かる文にする)
+@Test func screenshotUnavailableLabelForInCloudOnly() {
+    #expect(screenshotUnavailableSymbolName(reason: .inCloudOnly) == "icloud.slash")
+    #expect(screenshotUnavailableMessage(reason: .inCloudOnly).key == "Not on this iPhone")
+}
+
+/// iCloud 以外の理由 (取り消し・エラー・理由なし) では、注意の印と「読み込めません」を出し、「この iPhone にありません」と出さないこと
+@Test(arguments: [
+    ScreenshotImageUnavailableReason.cancelled,
+    .failed(errorDescription: "PHPhotosErrorDomain 3164: network"),
+    .unknown,
+])
+func screenshotUnavailableLabelForOtherReasons(reason: ScreenshotImageUnavailableReason) {
+    #expect(screenshotUnavailableSymbolName(reason: reason) == "exclamationmark.triangle")
+    #expect(screenshotUnavailableMessage(reason: reason).key == "Couldn't load")
+}
+
+/// エラーだけが添えられた時は、エラーのドメインとコードを含む失敗の理由にすること
+@Test func screenshotImageUnavailableReasonIsFailedWithErrorDescription() {
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageErrorKey: NSError(domain: "PHPhotosErrorDomain", code: 3164, userInfo: [NSLocalizedDescriptionKey: "network"])
+        ]) == .failed(errorDescription: "PHPhotosErrorDomain 3164: network")
+    )
+}
+
+/// info が無い時と、印がどれも false の時は、理由なしにすること
+@Test func screenshotImageUnavailableReasonIsUnknownWithoutReason() {
+    #expect(screenshotImageUnavailableReason(info: nil) == .unknown)
+    #expect(screenshotImageUnavailableReason(info: [:]) == .unknown)
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: false),
+            PHImageCancelledKey: NSNumber(value: false),
+        ]) == .unknown
+    )
+}
+
 /// 利用者が写真へのアクセスの許可をまだ選んでいない時は、許可を求める導線を出す状態になること
 @Test func screenshotAccessIsNotRequestedBeforeUserChooses() {
     #expect(screenshotAccess(authorizationStatus: .notDetermined) == .notRequested)

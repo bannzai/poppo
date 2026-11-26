@@ -1,9 +1,10 @@
 #if DEBUG
+import Photos
 import SwiftUI
 
 /// 開発者メニュー。simulator では動かない処理 (翻訳・返信案の生成・言語のダウンロード・画面の取り込み) を通さずに、その先の画面を確かめるための入口。
 /// DEBUG ビルドにだけ入る。書き換えるデータは、キーボードに渡す読み取り結果 (見本の保存と削除)、返信案を作るモデルの選択、
-/// 返信案を作るモデルの API キー (端末の Keychain) だけ
+/// 返信案を作るモデルの API キー (端末の Keychain)、写真ライブラリ (見本のスクリーンショットを足す。消さない) だけ
 struct DebugMenuView: View {
     /// 取り込みの状態。診断の記録を出すのに使う
     @Environment(ScreenCaptureController.self) private var screenCaptureController
@@ -26,6 +27,43 @@ struct DebugMenuView: View {
     @State private var apiKeyOperationError: String?
     /// 直前の、保存してある API キーの読み直しが失敗した時のエラーの説明 (API キーの値は入らない)。すべてのモデルを読めた時は nil
     @State private var apiKeyReloadError: String?
+
+    /// 写真ライブラリに残っている見本のスクリーンショットの数。この画面の操作の後と、画面を開いた時に読み直す
+    @State private var sampleScreenshotCount = 0
+    /// 見本のスクリーンショットのうち、写真アプリがスクリーンショットの種別を付けたものの数。sampleScreenshotCount と同じ時に読み直す
+    @State private var sampleScreenshotMarkedCount = 0
+    /// 直前の見本のスクリーンショットの追加が失敗した時のエラーの説明。成功した時と、まだ操作していない時は nil
+    @State private var sampleScreenshotError: String?
+    /// 見本のスクリーンショットを足している間は true。足し終わるまで次の追加を始めず、見本が 2 組入らないようにする
+    @State private var isAddingSampleScreenshots = false
+
+    /// 写真ライブラリへのアクセスの許可を (まだ選んでいなければ) 求めてから、見本のスクリーンショットを足す。
+    /// 足せなかった時は、エラーの説明を sampleScreenshotError に入れる。足している途中に呼ばれた時は何もしない
+    private func addSampleScreenshots() async {
+        guard !isAddingSampleScreenshots else {
+            return
+        }
+        isAddingSampleScreenshots = true
+        defer {
+            isAddingSampleScreenshots = false
+        }
+        if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
+            _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        }
+        do {
+            try await addDebugSampleScreenshots()
+            sampleScreenshotError = nil
+        } catch {
+            sampleScreenshotError = error.localizedDescription
+        }
+        reloadSampleScreenshotCounts()
+    }
+
+    /// 写真ライブラリに残っている見本のスクリーンショットの数を読み直す
+    private func reloadSampleScreenshotCounts() {
+        sampleScreenshotCount = debugSampleScreenshots().count
+        sampleScreenshotMarkedCount = debugSampleScreenshotsMarkedAsScreenshotCount()
+    }
 
     /// 返信案を作るモデルとして selectingReplyModel を選んだことを保存し、この画面の表示を保存した後の値にする
     private func select(replyModel selectingReplyModel: ReplyModel) {
@@ -198,6 +236,59 @@ struct DebugMenuView: View {
             }
             Section {
                 Button {
+                    Task {
+                        await addSampleScreenshots()
+                    }
+                } label: {
+                    Text(verbatim: "見本のスクリーンショット (\(recentScreenshotsLimit) 枚) を写真に足す")
+                }
+                .disabled(isAddingSampleScreenshots)
+                .accessibilityIdentifier("debug_add_sample_screenshots")
+                LabeledContent {
+                    Text(verbatim: "\(sampleScreenshotCount) 枚 (スクリーンショットの種別: \(sampleScreenshotMarkedCount) 枚)")
+                } label: {
+                    Text(verbatim: "写真にある見本")
+                }
+                .accessibilityIdentifier("debug_sample_screenshots_state")
+                NavigationLink {
+                    ScreenshotGrid(screenshots: debugSampleScreenshots())
+                } label: {
+                    Text(verbatim: "見本だけの一覧を開く")
+                }
+                .accessibilityIdentifier("debug_open_sample_screenshot_grid")
+                NavigationLink {
+                    ScrollView {
+                        LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridSpacing) {
+                            ForEach(
+                                [
+                                    ScreenshotImageUnavailableReason.inCloudOnly,
+                                    .cancelled,
+                                    .failed(errorDescription: "PHPhotosErrorDomain 3164: 見本のエラーの内容"),
+                                    .unknown,
+                                ],
+                                id: \.self
+                            ) { reason in
+                                ScreenshotThumbnailFrame(loadResult: .failure(reason))
+                            }
+                        }
+                        .padding()
+                    }
+                } label: {
+                    Text(verbatim: "読み出せない縮小画像の見本を開く")
+                }
+                .accessibilityIdentifier("debug_open_unavailable_thumbnails")
+                if let sampleScreenshotError {
+                    Text(verbatim: sampleScreenshotError)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("debug_sample_screenshots_error")
+                }
+            } header: {
+                Text(verbatim: "スクリーンショットの一覧")
+            } footer: {
+                Text(verbatim: "simulator の写真にはスクリーンショットが無いため、番号を書いた見本を足して一覧とタップを確かめる。1 番が最も新しく、2 番は横長、5 番は正方形、ほかは縦長。足した見本は写真アプリで消す (すべて残っていれば足し直さない。一部を消した時は 1 組を足し直すので、残りも写真アプリで消す)。スクリーンショットの種別が付かなかった時は「見本だけの一覧を開く」で、同じ一覧の画面に見本を並べる")
+            }
+            Section {
+                Button {
                     saveSampleLatestReading(capturedAt: Date(), replySuggestions: debugSampleReplySuggestions)
                 } label: {
                     Text(verbatim: "見本の読み取り結果を保存 (今読んだ)")
@@ -312,6 +403,7 @@ struct DebugMenuView: View {
             reloadSavedLatestReading()
             replyModel = selectedReplyModel(userDefaults: .standard)
             reloadReplyModelsWithSavedAPIKey()
+            reloadSampleScreenshotCounts()
         }
         .alert(
             Text(verbatim: "発言を端末の外へ送る"),
