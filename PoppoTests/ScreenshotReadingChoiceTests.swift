@@ -866,3 +866,13 @@ private let otherSpeakerNames = ["Priya Nakamoto", "Kenji Sato"]
     #expect(chatTitleReadFromScreen(lines: [line(0.351)]) == "Harbor Books")
     #expect(chatTitleReadFromScreen(lines: [line(0.349)]) == nil)
 }
+
+/// 行が画面の下の発言から順に渡されても、発言した人の名前は画面の上から下の順に返すこと
+@Test func speakerNamesAreOrderedFromTopToBottom() {
+    #expect(
+        speakerNames(
+            lines: threadMessageLines(name: "Priya Nakamoto", time: "11:02 AM", body: "Later message", top: 0.5)
+                + threadMessageLines(name: "Mira Solberg", time: "10:42 AM", body: "Earlier message", top: 0.2)
+        ) == ["Mira Solberg", "Priya Nakamoto"]
+    )
+}
