@@ -899,3 +899,28 @@ private func pastChoice(
     )
     #expect(loadScreenshotReadingChoices(fileURL: fileURL, now: testReadAt).count == 1)
 }
+
+/// 手がかりを読めなかった読み取りでも、残す期間を過ぎた記録をファイルから消すこと (読み出す時に除くだけでなく、ファイルの中からも消える)
+@Test func addChoiceWithoutClueStillRemovesExpiredRecordsFromFile() throws {
+    let fileURL = makeChoicesFileURL()
+    let kept = pastChoice(chatTitle: "Harbor Books", speakerNames: [], relationship: .stranger, readAt: testReadAt.addingTimeInterval(-60))
+    try save(
+        screenshotReadingChoices: [
+            kept,
+            pastChoice(chatTitle: "# design-review", speakerNames: [], relationship: .coworker, readAt: testReadAt.addingTimeInterval(-15 * 24 * 60 * 60)),
+        ],
+        fileURL: fileURL
+    )
+
+    _ = try addScreenshotReadingChoice(
+        lines: chatScreenLines(chatTitle: nil, speakers: []),
+        targetLanguageIdentifier: nil,
+        chatPartnerRelationship: nil,
+        usesMostSimilarChoice: true,
+        id: UUID(),
+        now: testReadAt,
+        fileURL: fileURL
+    )
+
+    #expect(try JSONDecoder().decode([ScreenshotReadingChoice].self, from: Data(contentsOf: fileURL)) == [kept])
+}

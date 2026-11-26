@@ -179,7 +179,7 @@ nonisolated func save(screenshotReadingChoices choices: [ScreenshotReadingChoice
 /// 似ているものが無い時と、usesMostSimilarChoice が false の時 (利用者が既に選び直した時) は、今選ばれている言語と関係
 /// (targetLanguageIdentifier・chatPartnerRelationship) を既定にする。
 /// 足す時に、残す期間を過ぎた記録と上限を超えた記録を消す。保存できなかった時はエラーを投げる (既定は返さない)。
-/// チャットの名前も発言した人の名前も読めなかった時は、記録を足さずに今の選択の記録を返す (どの記録とも似ているとしないため、
+/// チャットの名前も発言した人の名前も読めなかった時は、記録を足さずに (残す期間を過ぎた記録を消して保存し直し) 今の選択の記録を返す (どの記録とも似ているとしないため、
 /// 残しても既定に使われず、200 件の枠を使って手がかりのある記録を押し出すだけのため)。返した記録は保存していないため、書き換えても何も起きない
 nonisolated func addScreenshotReadingChoice(
     lines: [RecognizedTextLine],
@@ -207,9 +207,14 @@ nonisolated func addScreenshotReadingChoice(
         targetLanguageIdentifier: defaultTargetLanguageIdentifier,
         chatPartnerRelationship: defaultChatPartnerRelationship
     )
-    if chatTitle != nil || !names.isEmpty {
-        try save(screenshotReadingChoices: retainedScreenshotReadingChoices(choices: [newChoice] + pastChoices, now: now), fileURL: fileURL)
-    }
+    // 手がかりが無い時も保存し直す: 残す期間を過ぎた記録をファイルから消すため (プライバシーポリシーの「次に読み取った時に削除」)
+    try save(
+        screenshotReadingChoices: retainedScreenshotReadingChoices(
+            choices: (chatTitle != nil || !names.isEmpty ? [newChoice] : []) + pastChoices,
+            now: now
+        ),
+        fileURL: fileURL
+    )
     return newChoice
 }
 
