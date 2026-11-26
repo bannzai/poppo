@@ -2,7 +2,7 @@
   {
     "imageFileName": "chat-screen-sample-thread-light-english.png",
     "chatTitle": "# design-review",
-    "speakerNames": ["Mira Solberg", "Tobias Lindqvist", "Priya Nakamoto"],
+    "speakerNames": [],
     "appearance": "全員の発言が左に並ぶ明るい画面 (Slack に似せた形。日付の区切り・リアクション・スレッドの返信の数がある)",
     "language": "en",
     "source": "作った画像。documents/design/chat-screen-samples/thread-light-english.html を render.sh で描いた。会話と名前は作ったもの",
@@ -30,7 +30,7 @@
   {
     "imageFileName": "chat-screen-sample-thread-light-japanese.png",
     "chatTitle": "# 開発",
-    "speakerNames": ["水瀬 あおい", "槙原 そうた"],
+    "speakerNames": [],
     "appearance": "全員の発言が左に並ぶ明るい画面 (Slack に似せた形)",
     "language": "ja",
     "source": "作った画像。documents/design/chat-screen-samples/thread-light-japanese.html を render.sh で描いた。会話と名前は作ったもの",

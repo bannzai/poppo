@@ -153,7 +153,8 @@ nonisolated func loadScreenshotReadingChoices(fileURL: URL, now: Date) -> [Scree
 }
 
 /// 記録 (choices) を fileURL に保存し、そのファイルを端末のバックアップ (iCloud・パソコンへのバックアップ) から外す。
-/// 前に保存した記録は上書きされる。書き込めない時と、バックアップから外せない時はエラーを投げる
+/// 前に保存した記録は上書きされる。書き込めない時はエラーを投げる。
+/// バックアップから外せない時は、書いたファイルを消してからエラーを投げる (記録はすべて無くなる)
 nonisolated func save(screenshotReadingChoices choices: [ScreenshotReadingChoice], fileURL: URL) throws {
     // atomic: 書いている途中で本体アプリが終了しても、前の記録を壊さないため
     try JSONEncoder().encode(choices).write(to: fileURL, options: .atomic)
@@ -161,7 +162,13 @@ nonisolated func save(screenshotReadingChoices choices: [ScreenshotReadingChoice
     // (「the contents of the Library directory (with the exception of the Caches subdirectory) are backed up by iTunes and iCloud」
     // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html )。
     // atomic の書き込みはファイルを置き換えるため、書くたびに付け直す
-    try (fileURL as NSURL).setResourceValue(true, forKey: .isExcludedFromBackupKey)
+    do {
+        try (fileURL as NSURL).setResourceValue(true, forKey: .isExcludedFromBackupKey)
+    } catch {
+        // 消す: バックアップに入りうるファイルを残さないため。記録は既定を選ぶ手がかりで、無くなっても直前の選択が既定になるだけで済む
+        try? FileManager.default.removeItem(at: fileURL)
+        throw error
+    }
 }
 
 /// スクリーンショットから読んだ行 (lines) の手がかりと、この読み取りの既定にする言語と関係を、新しい記録として fileURL に足して返す。
