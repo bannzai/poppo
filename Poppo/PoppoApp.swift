@@ -26,12 +26,12 @@ func makeOnDeviceScreenCaptureController(latestReadingFileURL: URL?, diagnostics
         diagnosticsFileURL: diagnosticsFileURL,
         now: { Date() },
         recognizeTextLines: { try await recognizeTextLines(image: $0) },
-        translateTexts: {
-            try await translateOnDevice(texts: $0, targetLanguage: userLanguage(preferredLanguages: Locale.preferredLanguages))
-        },
+        // 訳す先の言語と相手との関係は、スクリーンショットからの読み取りの画面で選んで保存したものを使う
+        // (取り込みの間は本体アプリが背面にいて、選ぶ画面を出せないため)
+        translateTexts: { try await translateIntoSelectedLanguageOnDevice(texts: $0) },
         selectedReplyModel: { selectedReplyModel(userDefaults: .standard) },
         canGenerateReplies: { canGenerateReplies(replyModel: $0) },
-        generateReplyTexts: { try await generateReplyTexts(messages: $0, replyModel: $1) },
+        generateReplyTexts: { try await generateReplyTextsForSelectedRelationship(messages: $0, replyModel: $1) },
         wait: { try? await Task.sleep(for: .seconds($0)) }
     )
 }

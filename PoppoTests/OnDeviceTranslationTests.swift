@@ -48,6 +48,25 @@ private func translationResponse(clientIdentifier: String?, targetText: String) 
     )
 }
 
+/// 訳す先に端末の言語と違う言語 (英語) を選んだ時は、選んだ言語で書かれた文を訳さずに残し、ほかの言語 (日本語) の文だけを訳すこと
+@Test func translateForeignTextsKeepsTextsInSelectedTargetLanguage() async throws {
+    #expect(
+        try await translateForeignTexts(
+            texts: [
+                "今日は午後から会議があるので、少し遅れます",
+                "Can you review my pull request this afternoon?",
+            ],
+            targetLanguage: Locale.Language(identifier: "en"),
+            translate: { foreignTexts, sourceLanguage in
+                foreignTexts.map { "\(sourceLanguage.languageCode?.identifier ?? ""): \($0)" }
+            }
+        ) == [
+            "ja: 今日は午後から会議があるので、少し遅れます",
+            "Can you review my pull request this afternoon?",
+        ]
+    )
+}
+
 /// 訳す処理が投げた失敗 (言語が入っていない等) は、そのまま呼び出し元へ伝えること
 @Test func translateForeignTextsRethrowsErrorFromTranslate() async {
     await #expect(throws: ChatReadingError.incompleteTranslation) {
