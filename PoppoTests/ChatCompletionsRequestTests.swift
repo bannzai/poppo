@@ -191,10 +191,10 @@ private func chatCompletionsResponseBody(content: String) throws -> Data {
             chatPartnerRelationship: chatPartnerRelationship,
             apiKeyKeychainService: keychainService
         )
+        // #require の中に #require を書くとマクロの展開が再帰になりコンパイルできないため、要求を先に取り出す
+        let openAIRequest = try #require(ChatCompletionsStubURLProtocol.state.withLock { $0.receivedRequests }["api.openai.com"]?.last)
         let messages = try #require(
-            (try JSONSerialization.jsonObject(
-                with: try #require(ChatCompletionsStubURLProtocol.state.withLock { $0.receivedRequests }["api.openai.com"]?.last).body
-            ) as? [String: Any])?["messages"] as? [[String: String]]
+            (try JSONSerialization.jsonObject(with: openAIRequest.body) as? [String: Any])?["messages"] as? [[String: String]]
         )
         #expect(messages[0]["content"] == replyInstructions(chatPartnerRelationship: chatPartnerRelationship))
         #expect(messages[0]["content"]?.contains("superiors or business clients") == (chatPartnerRelationship == .superiorOrClient))
