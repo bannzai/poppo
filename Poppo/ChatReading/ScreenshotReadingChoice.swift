@@ -39,30 +39,49 @@ nonisolated func chatTitleReadFromScreen(lines: [RecognizedTextLine]) -> String?
         .map(\.text)
 }
 
-/// 行から、発言の見出し (名前と、そのすぐ右に別の行として並ぶ時刻) の名前を読んで、画面の上から下の順に返す。同じ名前は 1 つにまとめる。
-/// 見出しとするのは、発言の並ぶ範囲の左寄りの行で、すぐ右に時刻で終わる行 (「10:42 AM」「hoy a las 18:05」) が並び、すぐ下に同じ左端の本文の行が続く行だけ。
-/// 発言の本文を名前として残さないため、次の行は見出しにしない: 時刻で終わる 1 つの行 (「Meet me at 10:42」)、
-/// 吹き出しの中で最後の行の右に時刻が付く行 (下に本文が続かない)、右に寄った利用者の発言の行。
-/// 名前と時刻を Vision が 1 つの行として読んだ画面では、名前を読まない (本文の文と見分けられないため)
+/// 行から、発言の見出し (名前と時刻) の名前を読んで、画面の上から下の順に返す。同じ名前は 1 つにまとめる。
+/// 見出しとするのは、発言の並ぶ範囲の左寄りの行で、発言の最初の行 (すぐ上の行の続きでない) であり、すぐ下に同じ左端の本文の行が続き、
+/// 名前と時刻からなる行だけ。名前と時刻は、Vision が 1 つの行に読んだ時 (「Mira Solberg 10:42 AM」。時刻を除いた前の部分を名前にする) と、
+/// 別の行に読んだ時 (「luna_verde」の右に「hoy a las 18:05」。左の行を名前にする) のどちらも読む。
+/// 見出しの形の行が画面に 2 つ以上ある時だけ名前を返す (全員の発言に見出しが付くチャットだけから読み、
+/// 最初の行が時刻で終わる本文 (「Meet me at 10:42」) を名前として残さないため)。
+/// 吹き出しの中で最後の行に時刻が付く本文 (下に本文が続かない) と、右に寄った利用者の発言の行は見出しにしない
 nonisolated func speakerNames(lines: [RecognizedTextLine]) -> [String] {
     let chatAreaLines = lines.filter { isInsideChatArea(line: $0) }
-    return
-        chatAreaLines
-        .filter { nameLine in
-            chatAreaLines.contains { timeLine in
-                continuesRow(leftLine: nameLine, line: timeLine)
-                    // 時刻の前の語は 3 語まで: 「hoy a las 18:05」のような時刻の書き方を通し、本文の文を時刻の行にしないため
-                    && (0...3).contains { leadingWordCount in
-                        isTimeOnly(text: timeLine.text.split(separator: " ").dropFirst(leadingWordCount).joined(separator: " "))
-                    }
-                    && !isShiftedRight(lines: [nameLine, timeLine])
-            }
-                && chatAreaLines.contains { bodyLine in
-                    bodyLine.boundingBox.minY > nameLine.boundingBox.maxY && continuesMessage(previousLine: nameLine, line: bodyLine)
-                }
+    let headerNames = chatAreaLines.compactMap { line -> (top: CGFloat, name: String)? in
+        guard
+            !chatAreaLines.contains(where: { $0.boundingBox.maxY < line.boundingBox.minY && continuesMessage(previousLine: $0, line: line) }),
+            chatAreaLines.contains(where: { $0.boundingBox.minY > line.boundingBox.maxY && continuesMessage(previousLine: line, line: $0) })
+        else {
+            return nil
         }
-        .sorted { $0.boundingBox.minY < $1.boundingBox.minY }
-        .map(\.text)
+        if chatAreaLines.contains(where: { timeLine in
+            continuesRow(leftLine: line, line: timeLine)
+                // 時刻の前の語は 3 語まで: 「hoy a las 18:05」のような時刻の書き方を通し、本文の文を時刻の行にしないため
+                && (0...3).contains { leadingWordCount in
+                    isTimeOnly(text: timeLine.text.split(separator: " ").dropFirst(leadingWordCount).joined(separator: " "))
+                }
+                && !isShiftedRight(lines: [line, timeLine])
+        }) {
+            return (top: line.boundingBox.minY, name: line.text)
+        }
+        guard !isShiftedRight(lines: [line]) else {
+            return nil
+        }
+        // 1 つの行の時: 末尾の時刻 (「10:42 AM」「午後 3:41」のように空白を含むものは長い方) を除いた前の部分を名前にする
+        let words = line.text.split(separator: " ")
+        return (1..<max(words.count, 1))
+            .first { nameWordCount in isTimeOnly(text: words.dropFirst(nameWordCount).joined(separator: " ")) }
+            .map { (top: line.boundingBox.minY, name: words.prefix($0).joined(separator: " ")) }
+    }
+    // 2: 時刻で終わる本文がたまたま見出しの形になっても、画面の発言のうち 1 つだけなら名前にしないため
+    guard headerNames.count >= 2 else {
+        return []
+    }
+    return
+        headerNames
+        .sorted { $0.top < $1.top }
+        .map(\.name)
         .reduce(into: [String]()) { names, name in
             if !names.contains(where: { comparableClueText(text: $0) == comparableClueText(text: name) }) {
                 names.append(name)
