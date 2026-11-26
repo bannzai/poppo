@@ -116,6 +116,7 @@ struct ChatReadingView: View {
     #if DEBUG
     /// 開発者メニューのあるビルドでだけ画面の上に出す、読んでいる 1 枚の撮影日時と、タップしてからこの画面が出るまでの時間
     private var debugReadingInfo: some View {
+        // 2pt: 開発者向けの 2 行を 1 つのまとまりとして詰めて出し、読み取りの画面の本文を押し下げる量を小さくするため
         VStack(alignment: .leading, spacing: 2) {
             Text(verbatim: debugReadingScreenshotText(creationDate: screenshot.creationDate))
                 .accessibilityIdentifier("debug_reading_screenshot_date")

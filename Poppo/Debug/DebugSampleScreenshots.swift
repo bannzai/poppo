@@ -28,14 +28,14 @@ private func debugSavedSampleScreenshotIdentifiers() -> [String] {
 
 /// 見本のスクリーンショット 1 枚の形。一覧の縮小画像の枠 (9:19.5) より横長の画像が隣のセルのタップを受けるかを確かめるため、縦長のほかに横長と正方形を混ぜる
 nonisolated enum DebugSampleScreenshotShape: Equatable {
-    /// ホームボタンの無い iPhone の画面と同じ縦長 (1206 x 2622。iPhone 17 Pro の画面のピクセル数)
+    /// ホームボタンの無い iPhone の画面と同じ縦長
     case portrait
-    /// 横向きの iPhone の画面 (2622 x 1206)
+    /// 横向きの iPhone の画面
     case landscape
-    /// 正方形 (1600 x 1600。切り抜いた画像の代わり)
+    /// 正方形 (切り抜いた画像の代わり)
     case square
 
-    /// 画像のピクセル数
+    /// 画像のピクセル数。縦長と横長は iPhone 17 Pro の画面のピクセル数、正方形は縦長の短い辺と長い辺の間の大きさ
     var pixelSize: CGSize {
         switch self {
         case .portrait:
@@ -61,6 +61,12 @@ nonisolated func debugSampleScreenshotShape(number: Int) -> DebugSampleScreensho
     }
 }
 
+/// 見本のスクリーンショットを足すかを返す。savedCount は前に足した見本の控えの数、remainingCount はそのうち写真ライブラリに残っている数。
+/// 控えが無い時 (まだ足していない) と、一部か全部が消されていた時に true
+nonisolated func debugSampleScreenshotsNeedAdding(savedCount: Int, remainingCount: Int) -> Bool {
+    savedCount == 0 || remainingCount != savedCount
+}
+
 /// 見本のスクリーンショットを写真ライブラリに足す。前に足した見本がすべて残っていれば何もしない。
 /// 一部が消されていた時は 1 組を足し直し、残っていた見本は控えから外れる (写真アプリで消す)。同時に 2 回呼ばない前提で、呼び出し側が足している間の再実行を止める。
 /// number 枚目の撮影日時は今から number 分前にする。一覧のセルの撮影日時の表示 (分まで) で、どの 1 枚かを見分けるため。
@@ -68,9 +74,12 @@ nonisolated func debugSampleScreenshotShape(number: Int) -> DebugSampleScreensho
 /// 写真ライブラリへの書き込みの許可が要る
 func addDebugSampleScreenshots() async throws {
     let savedIdentifiers = debugSavedSampleScreenshotIdentifiers()
-    if !savedIdentifiers.isEmpty,
-        PHAsset.fetchAssets(withLocalIdentifiers: savedIdentifiers, options: nil).count == savedIdentifiers.count
-    {
+    guard
+        debugSampleScreenshotsNeedAdding(
+            savedCount: savedIdentifiers.count,
+            remainingCount: PHAsset.fetchAssets(withLocalIdentifiers: savedIdentifiers, options: nil).count
+        )
+    else {
         return
     }
     let now = Date()
@@ -129,7 +138,7 @@ func debugSampleScreenshotPNGData(number: Int) throws -> Data {
     let format = UIGraphicsImageRendererFormat()
     // ピクセル数を pixelSize のままにするため
     format.scale = 1
-    let image = UIGraphicsImageRenderer(size: shape.pixelSize, format: format).image { context in
+    let cgImage = UIGraphicsImageRenderer(size: shape.pixelSize, format: format).image { context in
         // 番号ごとに色を変え、一覧で隣のセルと見分けやすくする。12 色で一巡させる (3 列の一覧の 4 行分で、隣どうしと上下が同じ色にならない)。
         // 彩度 0.35・明度 0.95 は、黒い文字が読める淡い色にするため
         UIColor(hue: CGFloat(number % 12) / 12, saturation: 0.35, brightness: 0.95, alpha: 1).setFill()
@@ -143,10 +152,10 @@ func debugSampleScreenshotPNGData(number: Int) throws -> Data {
                 .foregroundColor: UIColor.black,
             ]
         )
-    }
+    }.cgImage
     let exifPNGData = NSMutableData()
     guard
-        let cgImage = image.cgImage,
+        let cgImage,
         let destination = CGImageDestinationCreateWithData(exifPNGData, UTType.png.identifier as CFString, 1, nil)
     else {
         throw CocoaError(.fileWriteUnknown)

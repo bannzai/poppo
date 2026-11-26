@@ -47,12 +47,27 @@ import UniformTypeIdentifiers
 @MainActor @Test(arguments: [(1, 1206, 2622), (2, 2622, 1206), (5, 1600, 1600)]) func debugSampleScreenshotPNGDataHasShapeSizeAndScreenshotComment(number: Int, width: Int, height: Int) throws {
     let source = try #require(CGImageSourceCreateWithData(try debugSampleScreenshotPNGData(number: number) as CFData, nil))
     let properties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
-    let exif = try #require(properties[kCGImagePropertyExifDictionary] as? [CFString: Any])
 
     #expect(CGImageSourceGetType(source) as String? == UTType.png.identifier)
     #expect(properties[kCGImagePropertyPixelWidth] as? Int == width)
     #expect(properties[kCGImagePropertyPixelHeight] as? Int == height)
-    #expect(exif[kCGImagePropertyExifUserComment] as? String == "Screenshot")
+    #expect((properties[kCGImagePropertyExifDictionary] as? [CFString: Any])?[kCGImagePropertyExifUserComment] as? String == "Screenshot")
+}
+
+/// まだ見本を足していない時 (控えが 0 件) は足すこと。控えが 0 件なら残っている数も 0 件で一致するが、それでも足す
+@Test func debugSampleScreenshotsNeedAddingWhenNothingSaved() {
+    #expect(debugSampleScreenshotsNeedAdding(savedCount: 0, remainingCount: 0))
+}
+
+/// 前に足した見本がすべて残っている時は足さないこと (何度押しても見本が 1 組のままになる)
+@Test func debugSampleScreenshotsDoNotNeedAddingWhenAllRemain() {
+    #expect(!debugSampleScreenshotsNeedAdding(savedCount: 30, remainingCount: 30))
+}
+
+/// 前に足した見本の一部か全部が写真アプリで消された時は、1 組を足し直すこと
+@Test func debugSampleScreenshotsNeedAddingWhenSomeRemoved() {
+    #expect(debugSampleScreenshotsNeedAdding(savedCount: 30, remainingCount: 29))
+    #expect(debugSampleScreenshotsNeedAdding(savedCount: 30, remainingCount: 0))
 }
 
 /// タップからの時間を測った時はミリ秒を、測っていない時 (開発者メニューから開いた時等) は「なし」と出すこと

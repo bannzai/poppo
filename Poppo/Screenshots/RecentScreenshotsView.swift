@@ -130,7 +130,7 @@ let screenshotGridSpacing: CGFloat = 8
 let screenshotGridColumns = Array(repeating: GridItem(.flexible(), spacing: screenshotGridSpacing), count: 3)
 
 /// 一覧の縮小画像の枠の形。見た目を切る形とタップを受ける形を同じにするため 1 か所に置く。角丸 8pt はセルの間隔と揃える
-let screenshotThumbnailShape = RoundedRectangle(cornerRadius: 8)
+let screenshotThumbnailShape = RoundedRectangle(cornerRadius: screenshotGridSpacing)
 
 /// スクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
 struct ScreenshotGrid: View {
@@ -223,22 +223,33 @@ struct ScreenshotThumbnailFrame: View {
     }
 }
 
-/// 縮小画像を読み出せなかった時に枠の中に出す表示。端末に無い (iCloud にだけある) 時と、ほかの理由の時で文を分ける
+/// 縮小画像を読み出せなかった時に枠の中に出すアイコン (SF Symbols の名前)。端末に無い (iCloud にだけある) 時は雲、ほかの理由の時は注意の印
+nonisolated func screenshotUnavailableSymbolName(reason: ScreenshotImageUnavailableReason) -> String {
+    reason == .inCloudOnly ? "icloud.slash" : "exclamationmark.triangle"
+}
+
+/// 縮小画像を読み出せなかった時に枠の中に出す文。端末に無い (iCloud にだけある) 時は、取りに行かないため読めないことが分かる文にする
+nonisolated func screenshotUnavailableMessage(reason: ScreenshotImageUnavailableReason) -> LocalizedStringResource {
+    if reason == .inCloudOnly {
+        // ja: この iPhone にありません
+        "Not on this iPhone"
+    } else {
+        // ja: 読み込めません
+        "Couldn't load"
+    }
+}
+
+/// 縮小画像を読み出せなかった時に枠の中に出す表示。端末に無い (iCloud にだけある) 時と、ほかの理由の時で文とアイコンを分ける
 struct ScreenshotUnavailableLabel: View {
     /// 読み出せなかった理由
     let reason: ScreenshotImageUnavailableReason
 
     var body: some View {
+        // 4pt: 幅 約 118pt の枠の中でアイコンと 2〜3 行の文を詰めて収めるための、間隔と余白の小さい値
         VStack(spacing: 4) {
-            Image(systemName: reason == .inCloudOnly ? "icloud.slash" : "exclamationmark.triangle")
+            Image(systemName: screenshotUnavailableSymbolName(reason: reason))
                 .font(.title3)
-            if reason == .inCloudOnly {
-                // ja: この iPhone にありません
-                Text("Not on this iPhone")
-            } else {
-                // ja: 読み込めません
-                Text("Couldn't load")
-            }
+            Text(screenshotUnavailableMessage(reason: reason))
             #if DEBUG
             // 実機で読み出せない原因を開発者メニューのあるビルドで見分けるため、写真ライブラリが返した理由をそのまま出す
             Text(verbatim: debugText(screenshotImageUnavailableReason: reason))

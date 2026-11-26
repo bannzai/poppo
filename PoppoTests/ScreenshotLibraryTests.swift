@@ -68,6 +68,23 @@ import Testing
     )
 }
 
+/// 端末に無く iCloud にだけある時は、雲のアイコンと「この iPhone にありません」を出すこと (取りに行かないため、読めない理由が分かる文にする)
+@Test func screenshotUnavailableLabelForInCloudOnly() {
+    #expect(screenshotUnavailableSymbolName(reason: .inCloudOnly) == "icloud.slash")
+    #expect(screenshotUnavailableMessage(reason: .inCloudOnly).key == "Not on this iPhone")
+}
+
+/// iCloud 以外の理由 (取り消し・エラー・理由なし) では、注意の印と「読み込めません」を出し、「この iPhone にありません」と出さないこと
+@Test(arguments: [
+    ScreenshotImageUnavailableReason.cancelled,
+    .failed(errorDescription: "PHPhotosErrorDomain 3164: network"),
+    .unknown,
+])
+func screenshotUnavailableLabelForOtherReasons(reason: ScreenshotImageUnavailableReason) {
+    #expect(screenshotUnavailableSymbolName(reason: reason) == "exclamationmark.triangle")
+    #expect(screenshotUnavailableMessage(reason: reason).key == "Couldn't load")
+}
+
 /// エラーだけが添えられた時は、エラーのドメインとコードを含む失敗の理由にすること
 @Test func screenshotImageUnavailableReasonIsFailedWithErrorDescription() {
     #expect(
