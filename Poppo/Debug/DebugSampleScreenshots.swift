@@ -78,8 +78,8 @@ func addDebugSampleScreenshots() async throws {
         // 一覧に並べる上限の枚数まで足し、11 枚目より後の縮小画像も確かめる。
         // performChanges の変更のブロックは main actor の外で呼ばれるため、画像はその前に作って渡す
         try await createDebugSampleScreenshotAssets(
-            samples: (1...recentScreenshotsLimit).map { number in
-                (pngData: debugSampleScreenshotPNGData(number: number), creationDate: now.addingTimeInterval(-60 * Double(number)))
+            samples: try (1...recentScreenshotsLimit).map { number in
+                (pngData: try debugSampleScreenshotPNGData(number: number), creationDate: now.addingTimeInterval(-60 * Double(number)))
             }
         ),
         forKey: debugSampleScreenshotIdentifiersKey
@@ -122,8 +122,9 @@ func debugSampleScreenshotsMarkedAsScreenshotCount() -> Int {
     debugSampleScreenshots().filter { $0.mediaSubtypes.contains(.photoScreenshot) }.count
 }
 
-/// 見本のスクリーンショットの number 枚目の PNG。番号と形を大きく書き、EXIF の UserComment に「Screenshot」を入れる
-private func debugSampleScreenshotPNGData(number: Int) -> Data {
+/// 見本のスクリーンショットの number 枚目の PNG。番号と形を大きく書き、EXIF の UserComment に「Screenshot」を入れる。
+/// PNG を書き出せなかった時は CocoaError.fileWriteUnknown を投げる (EXIF の無い PNG に切り替えると、写真アプリがスクリーンショットの種別を付けず、一覧の確かめ方が変わるため)
+func debugSampleScreenshotPNGData(number: Int) throws -> Data {
     let shape = debugSampleScreenshotShape(number: number)
     let format = UIGraphicsImageRendererFormat()
     // ピクセル数を pixelSize のままにするため
@@ -148,7 +149,7 @@ private func debugSampleScreenshotPNGData(number: Int) -> Data {
         let cgImage = image.cgImage,
         let destination = CGImageDestinationCreateWithData(exifPNGData, UTType.png.identifier as CFString, 1, nil)
     else {
-        return image.pngData() ?? Data()
+        throw CocoaError(.fileWriteUnknown)
     }
     CGImageDestinationAddImage(
         destination,
@@ -156,7 +157,7 @@ private func debugSampleScreenshotPNGData(number: Int) -> Data {
         [kCGImagePropertyExifDictionary: [kCGImagePropertyExifUserComment: "Screenshot"]] as CFDictionary
     )
     guard CGImageDestinationFinalize(destination) else {
-        return image.pngData() ?? Data()
+        throw CocoaError(.fileWriteUnknown)
     }
     return exifPNGData as Data
 }

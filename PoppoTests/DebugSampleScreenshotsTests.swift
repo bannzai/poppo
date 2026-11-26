@@ -1,5 +1,8 @@
 #if DEBUG
+import Foundation
+import ImageIO
 import Testing
+import UniformTypeIdentifiers
 
 @testable import Poppo
 
@@ -19,6 +22,37 @@ import Testing
 /// 読んでいる 1 枚の撮影日時が無い時は「撮影日時なし」と出すこと
 @Test func debugReadingScreenshotTextWithoutCreationDate() {
     #expect(debugReadingScreenshotText(creationDate: nil) == "読んでいる画像: 撮影日時なし")
+}
+
+/// 読んでいる 1 枚の撮影日時がある時は、その日時を分まで出し、「撮影日時なし」と出さないこと (一覧のセルの撮影日時と見比べて、タップした 1 枚が渡されたかを確かめるため)
+@Test func debugReadingScreenshotTextWithCreationDate() {
+    let creationDate = Date(timeIntervalSince1970: 1_795_700_000)
+
+    let text = debugReadingScreenshotText(creationDate: creationDate)
+
+    #expect(text == "読んでいる画像: \(creationDate.formatted(date: .abbreviated, time: .shortened))")
+    #expect(!text.contains("撮影日時なし"))
+}
+
+/// 縮小画像を読み出せなかった理由ごとに、開発者メニューのあるビルドで枠に出す文を分けること。エラーの時は写真ライブラリの説明をそのまま出す
+@Test func debugTextForEachScreenshotImageUnavailableReason() {
+    #expect(debugText(screenshotImageUnavailableReason: .inCloudOnly) == "iCloud にだけある")
+    #expect(debugText(screenshotImageUnavailableReason: .cancelled) == "取り消された")
+    #expect(debugText(screenshotImageUnavailableReason: .failed(errorDescription: "PHPhotosErrorDomain 3164: network")) == "PHPhotosErrorDomain 3164: network")
+    #expect(debugText(screenshotImageUnavailableReason: .unknown) == "理由なし")
+}
+
+/// 見本の PNG は形ごとのピクセル数で書き出し、EXIF の UserComment に「Screenshot」を入れること (写真アプリがスクリーンショットの種別を付ける手がかり)。
+/// number は見本の番号、width・height はその番号の形で期待するピクセル数
+@MainActor @Test(arguments: [(1, 1206, 2622), (2, 2622, 1206), (5, 1600, 1600)]) func debugSampleScreenshotPNGDataHasShapeSizeAndScreenshotComment(number: Int, width: Int, height: Int) throws {
+    let source = try #require(CGImageSourceCreateWithData(try debugSampleScreenshotPNGData(number: number) as CFData, nil))
+    let properties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+    let exif = try #require(properties[kCGImagePropertyExifDictionary] as? [CFString: Any])
+
+    #expect(CGImageSourceGetType(source) as String? == UTType.png.identifier)
+    #expect(properties[kCGImagePropertyPixelWidth] as? Int == width)
+    #expect(properties[kCGImagePropertyPixelHeight] as? Int == height)
+    #expect(exif[kCGImagePropertyExifUserComment] as? String == "Screenshot")
 }
 
 /// タップからの時間を測った時はミリ秒を、測っていない時 (開発者メニューから開いた時等) は「なし」と出すこと

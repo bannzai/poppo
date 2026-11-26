@@ -258,7 +258,7 @@ struct DebugMenuView: View {
                 .accessibilityIdentifier("debug_open_sample_screenshot_grid")
                 NavigationLink {
                     ScrollView {
-                        LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridRowSpacing) {
+                        LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridSpacing) {
                             ForEach(
                                 [
                                     ScreenshotImageUnavailableReason.inCloudOnly,

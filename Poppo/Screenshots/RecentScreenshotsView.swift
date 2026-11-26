@@ -123,11 +123,14 @@ struct RecentScreenshotsView: View {
 /// 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
 nonisolated let recentScreenshotsLimit = 30
 
-/// スクリーンショットの一覧の列。3 列・間隔 8pt は、iPhone の幅で縮小画像から何の画面かが分かる大きさにするため
-let screenshotGridColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+/// スクリーンショットの一覧のセルどうしの間隔 (列と行で揃える)。8pt は、3 列でも縮小画像から何の画面かが分かる幅を残しつつ、隣のセルと見分けられる間にするため
+let screenshotGridSpacing: CGFloat = 8
 
-/// スクリーンショットの一覧の行の間隔。列の間隔と揃える
-let screenshotGridRowSpacing: CGFloat = 8
+/// スクリーンショットの一覧の列。3 列は、iPhone の幅で縮小画像から何の画面かが分かる大きさにするため
+let screenshotGridColumns = Array(repeating: GridItem(.flexible(), spacing: screenshotGridSpacing), count: 3)
+
+/// 一覧の縮小画像の枠の形。見た目を切る形とタップを受ける形を同じにするため 1 か所に置く。角丸 8pt はセルの間隔と揃える
+let screenshotThumbnailShape = RoundedRectangle(cornerRadius: 8)
 
 /// スクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
 struct ScreenshotGrid: View {
@@ -140,7 +143,7 @@ struct ScreenshotGrid: View {
                 // ja: 直近のスクリーンショット
                 Text("Recent screenshots")
                     .font(.headline)
-                LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridRowSpacing) {
+                LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridSpacing) {
                     ForEach(screenshots, id: \.localIdentifier) { screenshot in
                         NavigationLink {
                             ChatReadingView(screenshot: screenshot)
@@ -213,10 +216,10 @@ struct ScreenshotThumbnailFrame: View {
                     EmptyView()
                 }
             }
-            .clipShape(.rect(cornerRadius: 8))
+            .clipShape(screenshotThumbnailShape)
             // scaledToFill の画像は枠より横長の時に左右へはみ出し、clipShape は見た目だけを切るため、タップを受ける範囲が隣のセルまで広がる。
             // タップを受ける範囲を枠に揃える (simtunnel の simulator で、横長の 2 枚目が幅 558pt の範囲でタップを受け、1 枚目を押すと 2 枚目が開いた)
-            .contentShape(.rect(cornerRadius: 8))
+            .contentShape(screenshotThumbnailShape)
     }
 }
 
@@ -251,7 +254,7 @@ struct ScreenshotUnavailableLabel: View {
 
 #if DEBUG
 /// 縮小画像を読み出せなかった理由を、開発者メニューのあるビルドで枠の中に出す文にして返す
-func debugText(screenshotImageUnavailableReason: ScreenshotImageUnavailableReason) -> String {
+nonisolated func debugText(screenshotImageUnavailableReason: ScreenshotImageUnavailableReason) -> String {
     switch screenshotImageUnavailableReason {
     case .inCloudOnly:
         "iCloud にだけある"
