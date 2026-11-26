@@ -46,13 +46,40 @@ func recentScreenshotFetchOptions(limit: Int) -> PHFetchOptions {
     return options
 }
 
+/// 写真ライブラリの 1 枚を読み出せなかった理由。PHImageManager が結果に添える info (PHImageManager.h の「Result's handler info dictionary keys」) から決める
+nonisolated enum ScreenshotImageUnavailableReason: Error, Hashable {
+    /// 端末に無く iCloud にだけある (PHImageResultIsInCloudKey)。iCloud にだけある画像は取りに行かない (documents/DIRECTION.md「決めたこと」2026-11-17)
+    case inCloudOnly
+    /// 読み出しが取り消された (PHImageCancelledKey)
+    case cancelled
+    /// 写真ライブラリがエラーを返した (PHImageErrorKey)。errorDescription はそのエラーの説明
+    case failed(errorDescription: String)
+    /// info に理由が無いまま画像が返らなかった
+    case unknown
+}
+
+/// 画像が返らなかった時の info から、読み出せなかった理由を返す。
+/// iCloud にだけある時はエラーも添えられることがあるため、iCloud・取り消し・エラーの順に見る
+nonisolated func screenshotImageUnavailableReason(info: [AnyHashable: Any]?) -> ScreenshotImageUnavailableReason {
+    if (info?[PHImageResultIsInCloudKey] as? NSNumber)?.boolValue == true {
+        return .inCloudOnly
+    }
+    if (info?[PHImageCancelledKey] as? NSNumber)?.boolValue == true {
+        return .cancelled
+    }
+    if let error = info?[PHImageErrorKey] as? NSError {
+        return .failed(errorDescription: "\(error.domain) \(error.code): \(error.localizedDescription)")
+    }
+    return .unknown
+}
+
 /// 写真ライブラリの 1 枚を、targetSize に合わせた画像として読み出す。
-/// 端末に無い画像 (iCloud にだけある) は取りに行かず、読み出せない時は nil を返す
+/// 端末に無い画像 (iCloud にだけある) は取りに行かない。読み出せない時は、その理由を failure で返す
 @concurrent nonisolated func loadScreenshotImage(
     asset: PHAsset,
     targetSize: CGSize,
     contentMode: PHImageContentMode
-) async -> UIImage? {
+) async -> Result<UIImage, ScreenshotImageUnavailableReason> {
     let options = PHImageRequestOptions()
     // 結果を 1 回だけ受け取るため。既定の opportunistic は質の低い画像と本来の画像で resultHandler を複数回呼ぶことがあり、
     // continuation を 2 回 resume してしまう (PHImageManager.h: highQualityFormat は「client will get one result only」)
@@ -63,8 +90,8 @@ func recentScreenshotFetchOptions(limit: Int) -> PHFetchOptions {
             targetSize: targetSize,
             contentMode: contentMode,
             options: options
-        ) { image, _ in
-            continuation.resume(returning: image)
+        ) { image, info in
+            continuation.resume(returning: image.map { .success($0) } ?? .failure(screenshotImageUnavailableReason(info: info)))
         }
     }
 }

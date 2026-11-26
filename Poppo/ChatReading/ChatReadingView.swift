@@ -58,11 +58,12 @@ func nextLanguageDownloadConfiguration(
 /// スクリーンショットを読み出せない時は ChatReadingError.imageUnavailable を、ほかは readChat(image:...) と同じエラーを投げる
 func readChat(screenshot: PHAsset) async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion]) {
     guard
-        let image = await loadScreenshotImage(
+        case .success(let loadedImage) = await loadScreenshotImage(
             asset: screenshot,
             targetSize: PHImageManagerMaximumSize,
             contentMode: .default
-        )?.cgImage
+        ),
+        let image = loadedImage.cgImage
     else {
         throw ChatReadingError.imageUnavailable
     }
@@ -156,6 +157,8 @@ func chatPartnerRelationshipText(chatPartnerRelationship: ChatPartnerRelationshi
 /// 読み取りの画面。訳す先の言語と相手との関係を選ぶ欄を上に置き、その下に読み取りの状態 (翻訳と返信案など) を出す。
 /// 言語か関係を選び直すと、選んだものを端末に保存して読み取りをやり直す。選択は端末の保存 (UserDefaults) だけを正として読み書きする
 struct ChatReadingView: View {
+    /// 読んでいるスクリーンショット。開発者メニューのあるビルドで撮影日時を出すのに使う。開発者メニューの見本から開いた時は nil
+    let screenshot: PHAsset?
     /// 読み取りの処理。発言ごとの翻訳と返信案を返す。訳す先の言語と相手との関係は、処理の中で端末に保存してある選択を読む
     /// (本物は readChat(screenshot:)。開発者メニューは見本の読み取り結果を返す処理を渡す)
     let readChatContent: @MainActor () async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
@@ -180,6 +183,10 @@ struct ChatReadingView: View {
     private var targetLanguageIdentifier: String {
         targetLanguage(savedIdentifier: savedTargetLanguageIdentifier, preferredLanguages: Locale.preferredLanguages).maximalIdentifier
     }
+    #if DEBUG
+    /// 一覧でタップしてからこの画面が出るまでの時間 (ミリ秒)。一覧からのタップを控えていない時 (開発者メニューから開いた時等) は nil
+    @State private var debugTapToAppearMilliseconds: Int?
+    #endif
 
     var body: some View {
         ChatReadingPhaseView(
@@ -247,6 +254,19 @@ struct ChatReadingView: View {
         // ja: 翻訳
         .navigationTitle("Translation")
         .navigationBarTitleDisplayMode(.inline)
+        #if DEBUG
+        // 一覧でタップした 1 枚がこの画面に渡されたかを、一覧のセルの撮影日時 (accessibilityLabel) と比べて確かめるため、
+        // 開発者メニューのあるビルドでだけ、読んでいる 1 枚の撮影日時と、タップしてからこの画面が出るまでの時間を出す
+        .safeAreaInset(edge: .top) {
+            debugReadingInfo
+        }
+        .onAppear {
+            debugTapToAppearMilliseconds = debugLastScreenshotTapUptime.map {
+                Int((ProcessInfo.processInfo.systemUptime - $0) * 1000)
+            }
+            debugLastScreenshotTapUptime = nil
+        }
+        #endif
         .task {
             supportedLanguages = await translationSupportedLanguages()
         }
@@ -274,6 +294,23 @@ struct ChatReadingView: View {
             }
         }
     }
+
+    #if DEBUG
+    /// 開発者メニューのあるビルドでだけ画面の上に出す、読んでいる 1 枚の撮影日時と、タップしてからこの画面が出るまでの時間
+    private var debugReadingInfo: some View {
+        // 2pt: 開発者向けの 2 行を 1 つのまとまりとして詰めて出し、読み取りの画面の本文を押し下げる量を小さくするため
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: debugReadingScreenshotText(creationDate: screenshot?.creationDate))
+                .accessibilityIdentifier("debug_reading_screenshot_date")
+            Text(verbatim: debugTapToAppearText(milliseconds: debugTapToAppearMilliseconds))
+                .accessibilityIdentifier("debug_tap_to_appear")
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+    }
+    #endif
 }
 
 /// 読み取りの画面の、状態ごとの表示
