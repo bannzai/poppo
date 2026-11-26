@@ -121,6 +121,16 @@
         }
       }
     },
+    "Coworker" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仕事の仲間"
+          }
+        }
+      }
+    },
     "Download language" : {
       "localizations" : {
         "ja" : {
@@ -141,6 +151,16 @@
         }
       }
     },
+    "Friend or family" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "友人・家族"
+          }
+        }
+      }
+    },
     "No chat text found" : {
       "localizations" : {
         "ja" : {
@@ -157,6 +177,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットがまだありません"
+          }
+        }
+      }
+    },
+    "Not selected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未選択"
           }
         }
       }
@@ -221,6 +251,16 @@
         }
       }
     },
+    "Relationship" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手との関係"
+          }
+        }
+      }
+    },
     "Reply suggestions" : {
       "localizations" : {
         "ja" : {
@@ -271,6 +311,16 @@
         }
       }
     },
+    "Someone new" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初めての相手"
+          }
+        }
+      }
+    },
     "Start screen capture" : {
       "localizations" : {
         "ja" : {
@@ -287,6 +337,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止"
+          }
+        }
+      }
+    },
+    "Superior or client" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目上・取引先"
           }
         }
       }
@@ -327,6 +387,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この言語はあなたの言語に翻訳できません"
+          }
+        }
+      }
+    },
+    "Translate into" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "訳す言語"
           }
         }
       }

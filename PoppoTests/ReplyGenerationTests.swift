@@ -83,6 +83,47 @@ import Testing
     )
 }
 
+/// 相手との関係が未選択の時は、モデルへの指示の文が、関係を選べるようにする前と同じ文 (replyInstructions) のままであること
+@Test func replyInstructionsWithoutRelationshipAreUnchanged() {
+    #expect(
+        replyInstructions(chatPartnerRelationship: nil)
+            == """
+            You help a person reply in a chat. The chat is listed from oldest to newest. \
+            Lines starting with "Me:" were written by the person you help. \
+            Lines starting with "Them:" were written by other people. \
+            Write replies that the person could send next in response to the latest "Them:" lines. \
+            Write every reply in the same language as the "Them:" lines.
+            """
+    )
+}
+
+/// 相手との関係を選んだ時は、関係を選ばない時の指示の文に続けて、その関係と、関係に合う口調を求める文が入ること
+@Test(arguments: [
+    (ChatPartnerRelationship.friendOrFamily, "friends or family", "casual"),
+    (.coworker, "coworkers", "professional"),
+    (.superiorOrClient, "superiors or business clients", "polite, respectful"),
+    (.stranger, "for the first time", "polite"),
+])
+func replyInstructionsWithRelationshipNameRelationshipAndTone(
+    chatPartnerRelationship: ChatPartnerRelationship,
+    relationshipText: String,
+    toneText: String
+) {
+    let instructions = replyInstructions(chatPartnerRelationship: chatPartnerRelationship)
+
+    #expect(instructions.hasPrefix(replyInstructions(chatPartnerRelationship: nil) + "\n"))
+    #expect(instructions.contains(relationshipText))
+    #expect(instructions.contains("Write the replies in a \(toneText)"))
+}
+
+/// 関係ごとの指示の文はどれも違うこと (別の関係を選んでも同じ口調の返信案にならないようにする)
+@Test func replyInstructionsDifferForEachRelationship() {
+    #expect(
+        Set(([nil] + ChatPartnerRelationship.allCases).map { replyInstructions(chatPartnerRelationship: $0) }).count
+            == ChatPartnerRelationship.allCases.count + 1
+    )
+}
+
 /// 発言が無い時は、会話の文が空になること
 @Test func replyPromptIsEmptyWithoutMessages() {
     #expect(replyPrompt(messages: []) == "")

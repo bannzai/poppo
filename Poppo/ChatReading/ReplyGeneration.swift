@@ -31,6 +31,25 @@ let replyInstructions = """
     Write every reply in the same language as the "Them:" lines.
     """
 
+/// 返信の文を作るモデルへの指示の文。chatPartnerRelationship は、利用者が選んだ相手との関係 (nil は未選択)。
+/// 未選択の時は replyInstructions をそのまま返し、関係を選んだ時は、その関係と合う口調を求める文を後ろに足す。どのモデルでも同じ文を使う
+nonisolated func replyInstructions(chatPartnerRelationship: ChatPartnerRelationship?) -> String {
+    switch chatPartnerRelationship {
+    case nil:
+        replyInstructions
+    case .friendOrFamily:
+        replyInstructions + "\nThe other people are the person's friends or family. Write the replies in a casual, friendly tone."
+    case .coworker:
+        replyInstructions + "\nThe other people are the person's coworkers. Write the replies in a friendly but professional tone."
+    case .superiorOrClient:
+        replyInstructions
+            + "\nThe other people are the person's superiors or business clients. Write the replies in a polite, respectful tone."
+    case .stranger:
+        replyInstructions
+            + "\nThe person is talking with the other people for the first time. Write the replies in a polite tone."
+    }
+}
+
 // Foundation Models の LanguageModel プロトコルと PrivateCloudComputeLanguageModel は iOS 27 の SDK (Xcode 27。Swift 6.4 以降) にしか無い。
 // CodeQL の Swift の解析 (.github/workflows/codeql.yml) は Xcode 26 (Swift 6.3) でアプリをビルドするため、
 // コンパイラの版で分ける (Xcode 26.6 のビルドの実測: 「cannot find type 'LanguageModel' in scope」
@@ -120,27 +139,47 @@ func canGenerateReplies(replyModel: ReplyModel, apiKeyKeychainService: String, i
     }
 }
 
-/// replyModel のモデルで、会話に続けて利用者が送れる返信の文を、相手の言語で作る。
+/// replyModel のモデルで、会話に続けて利用者が送れる返信の文を、相手の言語で、chatPartnerRelationship (相手との関係。nil は未選択) に合う口調で作る。
 /// モデルが使えない端末・状態では失敗するため、呼ぶ前に canGenerateReplies(replyModel:) を確かめる。
 /// Private Cloud Compute では Apple の、OpenAI では OpenAI の、Gemini では Google の、Claude では Anthropic のサーバーへ、messages の発言が送られる
-func generateReplyTexts(messages: [ExtractedMessage], replyModel: ReplyModel) async throws -> [String] {
-    try await generateReplyTexts(messages: messages, replyModel: replyModel, apiKeyKeychainService: replyModelAPIKeyKeychainService)
-}
-
-/// replyModel のモデルで、会話に続けて利用者が送れる返信の文を、相手の言語で作る。
-/// apiKeyKeychainService は、API キーが要るモデルのキーを保存してある Keychain の service。
-/// 端末の外へ送るモデル (sendsMessagesOutsideDevice(replyModel:) が true) では、messages の発言がそのモデルの提供元のサーバーへ送られる
-func generateReplyTexts(messages: [ExtractedMessage], replyModel: ReplyModel, apiKeyKeychainService: String) async throws -> [String] {
+func generateReplyTexts(
+    messages: [ExtractedMessage],
+    replyModel: ReplyModel,
+    chatPartnerRelationship: ChatPartnerRelationship?
+) async throws -> [String] {
     try await generateReplyTexts(
         messages: messages,
+        replyModel: replyModel,
+        chatPartnerRelationship: chatPartnerRelationship,
+        apiKeyKeychainService: replyModelAPIKeyKeychainService
+    )
+}
+
+/// replyModel のモデルで、会話に続けて利用者が送れる返信の文を、相手の言語で、chatPartnerRelationship (相手との関係。nil は未選択) に合う口調で作る。
+/// apiKeyKeychainService は、API キーが要るモデルのキーを保存してある Keychain の service。
+/// 端末の外へ送るモデル (sendsMessagesOutsideDevice(replyModel:) が true) では、messages の発言がそのモデルの提供元のサーバーへ送られる
+func generateReplyTexts(
+    messages: [ExtractedMessage],
+    replyModel: ReplyModel,
+    chatPartnerRelationship: ChatPartnerRelationship?,
+    apiKeyKeychainService: String
+) async throws -> [String] {
+    try await generateReplyTexts(
+        messages: messages,
+        chatPartnerRelationship: chatPartnerRelationship,
         languageModel: languageModel(replyModel: replyModel, apiKeyKeychainService: apiKeyKeychainService)
     )
 }
 
-/// languageModel (Foundation Models の LanguageModel に準拠したモデル) で、会話に続けて利用者が送れる返信の文を、相手の言語で作る。
+/// languageModel (Foundation Models の LanguageModel に準拠したモデル) で、会話に続けて利用者が送れる返信の文を、相手の言語で、
+/// chatPartnerRelationship (相手との関係。nil は未選択) に合う口調で作る。
 /// モデルへの指示の文と、出力の形 (GeneratedReplyTexts) は、どのモデルでも同じ
-private func generateReplyTexts(messages: [ExtractedMessage], languageModel: some LanguageModel) async throws -> [String] {
-    try await LanguageModelSession(model: languageModel, instructions: replyInstructions)
+private func generateReplyTexts(
+    messages: [ExtractedMessage],
+    chatPartnerRelationship: ChatPartnerRelationship?,
+    languageModel: some LanguageModel
+) async throws -> [String] {
+    try await LanguageModelSession(model: languageModel, instructions: replyInstructions(chatPartnerRelationship: chatPartnerRelationship))
         .respond(to: replyPrompt(messages: messages), generating: GeneratedReplyTexts.self)
         .content
         .texts
@@ -160,12 +199,19 @@ func canGenerateReplies(replyModel: ReplyModel) -> Bool {
     }
 }
 
-/// replyModel のモデルで、会話に続けて利用者が送れる返信の文を、相手の言語で作る。
+/// replyModel のモデルで、会話に続けて利用者が送れる返信の文を、相手の言語で、chatPartnerRelationship (相手との関係。nil は未選択) に合う口調で作る。
 /// この SDK には LanguageModel プロトコルが無いため、端末内のモデルのほかでは ReplyModelNotInSDKError を投げる (端末内のモデルへは切り替えない)
-func generateReplyTexts(messages: [ExtractedMessage], replyModel: ReplyModel) async throws -> [String] {
+func generateReplyTexts(
+    messages: [ExtractedMessage],
+    replyModel: ReplyModel,
+    chatPartnerRelationship: ChatPartnerRelationship?
+) async throws -> [String] {
     switch replyModel {
     case .onDevice:
-        try await LanguageModelSession(model: SystemLanguageModel.default, instructions: replyInstructions)
+        try await LanguageModelSession(
+            model: SystemLanguageModel.default,
+            instructions: replyInstructions(chatPartnerRelationship: chatPartnerRelationship)
+        )
             .respond(to: replyPrompt(messages: messages), generating: GeneratedReplyTexts.self)
             .content
             .texts

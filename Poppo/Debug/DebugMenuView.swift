@@ -181,6 +181,13 @@ struct DebugMenuView: View {
                 }
                 .accessibilityIdentifier("debug_open_sample_result_without_replies")
                 NavigationLink {
+                    // 訳す先の言語と相手との関係を選ぶ欄を、simulator (翻訳が動かない) で確かめるため、読み取りの処理の代わりに見本の読み取り結果を返す
+                    ChatReadingView(readChatContent: { (messages: debugSampleMessages, replySuggestions: debugSampleReplySuggestions) })
+                } label: {
+                    Text(verbatim: "見本の読み取り結果で読み取りの画面を開く (言語と相手との関係を選ぶ欄つき)")
+                }
+                .accessibilityIdentifier("debug_open_sample_chat_reading")
+                NavigationLink {
                     ChatReadingPhaseView(
                         phase: .needsLanguageDownload(
                             source: Locale.Language(identifier: "en"),

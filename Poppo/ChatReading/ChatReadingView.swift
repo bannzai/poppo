@@ -53,14 +53,87 @@ func nextLanguageDownloadConfiguration(
     return configuration
 }
 
-/// 選んだスクリーンショットを読み取り、発言ごとの翻訳と返信案を出す画面
+/// スクリーンショット (screenshot) から、発言ごとの翻訳と返信案を作って返す。
+/// 訳す先の言語・相手との関係・返信案を作るモデルは、端末に保存してある選択を使う。
+/// スクリーンショットを読み出せない時は ChatReadingError.imageUnavailable を、ほかは readChat(image:...) と同じエラーを投げる
+func readChat(screenshot: PHAsset) async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion]) {
+    guard
+        let image = await loadScreenshotImage(
+            asset: screenshot,
+            targetSize: PHImageManagerMaximumSize,
+            contentMode: .default
+        )?.cgImage
+    else {
+        throw ChatReadingError.imageUnavailable
+    }
+    return try await readChat(
+        image: image,
+        recognizeTextLines: { try await recognizeTextLines(image: $0) },
+        translateTexts: { try await translateIntoSelectedLanguageOnDevice(texts: $0) },
+        replyModel: selectedReplyModel(userDefaults: .standard),
+        canGenerateReplies: { canGenerateReplies(replyModel: $0) },
+        generateReplyTexts: { try await generateReplyTextsForSelectedRelationship(messages: $0, replyModel: $1) }
+    )
+}
+
+/// 訳す先として選べる言語の一覧を、名前の順に並べて返す。supportedLanguages は Translation が端末で訳せる言語、
+/// selectedLanguage は今選んでいる言語。selectedLanguage が supportedLanguages に無い時 (一覧を読み出す前を含む) も、選んでいる値を出すために足す。
+/// 同じ言語 (maximalIdentifier が同じ) は 1 つにまとめる
+func targetLanguageOptions(supportedLanguages: [Locale.Language], selectedLanguage: Locale.Language) -> [Locale.Language] {
+    ([selectedLanguage] + supportedLanguages)
+        .reduce(into: [Locale.Language]()) { options, language in
+            if !options.contains(where: { $0.maximalIdentifier == language.maximalIdentifier }) {
+                options.append(language)
+            }
+        }
+        .sorted { languageName(language: $0).localizedStandardCompare(languageName(language: $1)) == .orderedAscending }
+}
+
+/// 言語を、利用者が読める名前 (アプリが動いている言語での言語の名前) にして返す。名前を引けない言語は識別子を返す
+func languageName(language: Locale.Language) -> String {
+    Locale.current.localizedString(forIdentifier: language.minimalIdentifier) ?? language.minimalIdentifier
+}
+
+/// 相手との関係 (nil は未選択) の、選ぶ画面に出す名前
+func chatPartnerRelationshipText(chatPartnerRelationship: ChatPartnerRelationship?) -> Text {
+    switch chatPartnerRelationship {
+    case nil:
+        // ja: 未選択
+        Text("Not selected")
+    case .friendOrFamily:
+        // ja: 友人・家族
+        Text("Friend or family")
+    case .coworker:
+        // ja: 仕事の仲間
+        Text("Coworker")
+    case .superiorOrClient:
+        // ja: 目上・取引先
+        Text("Superior or client")
+    case .stranger:
+        // ja: 初めての相手
+        Text("Someone new")
+    }
+}
+
+/// 読み取りの画面。訳す先の言語と相手との関係を選ぶ欄を上に置き、その下に読み取りの状態 (翻訳と返信案など) を出す。
+/// 言語か関係を選び直すと、選んだものを端末に保存して読み取りをやり直す
 struct ChatReadingView: View {
-    /// 読み取るスクリーンショット
-    let screenshot: PHAsset
+    /// 読み取りの処理。発言ごとの翻訳と返信案を返す。訳す先の言語と相手との関係は、処理の中で端末に保存してある選択を読む
+    /// (本物は readChat(screenshot:)。開発者メニューは見本の読み取り結果を返す処理を渡す)
+    let readChatContent: @MainActor () async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion])
     /// 画面の状態
     @State private var phase = ChatReadingPhase.reading
     /// 言語のダウンロードをシステムに頼むための設定。利用者がダウンロードを選ぶまでは nil
     @State private var languageDownloadConfiguration: TranslationSession.Configuration?
+    /// 訳す先として選んでいる言語の maximalIdentifier。最初は端末に保存してある選択 (無ければ端末の言語)
+    @State private var targetLanguageIdentifier = selectedTargetLanguage(
+        userDefaults: .standard,
+        preferredLanguages: Locale.preferredLanguages
+    ).maximalIdentifier
+    /// 選んでいる相手との関係。nil は未選択。最初は端末に保存してある選択
+    @State private var chatPartnerRelationship = selectedChatPartnerRelationship(userDefaults: .standard)
+    /// Translation が端末で訳せる言語。読み出すまでは空
+    @State private var supportedLanguages: [Locale.Language] = []
 
     var body: some View {
         ChatReadingPhaseView(
@@ -78,10 +151,68 @@ struct ChatReadingView: View {
                 }
             }
         )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .top) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    // ja: 訳す言語
+                    Text("Translate into")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Picker(selection: $targetLanguageIdentifier) {
+                        ForEach(
+                            targetLanguageOptions(
+                                supportedLanguages: supportedLanguages,
+                                selectedLanguage: Locale.Language(identifier: targetLanguageIdentifier)
+                            ),
+                            id: \.maximalIdentifier
+                        ) { language in
+                            Text(verbatim: languageName(language: language))
+                                .tag(language.maximalIdentifier)
+                        }
+                    } label: {
+                        // ja: 訳す言語
+                        Text("Translate into")
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("target_language_picker")
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    // ja: 相手との関係
+                    Text("Relationship")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Picker(selection: $chatPartnerRelationship) {
+                        chatPartnerRelationshipText(chatPartnerRelationship: nil)
+                            .tag(ChatPartnerRelationship?.none)
+                        ForEach(ChatPartnerRelationship.allCases, id: \.self) { relationship in
+                            chatPartnerRelationshipText(chatPartnerRelationship: relationship)
+                                .tag(Optional(relationship))
+                        }
+                    } label: {
+                        // ja: 相手との関係
+                        Text("Relationship")
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("chat_partner_relationship_picker")
+                }
+                Spacer(minLength: 0)
+            }
+            .pickerStyle(.menu)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(.bar)
+        }
         // ja: 翻訳
         .navigationTitle("Translation")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            supportedLanguages = await LanguageAvailability().supportedLanguages
+        }
+        // 最初に開いた時と、言語か関係を選び直した時に読み取る。選び直した時は、前の読み取りを取りやめて読み直す
+        .task(id: [targetLanguageIdentifier, chatPartnerRelationship?.rawValue]) {
+            save(selectedTargetLanguage: Locale.Language(identifier: targetLanguageIdentifier), userDefaults: .standard)
+            save(selectedChatPartnerRelationship: chatPartnerRelationship, userDefaults: .standard)
             await read()
         }
         .translationTask(languageDownloadConfiguration) { session in
@@ -96,30 +227,16 @@ struct ChatReadingView: View {
         }
     }
 
-    /// スクリーンショットを読み取り、結果を画面の状態に入れる
+    /// 読み取りの処理を実行し、結果を画面の状態に入れる。
+    /// 読み取りの途中で取りやめた時 (言語か関係を選び直した時) は、結果を画面に入れない (選び直した後の読み取りの結果を、前の結果で上書きしないため)
     private func read() async {
         phase = .reading
-        phase = await chatReadingPhase {
-            guard
-                let image = await loadScreenshotImage(
-                    asset: screenshot,
-                    targetSize: PHImageManagerMaximumSize,
-                    contentMode: .default
-                )?.cgImage
-            else {
-                throw ChatReadingError.imageUnavailable
-            }
-            return try await readChat(
-                image: image,
-                recognizeTextLines: { try await recognizeTextLines(image: $0) },
-                translateTexts: {
-                    try await translateOnDevice(texts: $0, targetLanguage: userLanguage(preferredLanguages: Locale.preferredLanguages))
-                },
-                replyModel: selectedReplyModel(userDefaults: .standard),
-                canGenerateReplies: { canGenerateReplies(replyModel: $0) },
-                generateReplyTexts: { try await generateReplyTexts(messages: $0, replyModel: $1) }
-            )
+        // 取りやめを確かめる前に読み取りを終えるため、結果を変数に置く (式のまま畳むと、取りやめの確かめが読み取りより先に評価される)
+        let readPhase = await chatReadingPhase(read: readChatContent)
+        guard !Task.isCancelled else {
+            return
         }
+        phase = readPhase
     }
 }
 

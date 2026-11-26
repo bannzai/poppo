@@ -114,7 +114,7 @@ struct RecentScreenshotsView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                     ForEach(screenshots, id: \.localIdentifier) { screenshot in
                         NavigationLink {
-                            ChatReadingView(screenshot: screenshot)
+                            ChatReadingView(readChatContent: { try await readChat(screenshot: screenshot) })
                         } label: {
                             ScreenshotThumbnail(screenshot: screenshot)
                         }
