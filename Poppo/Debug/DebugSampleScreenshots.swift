@@ -71,6 +71,18 @@ func addDebugSampleScreenshots() async throws {
     let samples = (1...debugSampleScreenshotCount).map { number in
         (pngData: debugSampleScreenshotPNGData(number: number), creationDate: now.addingTimeInterval(-60 * Double(number)))
     }
+    UserDefaults.standard.set(
+        try await createDebugSampleScreenshotAssets(samples: samples),
+        forKey: debugSampleScreenshotIdentifiersKey
+    )
+}
+
+/// samples の画像を写真ライブラリに足し、足した asset の localIdentifier を samples の順に返す。
+/// main actor の外 (nonisolated) に置くのは、main actor の関数の中で書いた変更のブロックは main actor に隔離され、
+/// 写真ライブラリはそのブロックを別のキューで呼ぶため (main actor の関数の中に書いた版は、simtunnel の simulator で足す操作の後にアプリが終了し、写真に 1 枚も入らなかった)
+nonisolated private func createDebugSampleScreenshotAssets(
+    samples: [(pngData: Data, creationDate: Date)]
+) async throws -> [String] {
     // 変更のブロックは performChanges が戻る前に 1 度だけ呼ばれ、ほかから同時に触られないため、検査の対象から外す
     nonisolated(unsafe) var createdIdentifiers: [String] = []
     try await PHPhotoLibrary.shared().performChanges {
@@ -81,7 +93,7 @@ func addDebugSampleScreenshots() async throws {
             return request.placeholderForCreatedAsset?.localIdentifier
         }
     }
-    UserDefaults.standard.set(createdIdentifiers, forKey: debugSampleScreenshotIdentifiersKey)
+    return createdIdentifiers
 }
 
 /// 開発者メニューで足した見本のスクリーンショットのうち、写真ライブラリに残っているものを新しい順に返す。足していない時は空
