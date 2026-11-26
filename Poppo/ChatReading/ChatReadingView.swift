@@ -89,6 +89,11 @@ func targetLanguageOptions(supportedLanguages: [Locale.Language], selectedLangua
         .sorted { languageName(language: $0).localizedStandardCompare(languageName(language: $1)) == .orderedAscending }
 }
 
+/// Translation が端末で訳せる言語を返す。LanguageAvailability は Sendable でないため、main actor の外で作って読む
+@concurrent nonisolated func translationSupportedLanguages() async -> [Locale.Language] {
+    await LanguageAvailability().supportedLanguages
+}
+
 /// 言語を、利用者が読める名前 (アプリが動いている言語での言語の名前) にして返す。名前を引けない言語は識別子を返す
 func languageName(language: Locale.Language) -> String {
     Locale.current.localizedString(forIdentifier: language.minimalIdentifier) ?? language.minimalIdentifier
@@ -207,7 +212,7 @@ struct ChatReadingView: View {
         .navigationTitle("Translation")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            supportedLanguages = await LanguageAvailability().supportedLanguages
+            supportedLanguages = await translationSupportedLanguages()
         }
         // 最初に開いた時と、言語か関係を選び直した時に読み取る。選び直した時は、前の読み取りを取りやめて読み直す
         .task(id: [targetLanguageIdentifier, chatPartnerRelationship?.rawValue]) {
