@@ -61,6 +61,10 @@ struct ChatReadingView: View {
     @State private var phase = ChatReadingPhase.reading
     /// 言語のダウンロードをシステムに頼むための設定。利用者がダウンロードを選ぶまでは nil
     @State private var languageDownloadConfiguration: TranslationSession.Configuration?
+    #if DEBUG
+    /// 一覧でタップしてからこの画面が出るまでの時間 (ミリ秒)。一覧からのタップを控えていない時 (開発者メニューから開いた時等) は nil
+    @State private var debugTapToAppearMilliseconds: Int?
+    #endif
 
     var body: some View {
         ChatReadingPhaseView(
@@ -81,6 +85,28 @@ struct ChatReadingView: View {
         // ja: 翻訳
         .navigationTitle("Translation")
         .navigationBarTitleDisplayMode(.inline)
+        #if DEBUG
+        // 一覧でタップした 1 枚がこの画面に渡されたかを、一覧のセルの撮影日時 (accessibilityLabel) と比べて確かめるため、
+        // 開発者メニューのあるビルドでだけ、読んでいる 1 枚の撮影日時と、タップしてからこの画面が出るまでの時間を出す
+        .safeAreaInset(edge: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: "読んでいる画像: \(screenshot.creationDate?.formatted(date: .abbreviated, time: .shortened) ?? "撮影日時なし")")
+                    .accessibilityIdentifier("debug_reading_screenshot_date")
+                Text(verbatim: "タップから表示まで: \(debugTapToAppearMilliseconds.map { "\($0) ms" } ?? "なし")")
+                    .accessibilityIdentifier("debug_tap_to_appear")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+        }
+        .onAppear {
+            debugTapToAppearMilliseconds = debugLastScreenshotTapUptime.map {
+                Int((ProcessInfo.processInfo.systemUptime - $0) * 1000)
+            }
+            debugLastScreenshotTapUptime = nil
+        }
+        #endif
         .task {
             await read()
         }
