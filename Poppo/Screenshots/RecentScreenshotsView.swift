@@ -112,13 +112,22 @@ struct RecentScreenshotsView: View {
     private func loadScreenshots() {
         switch screenshotAccess(authorizationStatus: authorizationStatus) {
         case .allowed, .limited:
-            // 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
-            screenshots = fetchRecentScreenshots(limit: 30)
+            screenshots = fetchRecentScreenshots(limit: recentScreenshotsLimit)
         case .notRequested, .denied:
             return
         }
     }
 }
+
+/// 直近のスクリーンショットの一覧に並べる枚数の上限。
+/// 30: 3 列で 10 行ぶん。直近のものをすぐ選ぶための画面で、古いスクリーンショットを探す用途は持たないため
+nonisolated let recentScreenshotsLimit = 30
+
+/// スクリーンショットの一覧の列。3 列・間隔 8pt は、iPhone の幅で縮小画像から何の画面かが分かる大きさにするため
+let screenshotGridColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+
+/// スクリーンショットの一覧の行の間隔。列の間隔と揃える
+let screenshotGridRowSpacing: CGFloat = 8
 
 /// スクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む
 struct ScreenshotGrid: View {
@@ -131,7 +140,7 @@ struct ScreenshotGrid: View {
                 // ja: 直近のスクリーンショット
                 Text("Recent screenshots")
                     .font(.headline)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridRowSpacing) {
                     ForEach(screenshots, id: \.localIdentifier) { screenshot in
                         NavigationLink {
                             ChatReadingView(screenshot: screenshot)

@@ -34,10 +34,19 @@ struct DebugMenuView: View {
     @State private var sampleScreenshotMarkedCount = 0
     /// 直前の見本のスクリーンショットの追加が失敗した時のエラーの説明。成功した時と、まだ操作していない時は nil
     @State private var sampleScreenshotError: String?
+    /// 見本のスクリーンショットを足している間は true。足し終わるまで次の追加を始めず、見本が 2 組入らないようにする
+    @State private var isAddingSampleScreenshots = false
 
     /// 写真ライブラリへのアクセスの許可を (まだ選んでいなければ) 求めてから、見本のスクリーンショットを足す。
-    /// 足せなかった時は、エラーの説明を sampleScreenshotError に入れる
+    /// 足せなかった時は、エラーの説明を sampleScreenshotError に入れる。足している途中に呼ばれた時は何もしない
     private func addSampleScreenshots() async {
+        guard !isAddingSampleScreenshots else {
+            return
+        }
+        isAddingSampleScreenshots = true
+        defer {
+            isAddingSampleScreenshots = false
+        }
         if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
             _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         }
@@ -231,8 +240,9 @@ struct DebugMenuView: View {
                         await addSampleScreenshots()
                     }
                 } label: {
-                    Text(verbatim: "見本のスクリーンショット (30 枚) を写真に足す")
+                    Text(verbatim: "見本のスクリーンショット (\(recentScreenshotsLimit) 枚) を写真に足す")
                 }
+                .disabled(isAddingSampleScreenshots)
                 .accessibilityIdentifier("debug_add_sample_screenshots")
                 LabeledContent {
                     Text(verbatim: "\(sampleScreenshotCount) 枚 (スクリーンショットの種別: \(sampleScreenshotMarkedCount) 枚)")
@@ -248,7 +258,7 @@ struct DebugMenuView: View {
                 .accessibilityIdentifier("debug_open_sample_screenshot_grid")
                 NavigationLink {
                     ScrollView {
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                        LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridRowSpacing) {
                             ForEach(
                                 [
                                     ScreenshotImageUnavailableReason.inCloudOnly,
@@ -275,7 +285,7 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "スクリーンショットの一覧")
             } footer: {
-                Text(verbatim: "simulator の写真にはスクリーンショットが無いため、番号を書いた見本を足して一覧とタップを確かめる。1 番が最も新しく、2 番は横長、5 番は正方形、ほかは縦長。足した見本は写真アプリで消す (何度押しても、残っていれば足し直さない)。スクリーンショットの種別が付かなかった時は「見本だけの一覧を開く」で、同じ一覧の画面に見本を並べる")
+                Text(verbatim: "simulator の写真にはスクリーンショットが無いため、番号を書いた見本を足して一覧とタップを確かめる。1 番が最も新しく、2 番は横長、5 番は正方形、ほかは縦長。足した見本は写真アプリで消す (すべて残っていれば足し直さない。一部を消した時は 1 組を足し直すので、残りも写真アプリで消す)。スクリーンショットの種別が付かなかった時は「見本だけの一覧を開く」で、同じ一覧の画面に見本を並べる")
             }
             Section {
                 Button {

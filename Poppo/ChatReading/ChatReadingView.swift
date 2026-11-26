@@ -89,16 +89,7 @@ struct ChatReadingView: View {
         // 一覧でタップした 1 枚がこの画面に渡されたかを、一覧のセルの撮影日時 (accessibilityLabel) と比べて確かめるため、
         // 開発者メニューのあるビルドでだけ、読んでいる 1 枚の撮影日時と、タップしてからこの画面が出るまでの時間を出す
         .safeAreaInset(edge: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: "読んでいる画像: \(screenshot.creationDate?.formatted(date: .abbreviated, time: .shortened) ?? "撮影日時なし")")
-                    .accessibilityIdentifier("debug_reading_screenshot_date")
-                Text(verbatim: "タップから表示まで: \(debugTapToAppearMilliseconds.map { "\($0) ms" } ?? "なし")")
-                    .accessibilityIdentifier("debug_tap_to_appear")
-            }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal)
+            debugReadingInfo
         }
         .onAppear {
             debugTapToAppearMilliseconds = debugLastScreenshotTapUptime.map {
@@ -121,6 +112,22 @@ struct ChatReadingView: View {
             }
         }
     }
+
+    #if DEBUG
+    /// 開発者メニューのあるビルドでだけ画面の上に出す、読んでいる 1 枚の撮影日時と、タップしてからこの画面が出るまでの時間
+    private var debugReadingInfo: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: debugReadingScreenshotText(creationDate: screenshot.creationDate))
+                .accessibilityIdentifier("debug_reading_screenshot_date")
+            Text(verbatim: debugTapToAppearText(milliseconds: debugTapToAppearMilliseconds))
+                .accessibilityIdentifier("debug_tap_to_appear")
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+    }
+    #endif
 
     /// スクリーンショットを読み取り、結果を画面の状態に入れる
     private func read() async {

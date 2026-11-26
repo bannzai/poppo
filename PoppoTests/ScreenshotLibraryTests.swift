@@ -52,6 +52,22 @@ import Testing
     )
 }
 
+/// iCloud・取り消し・エラーの印が重なった時は、iCloud・取り消し・エラーの順で先に当たった理由にすること
+@Test func screenshotImageUnavailableReasonFollowsInCloudCancelledErrorOrder() {
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageResultIsInCloudKey: NSNumber(value: true),
+            PHImageCancelledKey: NSNumber(value: true),
+        ]) == .inCloudOnly
+    )
+    #expect(
+        screenshotImageUnavailableReason(info: [
+            PHImageCancelledKey: NSNumber(value: true),
+            PHImageErrorKey: NSError(domain: "PHPhotosErrorDomain", code: 3072),
+        ]) == .cancelled
+    )
+}
+
 /// エラーだけが添えられた時は、エラーのドメインとコードを含む失敗の理由にすること
 @Test func screenshotImageUnavailableReasonIsFailedWithErrorDescription() {
     #expect(

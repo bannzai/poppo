@@ -8,6 +8,16 @@ import UniformTypeIdentifiers
 /// 開発者メニューのあるビルドでだけ控える
 @MainActor var debugLastScreenshotTapUptime: TimeInterval?
 
+/// 読み取りの画面に開発者メニューのあるビルドでだけ出す、読んでいる 1 枚の撮影日時の文。creationDate は読んでいる 1 枚の撮影日時で、無い時は nil
+nonisolated func debugReadingScreenshotText(creationDate: Date?) -> String {
+    "読んでいる画像: \(creationDate?.formatted(date: .abbreviated, time: .shortened) ?? "撮影日時なし")"
+}
+
+/// 読み取りの画面に開発者メニューのあるビルドでだけ出す、一覧でタップしてからその画面が出るまでの時間の文。milliseconds はその時間で、測っていない時は nil
+nonisolated func debugTapToAppearText(milliseconds: Int?) -> String {
+    "タップから表示まで: \(milliseconds.map { "\($0) ms" } ?? "なし")"
+}
+
 /// 開発者メニューで写真ライブラリに足した、見本のスクリーンショットの localIdentifier を控える UserDefaults のキー
 private let debugSampleScreenshotIdentifiersKey = "debugSampleScreenshotIdentifiers"
 
@@ -39,8 +49,7 @@ nonisolated enum DebugSampleScreenshotShape: Equatable {
 }
 
 /// 見本のスクリーンショットの number 枚目 (1 が最も新しい) の形を返す。
-/// 2 枚目は横長、5 枚目は正方形、ほかは縦長。1 枚目の右隣が横長、4 枚目の右隣が正方形、7 枚目の右隣が縦長の並びになり、
-/// どの形の右隣で 1 枚目のタップが右隣に渡るかを 1 回の一覧で見比べられる
+/// 3 列の一覧で、左端のセルの右隣が横長・正方形・縦長になる行を 1 つずつ作り、どの形の右隣でタップが右隣に渡るかを 1 回の一覧で見比べるための並び
 nonisolated func debugSampleScreenshotShape(number: Int) -> DebugSampleScreenshotShape {
     switch number {
     case 2:
@@ -52,10 +61,8 @@ nonisolated func debugSampleScreenshotShape(number: Int) -> DebugSampleScreensho
     }
 }
 
-/// 見本のスクリーンショットの枚数。並べる上限 (30 枚。RecentScreenshotsView の loadScreenshots) まで並べ、11 枚目より後の縮小画像も確かめるため
-private let debugSampleScreenshotCount = 30
-
-/// 見本のスクリーンショットを写真ライブラリに足す。前に足した見本がすべて残っていれば何もしない (何度実行しても見本は 1 組だけ)。
+/// 見本のスクリーンショットを写真ライブラリに足す。前に足した見本がすべて残っていれば何もしない。
+/// 一部が消されていた時は 1 組を足し直し、残っていた見本は控えから外れる (写真アプリで消す)。同時に 2 回呼ばない前提で、呼び出し側が足している間の再実行を止める。
 /// number 枚目の撮影日時は今から number 分前にする。一覧のセルの撮影日時の表示 (分まで) で、どの 1 枚かを見分けるため。
 /// EXIF の UserComment に「Screenshot」を入れる。写真アプリがスクリーンショットの種別を付けるかは simulator で確かめる (付かない時は debugSampleScreenshots() の一覧で確かめる)。
 /// 写真ライブラリへの書き込みの許可が要る
@@ -67,12 +74,14 @@ func addDebugSampleScreenshots() async throws {
         return
     }
     let now = Date()
-    // performChanges の変更のブロックは main actor の外で呼ばれるため、画像はその前に作って渡す
-    let samples = (1...debugSampleScreenshotCount).map { number in
-        (pngData: debugSampleScreenshotPNGData(number: number), creationDate: now.addingTimeInterval(-60 * Double(number)))
-    }
     UserDefaults.standard.set(
-        try await createDebugSampleScreenshotAssets(samples: samples),
+        // 一覧に並べる上限の枚数まで足し、11 枚目より後の縮小画像も確かめる。
+        // performChanges の変更のブロックは main actor の外で呼ばれるため、画像はその前に作って渡す
+        try await createDebugSampleScreenshotAssets(
+            samples: (1...recentScreenshotsLimit).map { number in
+                (pngData: debugSampleScreenshotPNGData(number: number), creationDate: now.addingTimeInterval(-60 * Double(number)))
+            }
+        ),
         forKey: debugSampleScreenshotIdentifiersKey
     )
 }
@@ -120,10 +129,12 @@ private func debugSampleScreenshotPNGData(number: Int) -> Data {
     // ピクセル数を pixelSize のままにするため
     format.scale = 1
     let image = UIGraphicsImageRenderer(size: shape.pixelSize, format: format).image { context in
-        // 番号ごとに色を変え、一覧で隣のセルと見分けやすくする。12 色で一巡させる
+        // 番号ごとに色を変え、一覧で隣のセルと見分けやすくする。12 色で一巡させる (3 列の一覧の 4 行分で、隣どうしと上下が同じ色にならない)。
+        // 彩度 0.35・明度 0.95 は、黒い文字が読める淡い色にするため
         UIColor(hue: CGFloat(number % 12) / 12, saturation: 0.35, brightness: 0.95, alpha: 1).setFill()
         context.fill(CGRect(origin: .zero, size: shape.pixelSize))
         ("Sample \(number)\n\(shape)" as NSString).draw(
+            // 左右 80px は文字が画像の端に付かないための余白。上下の 1/3 は、縦長の画像が枠に合わせて縦に切られても文字が真ん中に残るため
             in: CGRect(origin: .zero, size: shape.pixelSize).insetBy(dx: 80, dy: shape.pixelSize.height / 3),
             withAttributes: [
                 // 一覧の縮小画像 (幅 約 118pt) でも番号が読める大きさ
@@ -132,10 +143,10 @@ private func debugSampleScreenshotPNGData(number: Int) -> Data {
             ]
         )
     }
-    let data = NSMutableData()
+    let exifPNGData = NSMutableData()
     guard
         let cgImage = image.cgImage,
-        let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+        let destination = CGImageDestinationCreateWithData(exifPNGData, UTType.png.identifier as CFString, 1, nil)
     else {
         return image.pngData() ?? Data()
     }
@@ -147,6 +158,6 @@ private func debugSampleScreenshotPNGData(number: Int) -> Data {
     guard CGImageDestinationFinalize(destination) else {
         return image.pngData() ?? Data()
     }
-    return data as Data
+    return exifPNGData as Data
 }
 #endif
