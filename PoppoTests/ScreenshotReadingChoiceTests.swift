@@ -768,3 +768,23 @@ private func pastChoice(
     #expect(Set(chatTitles).count == DebugSampleChat.allCases.count)
 }
 #endif
+
+/// 見出しの形の行 (名前と右の時刻) の下に行があっても、同じ発言の続きでない時 (行間が離れている・左端がずれている) は名前として読まないこと。
+/// すぐ下に同じ左端で続く時は読むこと (境目の対)
+@Test func speakerNamesRequireBodyLineContinuingBelowHeader() {
+    let line = { (text: String, x: CGFloat, y: CGFloat) in RecognizedTextLine(text: text, boundingBox: CGRect(x: x, y: y, width: 0.25, height: 0.02)) }
+    let header = [line("Mira Solberg", 0.16, 0.2), line("10:42 AM", 0.43, 0.2)]
+
+    // 行間 0.05 (行の高さ 0.02 の 0.75 倍を超える)
+    #expect(speakerNames(lines: header + [line("Body", 0.16, 0.27)]).isEmpty)
+    // 左端が 0.1 ずれる (0.04 を超える)
+    #expect(speakerNames(lines: header + [line("Body", 0.26, 0.23)]).isEmpty)
+    // 行間 0.01・左端が同じ
+    #expect(speakerNames(lines: header + [line("Body", 0.16, 0.23)]) == ["Mira Solberg"])
+}
+
+/// 端末に保存してある訳す先の言語を記録に残す形: 空文字 (未選択) は nil、選んだ言語はそのまま
+@Test func recordedTargetLanguageIdentifierTreatsEmptyAsUnselected() {
+    #expect(recordedTargetLanguageIdentifier(savedIdentifier: "") == nil)
+    #expect(recordedTargetLanguageIdentifier(savedIdentifier: "da-Latn-DK") == "da-Latn-DK")
+}

@@ -359,11 +359,6 @@ struct ChatReadingView: View {
         }
     }
 
-    /// 端末に保存してある、訳す先として選んだ言語の maximalIdentifier。何も選んでいない (端末の言語へ訳す) 時は nil
-    private var selectedTargetLanguageIdentifier: String? {
-        savedTargetLanguageIdentifier.isEmpty ? nil : savedTargetLanguageIdentifier
-    }
-
     /// この画面の読み取りに使う文字の行を返す。画面を開いて最初の 1 回だけ文字を読み、読み取りを記録して、
     /// 前に読んだ同じ相手のスクリーンショットで選ばれていた言語と関係を既定として選ぶ (この画面で利用者が既に選び直していた時は選ばない)。
     /// 既定を選んで、読み取りのタスクの id (chatReadingTaskID) が変わった時 (.task(id:) がその選択で読み取りを始め直すため) と、読んでいる途中で取りやめられた時は nil を返す。
@@ -416,7 +411,7 @@ struct ChatReadingView: View {
         // 書き換えられない時は、次に同じ相手を読んだ時の既定が前の選択のままになるだけで、この画面の読み取りには関わらないため、読み取りを止めない
         try? updateScreenshotReadingChoice(
             id: screenshotReadingChoiceID,
-            targetLanguageIdentifier: selectedTargetLanguageIdentifier,
+            targetLanguageIdentifier: recordedTargetLanguageIdentifier(savedIdentifier: savedTargetLanguageIdentifier),
             chatPartnerRelationship: chatPartnerRelationship,
             now: Date(),
             fileURL: fileURL

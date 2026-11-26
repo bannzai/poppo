@@ -29,6 +29,12 @@ func selectedTargetLanguage(userDefaults: UserDefaults, preferredLanguages: [Str
     )
 }
 
+/// 端末に保存してある訳す先の言語の識別子 (savedIdentifier。空文字は未選択) を、スクリーンショットからの読み取りの記録
+/// (ScreenshotReadingChoice.targetLanguageIdentifier) に残す形にして返す。未選択の時は nil
+nonisolated func recordedTargetLanguageIdentifier(savedIdentifier: String) -> String? {
+    savedIdentifier.isEmpty ? nil : savedIdentifier
+}
+
 /// 保存してある訳す先の言語の識別子 (savedIdentifier。nil か空文字は未選択) から、訳す先の言語を返す。
 /// preferredLanguages は利用者が端末で選んだ言語の並び
 func targetLanguage(savedIdentifier: String?, preferredLanguages: [String]) -> Locale.Language {

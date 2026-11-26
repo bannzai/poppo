@@ -45,7 +45,9 @@ nonisolated func speakerNames(lines: [RecognizedTextLine]) -> [String] {
             chatAreaLines.contains { timeLine in
                 continuesRow(leftLine: nameLine, line: timeLine)
                     // 時刻の前の語は 3 語まで: 「hoy a las 18:05」のような時刻の書き方を通し、本文の文を時刻の行にしないため
-                    && timeLine.text.wholeMatch(of: #/(\S+\s+){0,3}((午前|午後)\s?)?\d{1,2}:\d{2}(\s?[AaPp][Mm])?/#) != nil
+                    && (0...3).contains { leadingWordCount in
+                        isTimeOnly(text: timeLine.text.split(separator: " ").dropFirst(leadingWordCount).joined(separator: " "))
+                    }
                     && !isShiftedRight(lines: [nameLine, timeLine])
             }
                 && chatAreaLines.contains { bodyLine in
@@ -209,7 +211,7 @@ func recordScreenshotReading(
         let choice = fileURL.flatMap({
             try? addScreenshotReadingChoice(
                 lines: lines,
-                targetLanguageIdentifier: savedTargetLanguageIdentifier.isEmpty ? nil : savedTargetLanguageIdentifier,
+                targetLanguageIdentifier: recordedTargetLanguageIdentifier(savedIdentifier: savedTargetLanguageIdentifier),
                 chatPartnerRelationship: chatPartnerRelationship,
                 usesMostSimilarChoice: !hasUserChangedChoice,
                 id: id,
