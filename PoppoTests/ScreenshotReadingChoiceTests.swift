@@ -116,6 +116,9 @@ private func pastChoice(
     #expect(speakerNames(lines: [line("Meet me at 10:42", 0.16, 0.2), line("See you", 0.16, 0.23)]).isEmpty)
     // 吹き出しの最後の行の右に時刻 (下に本文が続かない)
     #expect(speakerNames(lines: [line("Bonjour", 0.16, 0.2), line("10:42", 0.43, 0.2)]).isEmpty)
+    // 残る経路の記録: 同じ吹き出しのすぐ下に次の吹き出しが詰めて並ぶと、位置と形では見出しと見分けられず名前として読む
+    // (documents/DIRECTION.md の 2026-11-27 の行と、プライバシーポリシーの「発言の一部が含まれる場合」)。見分けられるようになったら、ここを空に直す
+    #expect(speakerNames(lines: [line("Bonjour", 0.16, 0.2), line("10:42", 0.43, 0.2), line("See you", 0.16, 0.23)]) == ["Bonjour"])
     // 右の行が 4 語以上の文で時刻で終わる (時刻の行ではない)
     #expect(
         speakerNames(lines: [line("Mira Solberg", 0.16, 0.2), line("we can meet at 10:42", 0.43, 0.2), line("Body", 0.16, 0.23)]).isEmpty
