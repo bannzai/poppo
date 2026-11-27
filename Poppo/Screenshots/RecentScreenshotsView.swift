@@ -329,7 +329,14 @@ struct ScreenshotGridCell: View {
             )
             // 待っている間に task が取りやめられた時と、利用者がダウンロードのボタンを押して取り始めた時は、その表示を読み出す前の結果で上書きしない
             // (読み出しを待つ前に畳むと、待った後の状態を確かめられないため、結果を変数で受ける)
-            guard !Task.isCancelled,
+            if Task.isCancelled {
+                // この task が出した取っている表示を残すと、次に画面に出た時に冒頭の guard で読み出し直せず、取っている表示のまま止まるため、読み出す前に戻す
+                if isDownloadRequested, case .downloading = thumbnailState {
+                    thumbnailState = .loading
+                }
+                return
+            }
+            guard
                 canApplyInitialScreenshotThumbnailState(
                     currentThumbnailState: thumbnailState,
                     isDownloadRequested: isDownloadRequested
