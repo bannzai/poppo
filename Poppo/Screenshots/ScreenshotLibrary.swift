@@ -63,19 +63,59 @@ nonisolated func toggledPhotoLibraryMediaKinds(
 /// 写真へのアクセスが許可されている時に呼ぶ
 func fetchRecentScreenshots(limit: Int, mediaKinds: PhotoLibraryMediaKinds) -> [PHAsset] {
     let fetchResult = PHAsset.fetchAssets(with: recentScreenshotFetchOptions(limit: limit, mediaKinds: mediaKinds))
-    return fetchResult.objects(at: IndexSet(integersIn: 0..<fetchResult.count))
+    // PHFetchResult は項目を読む時に読み出すため、limit 件に達した所で読むのをやめる
+    return listedPhotoLibraryItems(
+        items: (0..<fetchResult.count).lazy.map { fetchResult.object(at: $0) },
+        limit: limit,
+        mediaKinds: mediaKinds,
+        mediaKind: { photoLibraryMediaKind(mediaType: $0.mediaType, mediaSubtypes: $0.mediaSubtypes) }
+    )
 }
 
-/// 写真ライブラリへの問い合わせの条件。mediaKinds の種類に当たる項目を、撮った日時の新しい順に、limit 件まで取る
+/// 新しい順の項目 (items) から、種類 (mediaKind で求める) が mediaKinds に入っているものを、先頭から limit 件まで返す。
+/// 問い合わせの述語 (photoLibraryMediaKindsPredicate) が選んだ項目から、述語では絞れない種類を除くために使う
+nonisolated func listedPhotoLibraryItems<Item>(
+    items: some Sequence<Item>,
+    limit: Int,
+    mediaKinds: PhotoLibraryMediaKinds,
+    mediaKind: (Item) -> PhotoLibraryMediaKinds?
+) -> [Item] {
+    Array(items.lazy.filter { mediaKind($0).map { mediaKinds.contains($0) } ?? false }.prefix(limit))
+}
+
+/// 写真ライブラリの項目 (mediaType と mediaSubtypes) が当たる種類を返す。画像と動画のどちらでもない (音声等) 時は nil
+nonisolated func photoLibraryMediaKind(mediaType: PHAssetMediaType, mediaSubtypes: PHAssetMediaSubtype) -> PhotoLibraryMediaKinds? {
+    switch mediaType {
+    case .image:
+        mediaSubtypes.contains(.photoScreenshot) ? .screenshots : .otherPhotos
+    case .video:
+        mediaSubtypes.contains(.videoScreenRecording) ? .screenRecordings : .otherVideos
+    default:
+        nil
+    }
+}
+
+/// 写真ライブラリへの問い合わせの条件。mediaKinds の種類に当たる項目を含む項目を、撮った日時の新しい順に取る。
+/// 述語が mediaKinds の種類だけを選べる時は limit 件までに限り、選べない時 (photoLibraryMediaKindsPredicate の「ほか」の種類) は限らない
+/// (述語が選んだ項目から、呼び出し側が種類で除いた後に limit 件を残すため)
 func recentScreenshotFetchOptions(limit: Int, mediaKinds: PhotoLibraryMediaKinds) -> PHFetchOptions {
     let options = PHFetchOptions()
     options.predicate = photoLibraryMediaKindsPredicate(mediaKinds: mediaKinds)
     options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-    options.fetchLimit = limit
+    if photoLibraryMediaKindsPredicateIsExact(mediaKinds: mediaKinds) {
+        options.fetchLimit = limit
+    }
     return options
 }
 
-/// 種類の組 mediaKinds に当たる項目を選ぶ、写真ライブラリへの問い合わせの述語。画像と動画の述語を OR でつなぐ。
+/// photoLibraryMediaKindsPredicate が、mediaKinds の種類の項目だけを選ぶか (ほかの種類の項目を含めないか) を返す。
+/// 「ほかの写真」か「ほかの動画」を、同じ画像・動画のもう一方の種類を選ばずに選んだ時は、述語がその画像・動画のすべてを選ぶため false
+nonisolated func photoLibraryMediaKindsPredicateIsExact(mediaKinds: PhotoLibraryMediaKinds) -> Bool {
+    !(mediaKinds.contains(.otherPhotos) && !mediaKinds.contains(.screenshots))
+        && !(mediaKinds.contains(.otherVideos) && !mediaKinds.contains(.screenRecordings))
+}
+
+/// 種類の組 mediaKinds に当たる項目を含む項目を選ぶ、写真ライブラリへの問い合わせの述語。画像と動画の述語を OR でつなぐ。
 /// 片方だけの時は OR でつながずにその述語を返す (スクリーンショットだけの時に、種類の組を足す前と同じ述語で問い合わせるため)
 nonisolated func photoLibraryMediaKindsPredicate(mediaKinds: PhotoLibraryMediaKinds) -> NSPredicate {
     let subpredicates = [
@@ -95,8 +135,11 @@ nonisolated func photoLibraryMediaKindsPredicate(mediaKinds: PhotoLibraryMediaKi
     return subpredicates.count == 1 ? subpredicates[0] : NSCompoundPredicate(orPredicateWithSubpredicates: subpredicates)
 }
 
-/// mediaType の項目のうち、種別 mediaSubtype を持つもの (includesSubtype) と持たないもの (includesOthers) を選ぶ述語。
-/// 両方を選ぶ時は種別を見ない。どちらも選ばない時は nil
+/// mediaType の項目のうち、種別 mediaSubtype を持つもの (includesSubtype) と持たないもの (includesOthers) を含む項目を選ぶ述語。
+/// 持たないものだけを選ぶ時も種別を見ずに mediaType のすべてを選ぶ。写真ライブラリは「種別を持たない」の述語
+/// (`(mediaSubtypes & %d) == 0`) で 1 件も返さなかったため (2026-11-27 に iOS 27.2 の simulator で、種別を持たない動画が
+/// この述語では並ばず、mediaType だけの述語では並んだ。https://github.com/bannzai/poppo/pull/71 )。持つものを除くのは呼び出し側が行う。
+/// どちらも選ばない時は nil
 nonisolated private func mediaTypePredicate(
     mediaType: PHAssetMediaType,
     mediaSubtype: PHAssetMediaSubtype,
@@ -104,12 +147,10 @@ nonisolated private func mediaTypePredicate(
     includesOthers: Bool
 ) -> NSPredicate? {
     switch (includesSubtype, includesOthers) {
-    case (true, true):
+    case (true, true), (false, true):
         NSPredicate(format: "mediaType == %d", mediaType.rawValue)
     case (true, false):
         NSPredicate(format: "mediaType == %d AND (mediaSubtypes & %d) != 0", mediaType.rawValue, mediaSubtype.rawValue)
-    case (false, true):
-        NSPredicate(format: "mediaType == %d AND (mediaSubtypes & %d) == 0", mediaType.rawValue, mediaSubtype.rawValue)
     case (false, false):
         nil
     }

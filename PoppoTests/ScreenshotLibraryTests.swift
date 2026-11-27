@@ -38,16 +38,48 @@ private nonisolated let photoLibraryItemSamples: [(mediaType: PHAssetMediaType, 
     (.audio, [], nil),
 ]
 
-/// 種類の組のすべて (空を除く 15 通り) で、問い合わせの述語が、組に入っている種類の項目だけを選ぶこと
-@Test(arguments: 1..<16) func recentScreenshotFetchOptionsSelectOnlyListedMediaKinds(mediaKindsRawValue: Int) {
+/// 種類の組のすべて (空を除く 15 通り) で、問い合わせの述語が選び、取得後に種類で絞った後に残るのが、組に入っている種類の項目だけであること
+@Test(arguments: 1..<16) func recentScreenshotFetchSelectsOnlyListedMediaKinds(mediaKindsRawValue: Int) {
     let mediaKinds = PhotoLibraryMediaKinds(rawValue: mediaKindsRawValue)
     for sample in photoLibraryItemSamples {
         #expect(
-            photoLibraryMediaKindsPredicateSelects(mediaKinds: mediaKinds, mediaType: sample.mediaType, mediaSubtypes: sample.mediaSubtypes)
+            !listedPhotoLibraryItems(
+                items: [sample].filter {
+                    photoLibraryMediaKindsPredicateSelects(mediaKinds: mediaKinds, mediaType: $0.mediaType, mediaSubtypes: $0.mediaSubtypes)
+                },
+                limit: 30,
+                mediaKinds: mediaKinds,
+                mediaKind: { photoLibraryMediaKind(mediaType: $0.mediaType, mediaSubtypes: $0.mediaSubtypes) }
+            ).isEmpty
                 == sample.mediaKind.map { mediaKinds.contains($0) } ?? false,
             "種類の組 \(mediaKindsRawValue) で \(sample)"
         )
     }
+}
+
+/// 写真ライブラリの項目が当たる種類が、画像・動画と種別で決まること
+@Test func photoLibraryMediaKindFollowsMediaTypeAndSubtype() {
+    for sample in photoLibraryItemSamples {
+        #expect(photoLibraryMediaKind(mediaType: sample.mediaType, mediaSubtypes: sample.mediaSubtypes) == sample.mediaKind, "\(sample)")
+    }
+}
+
+/// 問い合わせの述語が「種別を持たない」の条件 (`== 0`) を使わないこと。写真ライブラリがこの条件で 1 件も返さなかったため
+/// (2026-11-27 に simulator で、種別を持たない動画がこの条件では並ばなかった)
+@Test(arguments: 1..<16) func photoLibraryMediaKindsPredicateDoesNotUseSubtypeAbsence(mediaKindsRawValue: Int) {
+    #expect(!photoLibraryMediaKindsPredicate(mediaKinds: PhotoLibraryMediaKinds(rawValue: mediaKindsRawValue)).predicateFormat.contains("== 0"))
+}
+
+/// 種類で絞る処理が、新しい順を保ったまま、組に入っていない種類と種類の無い項目を飛ばし、limit 件で止まること
+@Test func listedPhotoLibraryItemsSkipsUnlistedKindsAndStopsAtLimit() {
+    let items: [(name: String, mediaKind: PhotoLibraryMediaKinds?)] = [
+        ("screenshot1", .screenshots), ("video1", .otherVideos), ("audio", nil), ("video2", .otherVideos), ("video3", .otherVideos),
+    ]
+
+    #expect(listedPhotoLibraryItems(items: items, limit: 2, mediaKinds: .otherVideos, mediaKind: \.mediaKind).map(\.name) == ["video1", "video2"])
+    #expect(listedPhotoLibraryItems(items: items, limit: 30, mediaKinds: .otherVideos, mediaKind: \.mediaKind).map(\.name) == ["video1", "video2", "video3"])
+    #expect(listedPhotoLibraryItems(items: items, limit: 0, mediaKinds: .otherVideos, mediaKind: \.mediaKind).isEmpty)
+    #expect(listedPhotoLibraryItems(items: items, limit: 30, mediaKinds: .screenRecordings, mediaKind: \.mediaKind).isEmpty)
 }
 
 /// スクリーンショットだけの時の述語が、種類の組を足す前 (スクリーンショットだけの切り替え) と同じ書式であること。
@@ -72,11 +104,18 @@ func recentScreenshotFetchOptionsSortNewestFirst(mediaKinds: PhotoLibraryMediaKi
     #expect(options.sortDescriptors?.map(\.ascending) == [false])
 }
 
-/// 写真ライブラリへの問い合わせが、どの種類の組でも渡した件数までに限ること (1 件と 30 件)
-@Test(arguments: [PhotoLibraryMediaKinds.screenshots, [.screenshots, .otherVideos]])
+/// 述語が組の種類だけを選べる時は、写真ライブラリへの問い合わせを渡した件数までに限ること (1 件と 30 件)
+@Test(arguments: [PhotoLibraryMediaKinds.screenshots, .screenRecordings, [.screenshots, .otherPhotos, .screenRecordings, .otherVideos]])
 func recentScreenshotFetchOptionsLimitCount(mediaKinds: PhotoLibraryMediaKinds) {
     #expect(recentScreenshotFetchOptions(limit: 1, mediaKinds: mediaKinds).fetchLimit == 1)
     #expect(recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds).fetchLimit == 30)
+}
+
+/// 「ほかの写真」か「ほかの動画」を、同じ画像・動画のもう一方を選ばずに選んだ時は、問い合わせを件数で限らないこと
+/// (0 は PHFetchOptions の「限らない」。述語が選ぶ項目から種類で除いた後に件数を残すため)
+@Test(arguments: [PhotoLibraryMediaKinds.otherPhotos, .otherVideos, [.screenshots, .otherVideos], [.otherPhotos, .screenRecordings]])
+func recentScreenshotFetchOptionsDoesNotLimitWhenPredicateIsBroader(mediaKinds: PhotoLibraryMediaKinds) {
+    #expect(recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds).fetchLimit == 0)
 }
 
 /// 絞り込みの切り替えが、選ぶと種類を足し、外すと種類を除くこと
