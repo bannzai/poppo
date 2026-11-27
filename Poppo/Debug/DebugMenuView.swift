@@ -321,14 +321,43 @@ struct DebugMenuView: View {
                 }
                 .accessibilityIdentifier("debug_sample_screenshots_state")
                 NavigationLink {
-                    ScreenshotGrid(screenshots: debugSampleScreenshots())
+                    ScreenshotGrid(
+                        title: recentScreenshotsTitle(showsOnlyScreenshots: true),
+                        screenshots: debugSampleScreenshots(),
+                        loadThumbnailImage: { asset, isNetworkAccessAllowed, progressHandler in
+                            await loadScreenshotThumbnailImage(
+                                asset: asset,
+                                isNetworkAccessAllowed: isNetworkAccessAllowed,
+                                progressHandler: progressHandler
+                            )
+                        }
+                    )
                 } label: {
                     Text(verbatim: "見本だけの一覧を開く")
                 }
                 .accessibilityIdentifier("debug_open_sample_screenshot_grid")
                 NavigationLink {
+                    ScreenshotGrid(
+                        title: recentScreenshotsTitle(showsOnlyScreenshots: true),
+                        screenshots: debugSampleScreenshots(),
+                        loadThumbnailImage: { asset, isNetworkAccessAllowed, progressHandler in
+                            await debugSampleScreenshotThumbnailImage(
+                                asset: asset,
+                                isNetworkAccessAllowed: isNetworkAccessAllowed,
+                                progressHandler: progressHandler
+                            )
+                        }
+                    )
+                } label: {
+                    Text(verbatim: "見本の一覧を、iCloud にだけある見本と読み出せない見本を混ぜて開く")
+                }
+                .accessibilityIdentifier("debug_open_sample_screenshot_grid_with_icloud")
+                NavigationLink {
                     ScrollView {
                         LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridSpacing) {
+                            ScreenshotThumbnailFrame(thumbnailState: .needsDownload, download: {})
+                            // 0.4: 進み具合の棒が途中まで伸びた見た目を確かめるため
+                            ScreenshotThumbnailFrame(thumbnailState: .downloading(fractionCompleted: 0.4), download: {})
                             ForEach(
                                 [
                                     ScreenshotImageUnavailableReason.inCloudOnly,
@@ -338,15 +367,15 @@ struct DebugMenuView: View {
                                 ],
                                 id: \.self
                             ) { reason in
-                                ScreenshotThumbnailFrame(loadResult: .failure(reason))
+                                ScreenshotThumbnailFrame(thumbnailState: .downloadFailed(reason: reason), download: {})
                             }
                         }
                         .padding()
                     }
                 } label: {
-                    Text(verbatim: "読み出せない縮小画像の見本を開く")
+                    Text(verbatim: "iCloud から取る縮小画像の見本を開く")
                 }
-                .accessibilityIdentifier("debug_open_unavailable_thumbnails")
+                .accessibilityIdentifier("debug_open_download_thumbnails")
                 if let sampleScreenshotError {
                     Text(verbatim: sampleScreenshotError)
                         .foregroundStyle(.red)
@@ -355,7 +384,10 @@ struct DebugMenuView: View {
             } header: {
                 Text(verbatim: "スクリーンショットの一覧")
             } footer: {
-                Text(verbatim: "simulator の写真にはスクリーンショットが無いため、番号を書いた見本を足して一覧とタップを確かめる。1 番が最も新しく、2 番は横長、5 番は正方形、ほかは縦長。足した見本は写真アプリで消す (すべて残っていれば足し直さない。一部を消した時は 1 組を足し直すので、残りも写真アプリで消す)。スクリーンショットの種別が付かなかった時は「見本だけの一覧を開く」で、同じ一覧の画面に見本を並べる")
+                Text(
+                    verbatim:
+                        "simulator の写真にはスクリーンショットが無いため、番号を書いた見本を足して一覧とタップを確かめる。1 番が最も新しく、2 番は横長、5 番は正方形、ほかは縦長。足した見本は写真アプリで消す (すべて残っていれば足し直さない。一部を消した時は 1 組を足し直すので、残りも写真アプリで消す)。スクリーンショットの種別が付かなかった時は「見本だけの一覧を開く」で、同じ一覧の画面に見本を並べる。iCloud にだけある見本と読み出せない見本を混ぜた一覧では、3 番と 4 番を iCloud にだけある画像として扱い (3 番はダウンロードのボタンを押すと 2 秒かけて取れ、4 番は取れない)、7 番は読み出せない画像として一覧から外す"
+                )
             }
             Section {
                 Button {

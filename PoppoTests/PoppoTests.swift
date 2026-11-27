@@ -33,7 +33,7 @@ import Testing
     #expect(
         Bundle.main.url(forResource: "InfoPlist", withExtension: "strings", subdirectory: nil, localization: "ja")
             .flatMap { NSDictionary(contentsOf: $0) as? [String: String] }?["NSPhotoLibraryUsageDescription"]
-            == "直近のスクリーンショットを並べて、翻訳する 1 枚を選べるようにします。スクリーンショットはこの端末の中でだけ読み取ります。"
+            == "直近のスクリーンショットか写真を並べて、翻訳する 1 枚を選べるようにします。画像はこの端末の中でだけ読み取ります。"
     )
 }
 

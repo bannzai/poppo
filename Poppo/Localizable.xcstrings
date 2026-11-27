@@ -11,6 +11,16 @@
         }
       }
     },
+    "Allow access to all photos in Settings to see new photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく保存した写真を並べるには設定ですべての写真へのアクセスを許可してください"
+          }
+        }
+      }
+    },
     "Allow access to all photos in Settings to see new screenshots" : {
       "localizations" : {
         "ja" : {
@@ -101,12 +111,22 @@
         }
       }
     },
-    "Couldn't load" : {
+    "Couldn't download" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "読み込めません"
+            "value" : "ダウンロードできませんでした"
+          }
+        }
+      }
+    },
+    "Couldn't get it from iCloud" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud から取れませんでした"
           }
         }
       }
@@ -141,6 +161,16 @@
         }
       }
     },
+    "Download from iCloud" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud からダウンロード"
+          }
+        }
+      }
+    },
     "Download language" : {
       "localizations" : {
         "ja" : {
@@ -157,6 +187,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末で翻訳するには言語のダウンロードが必要です"
+          }
+        }
+      }
+    },
+    "Download was canceled" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロードが取り消されました"
+          }
+        }
+      }
+    },
+    "Downloading" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード中"
           }
         }
       }
@@ -181,22 +231,22 @@
         }
       }
     },
+    "No photos yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真がまだありません"
+          }
+        }
+      }
+    },
     "No screenshots yet" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットがまだありません"
-          }
-        }
-      }
-    },
-    "Not on this iPhone" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この iPhone にありません"
           }
         }
       }
@@ -261,6 +311,16 @@
         }
       }
     },
+    "Recent photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近の写真"
+          }
+        }
+      }
+    },
     "Recent screenshots" : {
       "localizations" : {
         "ja" : {
@@ -301,6 +361,16 @@
         }
       }
     },
+    "Save a chat image to Photos and open this app again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットの画像を写真に保存してからこのアプリを開き直してください"
+          }
+        }
+      }
+    },
     "Screen capture" : {
       "localizations" : {
         "ja" : {
@@ -327,6 +397,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショット"
+          }
+        }
+      }
+    },
+    "Screenshots only" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットだけ"
           }
         }
       }

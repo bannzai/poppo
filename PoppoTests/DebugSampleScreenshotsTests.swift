@@ -34,12 +34,19 @@ import UniformTypeIdentifiers
     #expect(!text.contains("撮影日時なし"))
 }
 
-/// 縮小画像を読み出せなかった理由ごとに、開発者メニューのあるビルドで枠に出す文を分けること。エラーの時は写真ライブラリの説明をそのまま出す
-@Test func debugTextForEachScreenshotImageUnavailableReason() {
-    #expect(debugText(screenshotImageUnavailableReason: .inCloudOnly) == "iCloud にだけある")
-    #expect(debugText(screenshotImageUnavailableReason: .cancelled) == "取り消された")
-    #expect(debugText(screenshotImageUnavailableReason: .failed(errorDescription: "PHPhotosErrorDomain 3164: network")) == "PHPhotosErrorDomain 3164: network")
-    #expect(debugText(screenshotImageUnavailableReason: .unknown) == "理由なし")
+/// iCloud にだけある見本と読み出せない見本を混ぜた一覧で、3 番は取れる iCloud の画像、4 番は取れない iCloud の画像、7 番は読み出せない画像にすること
+/// (開発者メニューの説明の文に書いた番号と同じにするため)
+@Test func debugSampleScreenshotAvailabilityForICloudAndUnavailableSamples() {
+    #expect(debugSampleScreenshotAvailability(number: 3) == .inCloudOnly(downloadSucceeds: true))
+    #expect(debugSampleScreenshotAvailability(number: 4) == .inCloudOnly(downloadSucceeds: false))
+    #expect(debugSampleScreenshotAvailability(number: 7) == .unavailable)
+}
+
+/// 上の 3 つの番号の隣と、最初と最後の番号は、端末にある画像として扱うこと
+@Test func debugSampleScreenshotAvailabilityIsOnDeviceForOtherNumbers() {
+    for number in [1, 2, 5, 6, 8, recentScreenshotsLimit] {
+        #expect(debugSampleScreenshotAvailability(number: number) == .onDevice, "number: \(number)")
+    }
 }
 
 /// 見本の PNG は形ごとのピクセル数で書き出し、EXIF の UserComment に「Screenshot」を入れること (写真アプリがスクリーンショットの種別を付ける手がかり)。

@@ -1,37 +1,250 @@
 import Photos
+import Synchronization
 import Testing
+import UIKit
 
 @testable import Poppo
 
-/// 写真ライブラリへの問い合わせが、スクリーンショットの種別を持つ写真だけを選ぶこと。
-/// スクリーンショットとほかの種別を併せ持つ写真は選び、ほかの種別だけの写真 (Live Photo・パノラマ) と種別の無い写真は選ばない
-@Test func recentScreenshotFetchOptionsSelectOnlyScreenshots() throws {
-    let predicate = try #require(recentScreenshotFetchOptions(limit: 30).predicate)
+/// 写真ライブラリの 1 枚を、述語が評価できる形 (PHAsset の mediaType と mediaSubtypes のキー) で返す
+private func photoLibraryAssetValues(mediaType: PHAssetMediaType, mediaSubtypes: PHAssetMediaSubtype) -> [String: Any] {
+    ["mediaType": mediaType.rawValue, "mediaSubtypes": mediaSubtypes.rawValue]
+}
 
-    #expect(predicate.evaluate(with: ["mediaSubtypes": PHAssetMediaSubtype.photoScreenshot.rawValue]))
-    #expect(
-        predicate.evaluate(with: [
-            "mediaSubtypes": PHAssetMediaSubtype.photoScreenshot.union(.photoHDR).rawValue
-        ])
+/// スクリーンショットだけを並べる時の問い合わせが、スクリーンショットの種別を持つ画像だけを選ぶこと。
+/// スクリーンショットとほかの種別を併せ持つ画像は選び、ほかの種別だけの画像 (Live Photo・パノラマ)・種別の無い画像・動画は選ばない
+@Test func recentScreenshotFetchOptionsSelectOnlyScreenshotsWhenShowingOnlyScreenshots() throws {
+    let predicate = try #require(recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: true).predicate)
+
+    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoScreenshot)))
+    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: [.photoScreenshot, .photoHDR])))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoLive)))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoPanorama)))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: [])))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: [])))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .videoHighFrameRate)))
+    // 種別のビットがスクリーンショットと同じでも、動画は画像ではないため選ばない (述語が mediaType を見ていることを確かめるため)
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .photoScreenshot)))
+}
+
+/// 写真のすべてを並べる時の問い合わせが、種別を問わず画像を選び (スクリーンショット・Live Photo・種別の無い画像)、動画と音声は選ばないこと
+@Test func recentScreenshotFetchOptionsSelectAllImagesWhenShowingAllPhotos() throws {
+    let predicate = try #require(recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: false).predicate)
+
+    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoScreenshot)))
+    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoLive)))
+    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: [])))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: [])))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .videoHighFrameRate)))
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .audio, mediaSubtypes: [])))
+}
+
+/// 写真ライブラリへの問い合わせが、どちらの並べ方でも撮った日時の新しい順に並べること
+@Test(arguments: [true, false]) func recentScreenshotFetchOptionsSortNewestFirst(showsOnlyScreenshots: Bool) {
+    let options = recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: showsOnlyScreenshots)
+
+    #expect(options.sortDescriptors?.map(\.key) == ["creationDate"])
+    #expect(options.sortDescriptors?.map(\.ascending) == [false])
+}
+
+/// 写真ライブラリへの問い合わせが、どちらの並べ方でも渡した枚数までに限ること (1 枚と 30 枚)
+@Test(arguments: [true, false]) func recentScreenshotFetchOptionsLimitCount(showsOnlyScreenshots: Bool) {
+    #expect(recentScreenshotFetchOptions(limit: 1, showsOnlyScreenshots: showsOnlyScreenshots).fetchLimit == 1)
+    #expect(recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: showsOnlyScreenshots).fetchLimit == 30)
+}
+
+/// 一覧の見出しは、スクリーンショットだけの時は「直近のスクリーンショット」、写真のすべての時は「直近の写真」にすること
+@Test func recentScreenshotsTitleFollowsShowsOnlyScreenshots() {
+    #expect(recentScreenshotsTitle(showsOnlyScreenshots: true).key == "Recent screenshots")
+    #expect(recentScreenshotsTitle(showsOnlyScreenshots: false).key == "Recent photos")
+}
+
+/// 写真ライブラリの読み出しの代わりに result を返す処理を screenshotThumbnailState へ渡して呼ぶ。
+/// 返す値は、決まった縮小画像の状態 (state) と、読み出しに渡された isNetworkAccessAllowed (requestedNetworkAccess。渡された順)
+private func screenshotThumbnailStateWithStubbedImage(
+    isNetworkAccessAllowed: Bool,
+    result: Result<UIImage, ScreenshotImageUnavailableReason>
+) async -> (state: ScreenshotThumbnailState, requestedNetworkAccess: [Bool]) {
+    var requestedNetworkAccess: [Bool] = []
+    // tuple の要素は左から順に評価されるため、requestedNetworkAccess は読み出しが終わった後の値になる
+    return (
+        await screenshotThumbnailState(isNetworkAccessAllowed: isNetworkAccessAllowed) { requestedIsNetworkAccessAllowed in
+            requestedNetworkAccess.append(requestedIsNetworkAccessAllowed)
+            return result
+        },
+        requestedNetworkAccess
     )
-    #expect(!predicate.evaluate(with: ["mediaSubtypes": PHAssetMediaSubtype.photoLive.rawValue]))
-    #expect(!predicate.evaluate(with: ["mediaSubtypes": PHAssetMediaSubtype.photoPanorama.rawValue]))
-    #expect(!predicate.evaluate(with: ["mediaSubtypes": PHAssetMediaSubtype().rawValue]))
 }
 
-/// 写真ライブラリへの問い合わせが、撮った日時の新しい順に並べること
-@Test func recentScreenshotFetchOptionsSortNewestFirst() {
-    #expect(recentScreenshotFetchOptions(limit: 30).sortDescriptors?.map(\.key) == ["creationDate"])
-    #expect(recentScreenshotFetchOptions(limit: 30).sortDescriptors?.map(\.ascending) == [false])
+/// 一覧を開いた時の読み出しは iCloud から取らず (isNetworkAccessAllowed は false)、読み出せた画像はそのまま縮小画像にすること
+@Test func screenshotThumbnailStateIsLoadedWithoutNetworkAccess() async {
+    let image = UIImage()
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: false,
+        result: .success(image)
+    )
+
+    #expect(requestedNetworkAccess == [false])
+    guard case .loaded(let loadedImage) = state else {
+        Issue.record("縮小画像の状態にならなかった: \(state)")
+        return
+    }
+    #expect(loadedImage === image)
 }
 
-/// 写真ライブラリへの問い合わせが、渡した枚数までに限ること (1 枚と 30 枚)
-@Test func recentScreenshotFetchOptionsLimitCount() {
-    #expect(recentScreenshotFetchOptions(limit: 1).fetchLimit == 1)
-    #expect(recentScreenshotFetchOptions(limit: 30).fetchLimit == 30)
+/// 一覧を開いた時に iCloud にだけあった画像は、一覧から外さずダウンロードのボタンを出す状態にすること
+@Test func screenshotThumbnailStateNeedsDownloadWhenInCloudOnly() async {
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: false,
+        result: .failure(.inCloudOnly)
+    )
+
+    #expect(requestedNetworkAccess == [false])
+    guard case .needsDownload = state else {
+        Issue.record("ダウンロードのボタンを出す状態にならなかった: \(state)")
+        return
+    }
 }
 
-/// 端末に無く iCloud にだけある時は、エラーが添えられていても iCloud にだけある理由にすること (一覧で「この iPhone にありません」と出すため)
+/// iCloud にだけあること以外の、縮小画像を読み出せなかった理由 (取り消し・エラー・理由なし)
+private nonisolated let screenshotImageUnavailableReasonsOtherThanInCloud: [ScreenshotImageUnavailableReason] = [
+    .cancelled,
+    .failed(errorDescription: "PHPhotosErrorDomain 3164: network"),
+    .unknown,
+]
+
+/// 一覧を開いた時に iCloud にだけあること以外の理由 (取り消し・エラー・理由なし) で読み出せなかった画像は、一覧に出さない状態にすること
+@Test(arguments: screenshotImageUnavailableReasonsOtherThanInCloud) func screenshotThumbnailStateIsUnavailableForOtherReasons(reason: ScreenshotImageUnavailableReason) async {
+    let (state, _) = await screenshotThumbnailStateWithStubbedImage(isNetworkAccessAllowed: false, result: .failure(reason))
+
+    guard case .unavailable = state else {
+        Issue.record("一覧に出さない状態にならなかった: \(state)")
+        return
+    }
+}
+
+/// ダウンロードのボタンを押した時の読み出しは iCloud から取り (isNetworkAccessAllowed は true)、取れた画像を縮小画像にすること
+@Test func screenshotThumbnailStateIsLoadedAfterDownload() async {
+    let image = UIImage()
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: true,
+        result: .success(image)
+    )
+
+    #expect(requestedNetworkAccess == [true])
+    guard case .loaded(let loadedImage) = state else {
+        Issue.record("縮小画像の状態にならなかった: \(state)")
+        return
+    }
+    #expect(loadedImage === image)
+}
+
+/// iCloud から取れなかった時は、どの理由でも一覧から外さず、その理由を出す状態にすること
+/// (iCloud にだけある理由のままでも、ダウンロードのボタンだけの状態に戻さない)
+@Test(arguments: [ScreenshotImageUnavailableReason.inCloudOnly] + screenshotImageUnavailableReasonsOtherThanInCloud) func screenshotThumbnailStateIsDownloadFailedWhenDownloadFails(reason: ScreenshotImageUnavailableReason) async {
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: true,
+        result: .failure(reason)
+    )
+
+    #expect(requestedNetworkAccess == [true])
+    guard case .downloadFailed(let failedReason) = state else {
+        Issue.record("取れなかった理由を出す状態にならなかった: \(state)")
+        return
+    }
+    #expect(failedReason == reason)
+}
+
+/// 一覧に並べる写真から、読み出せないと分かった写真だけを除き、残りの順を変えないこと
+/// (最初・途中・最後の写真を除く時、何も除かない時、一覧に無い識別子だけが渡された時)
+@Test func listedScreenshotsExcludesUnavailableScreenshots() {
+    let screenshotIdentifiers = ["first", "second", "third", "fourth"]
+
+    #expect(
+        listedScreenshots(screenshots: screenshotIdentifiers, localIdentifier: { $0 }, unavailableScreenshotIdentifiers: ["first", "third", "fourth"])
+            == ["second"]
+    )
+    #expect(
+        listedScreenshots(screenshots: screenshotIdentifiers, localIdentifier: { $0 }, unavailableScreenshotIdentifiers: [])
+            == screenshotIdentifiers
+    )
+    #expect(
+        listedScreenshots(screenshots: screenshotIdentifiers, localIdentifier: { $0 }, unavailableScreenshotIdentifiers: ["absent"])
+            == screenshotIdentifiers
+    )
+}
+
+/// ダウンロードのボタンを出している状態 (iCloud にだけある・取れなかった) だけ、iCloud から取り始めてよいこと。
+/// 取っている間・読み出せた後・読み出す前・読み出せない時は取り始めない (続けて押した時に 2 本並べて取らないため)
+@Test func canStartScreenshotDownloadOnlyWhileShowingDownloadButton() {
+    #expect(canStartScreenshotDownload(thumbnailState: .needsDownload))
+    #expect(canStartScreenshotDownload(thumbnailState: .downloadFailed(reason: .inCloudOnly)))
+    #expect(canStartScreenshotDownload(thumbnailState: .downloadFailed(reason: .unknown)))
+    #expect(!canStartScreenshotDownload(thumbnailState: .downloading(fractionCompleted: 0)))
+    #expect(!canStartScreenshotDownload(thumbnailState: .downloading(fractionCompleted: 1)))
+    #expect(!canStartScreenshotDownload(thumbnailState: .loaded(image: UIImage())))
+    #expect(!canStartScreenshotDownload(thumbnailState: .loading))
+    #expect(!canStartScreenshotDownload(thumbnailState: .unavailable))
+}
+
+/// 初めの読み出しの結果は、読み出しを始めた時の状態のままの時だけ書くこと。
+/// ボタンを押していない時は読み出す前の状態、押した後に作り直されたセルでは取っている状態の時だけ書く
+@Test func canApplyInitialScreenshotThumbnailStateOnlyWhenStateIsUnchanged() {
+    #expect(canApplyInitialScreenshotThumbnailState(currentThumbnailState: .loading, isDownloadRequested: false))
+    #expect(canApplyInitialScreenshotThumbnailState(currentThumbnailState: .downloading(fractionCompleted: 0.5), isDownloadRequested: true))
+}
+
+/// 待っている間に状態が変わった時は、初めの読み出しの結果を書かないこと
+/// (ボタンを押していない読み出しの間に取り始めた時、読み出せた後、ボタンを出した後、取れなかった後、一覧から外した後)
+@Test func canApplyInitialScreenshotThumbnailStateRejectsChangedState() {
+    #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .downloading(fractionCompleted: 0), isDownloadRequested: false))
+    #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .loading, isDownloadRequested: true))
+    for isDownloadRequested in [true, false] {
+        #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .loaded(image: UIImage()), isDownloadRequested: isDownloadRequested))
+        #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .needsDownload, isDownloadRequested: isDownloadRequested))
+        #expect(
+            !canApplyInitialScreenshotThumbnailState(
+                currentThumbnailState: .downloadFailed(reason: .inCloudOnly),
+                isDownloadRequested: isDownloadRequested
+            )
+        )
+        #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .unavailable, isDownloadRequested: isDownloadRequested))
+    }
+}
+
+/// 写真ライブラリへ渡す読み出しの条件が、iCloud から取ってよいかをそのまま写し、結果を 1 回だけ返す形にすること
+@Test(arguments: [true, false]) func screenshotImageRequestOptionsCopyNetworkAccess(isNetworkAccessAllowed: Bool) {
+    let options = screenshotImageRequestOptions(isNetworkAccessAllowed: isNetworkAccessAllowed, progressHandler: nil)
+
+    #expect(options.isNetworkAccessAllowed == isNetworkAccessAllowed)
+    #expect(options.deliveryMode == .highQualityFormat)
+    #expect(options.progressHandler == nil)
+}
+
+/// 進み具合を受け取る処理を渡した時は、写真ライブラリが伝えた進み具合をそのまま渡すこと
+@Test func screenshotImageRequestOptionsForwardProgress() throws {
+    let receivedFractions = Mutex<[Double]>([])
+    let progressHandler = try #require(
+        screenshotImageRequestOptions(isNetworkAccessAllowed: true) { fractionCompleted in
+            receivedFractions.withLock { $0.append(fractionCompleted) }
+        }.progressHandler
+    )
+    var stop = ObjCBool(false)
+
+    progressHandler(0.25, nil, &stop, nil)
+    progressHandler(1, nil, &stop, nil)
+
+    #expect(receivedFractions.withLock { $0 } == [0.25, 1])
+}
+
+/// iCloud から取れなかった理由ごとに、セルに出す文を分けること (エラーと理由なしは同じ文で、エラーの説明はセルに別に出す)
+@Test func screenshotDownloadFailedMessageForEachReason() {
+    #expect(screenshotDownloadFailedMessage(reason: .inCloudOnly).key == "Couldn't get it from iCloud")
+    #expect(screenshotDownloadFailedMessage(reason: .cancelled).key == "Download was canceled")
+    #expect(screenshotDownloadFailedMessage(reason: .failed(errorDescription: "PHPhotosErrorDomain 3164: network")).key == "Couldn't download")
+    #expect(screenshotDownloadFailedMessage(reason: .unknown).key == "Couldn't download")
+}
+
+/// 端末に無く iCloud にだけある時は、エラーが添えられていても iCloud にだけある理由にすること (一覧でダウンロードのボタンを出すため)
 @Test func screenshotImageUnavailableReasonIsInCloudOnlyWhenInCloud() {
     #expect(screenshotImageUnavailableReason(info: [PHImageResultIsInCloudKey: NSNumber(value: true)]) == .inCloudOnly)
     #expect(
@@ -66,23 +279,6 @@ import Testing
             PHImageErrorKey: NSError(domain: "PHPhotosErrorDomain", code: 3072),
         ]) == .cancelled
     )
-}
-
-/// 端末に無く iCloud にだけある時は、雲のアイコンと「この iPhone にありません」を出すこと (取りに行かないため、読めない理由が分かる文にする)
-@Test func screenshotUnavailableLabelForInCloudOnly() {
-    #expect(screenshotUnavailableSymbolName(reason: .inCloudOnly) == "icloud.slash")
-    #expect(screenshotUnavailableMessage(reason: .inCloudOnly).key == "Not on this iPhone")
-}
-
-/// iCloud 以外の理由 (取り消し・エラー・理由なし) では、注意の印と「読み込めません」を出し、「この iPhone にありません」と出さないこと
-@Test(arguments: [
-    ScreenshotImageUnavailableReason.cancelled,
-    .failed(errorDescription: "PHPhotosErrorDomain 3164: network"),
-    .unknown,
-])
-func screenshotUnavailableLabelForOtherReasons(reason: ScreenshotImageUnavailableReason) {
-    #expect(screenshotUnavailableSymbolName(reason: reason) == "exclamationmark.triangle")
-    #expect(screenshotUnavailableMessage(reason: reason).key == "Couldn't load")
 }
 
 /// エラーだけが添えられた時は、エラーのドメインとコードを含む失敗の理由にすること
