@@ -323,16 +323,18 @@ func writeDebugSampleChatVideo(fileURL: URL) async throws {
     try? FileManager.default.removeItem(at: fileURL)
     let pixelSize = DebugSampleScreenshotShape.portrait.pixelSize
     let writer = try AVAssetWriter(outputURL: fileURL, fileType: .mp4)
-    let input = AVAssetWriterInput(
-        mediaType: .video,
-        outputSettings: [
-            // H.264: iPhone の画面収録と同じく、写真ライブラリと AVFoundation がそのまま読める形式にするため
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: Int(pixelSize.width),
-            AVVideoHeightKey: Int(pixelSize.height),
-        ]
+    let receiver = writer.inputPixelBufferReceiver(
+        for: AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                // H.264: iPhone の画面収録と同じく、写真ライブラリと AVFoundation がそのまま読める形式にするため
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: Int(pixelSize.width),
+                AVVideoHeightKey: Int(pixelSize.height),
+            ]
+        ),
+        pixelBufferAttributes: nil
     )
-    let receiver = writer.inputPixelBufferReceiver(for: input, pixelBufferAttributes: nil)
     try writer.start()
     writer.startSession(atSourceTime: .zero)
     for (index, image) in images.enumerated() {

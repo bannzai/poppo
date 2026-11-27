@@ -9,18 +9,23 @@ import SwiftUI
 /// iCloud から取っている間は、取れた割合 (0 から 1) を progress に渡す (写真ライブラリが決めた別のキューから呼ばれる)
 @concurrent nonisolated func loadVideoAsset(video: PHAsset, progress: @escaping @Sendable (Double) -> Void) async -> AVURLAsset? {
     await withCheckedContinuation { continuation in
-        let options = PHVideoRequestOptions()
-        options.isNetworkAccessAllowed = true
-        options.progressHandler = { value, _, _, _ in
-            progress(value)
-        }
-        // 読み取る場面の小さい文字を、縮めた動画から読まないため。PHImageManager.h: 既定の automatic は iCloud から取る AVAsset で
-        // 「typ. PHVideoRequestOptionsDeliveryModeMediumQualityFormat」(720p 前後) を選び、highQualityFormat は「best quality」
-        options.deliveryMode = .highQualityFormat
-        PHImageManager.default().requestAVAsset(forVideo: video, options: options) { asset, _, _ in
+        PHImageManager.default().requestAVAsset(forVideo: video, options: videoRequestOptions(progress: progress)) { asset, _, _ in
             continuation.resume(returning: asset as? AVURLAsset)
         }
     }
+}
+
+/// loadVideoAsset が写真ライブラリへ渡す読み出しの条件。iCloud から取ることを許し、取れた割合を progress に渡す
+nonisolated func videoRequestOptions(progress: @escaping @Sendable (Double) -> Void) -> PHVideoRequestOptions {
+    let options = PHVideoRequestOptions()
+    options.isNetworkAccessAllowed = true
+    options.progressHandler = { value, _, _, _ in
+        progress(value)
+    }
+    // 読み取る場面の小さい文字を、縮めた動画から読まないため。PHImageManager.h: 既定の automatic は iCloud から取る AVAsset で
+    // 「typ. PHVideoRequestOptionsDeliveryModeMediumQualityFormat」(720p 前後) を選び、highQualityFormat は「best quality」
+    options.deliveryMode = .highQualityFormat
+    return options
 }
 
 /// 動画 (asset) の長さを秒で返す

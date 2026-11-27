@@ -1,5 +1,7 @@
 import AVFoundation
 import Foundation
+import Photos
+import Synchronization
 import Testing
 
 @testable import Poppo
@@ -108,5 +110,18 @@ func recognizeTextLinesReadsSelectedVideoFrame(index: Int, sampleChat: DebugSamp
     let image = try await videoFrameImage(asset: try await writtenDebugSampleChatVideoAsset(), seconds: 0.5, maximumSize: CGSize(width: 300, height: 300))
 
     #expect(image.height == 300)
-    #expect(image.width < 300)
+    // 1206 × 2622 の比を保った幅は 300 × 1206 / 2622 ≒ 138。画像の大きさの丸めで 1 ずれてもよい
+    #expect(abs(image.width - 138) <= 1)
+}
+
+/// 動画の読み出しの条件が、iCloud から取ることを許し、縮めていない質の動画を求め、取れた割合を渡すこと
+@Test func videoRequestOptionsAllowNetworkAndHighQuality() throws {
+    let receivedProgress = Mutex<[Double]>([])
+    let options = videoRequestOptions(progress: { value in receivedProgress.withLock { $0.append(value) } })
+
+    #expect(options.isNetworkAccessAllowed)
+    #expect(options.deliveryMode == .highQualityFormat)
+    var stop: ObjCBool = false
+    try #require(options.progressHandler)(0.25, nil, &stop, nil)
+    #expect(receivedProgress.withLock { $0 } == [0.25])
 }

@@ -82,6 +82,23 @@ private nonisolated let photoLibraryItemSamples: [(mediaType: PHAssetMediaType, 
     #expect(listedPhotoLibraryItems(items: items, limit: 30, mediaKinds: .screenRecordings, mediaKind: \.mediaKind).isEmpty)
 }
 
+/// 種類で絞る処理が、limit 件に達した後の項目の種類を求めないこと (写真ライブラリの項目を、並べる件数に達した後も読み続けないため)
+@Test func listedPhotoLibraryItemsStopsReadingAtLimit() {
+    var readNames: [String] = []
+
+    _ = listedPhotoLibraryItems(
+        items: [("video1", .otherVideos), ("screenshot1", .screenshots), ("video2", .otherVideos), ("video3", .otherVideos)]
+            as [(name: String, mediaKind: PhotoLibraryMediaKinds?)],
+        limit: 2,
+        mediaKinds: .otherVideos
+    ) { item in
+        readNames.append(item.name)
+        return item.mediaKind
+    }
+
+    #expect(readNames == ["video1", "screenshot1", "video2"])
+}
+
 /// スクリーンショットだけの時の述語が、種類の組を足す前 (スクリーンショットだけの切り替え) と同じ書式であること。
 /// 実機で動いていた問い合わせを変えないため
 @Test func recentScreenshotFetchOptionsKeepScreenshotsOnlyPredicate() {
