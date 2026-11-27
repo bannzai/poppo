@@ -50,6 +50,7 @@ struct RecentScreenshotsView: View {
                     openSettingsButton
                 }
             case .allowed:
+                // 0: 切り替えの行の上下の余白は切り替え自身が持つため、切り替えと一覧の間に余白を足さない (選んだ写真だけの時の VStack と同じ)
                 VStack(spacing: 0) {
                     showsOnlyScreenshotsToggle
                     if screenshots.isEmpty {
@@ -158,7 +159,7 @@ struct RecentScreenshotsView: View {
         }
     }
 
-    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近のスクリーンショットを取り直す。
+    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近の写真 (showsOnlyScreenshots が true の時はスクリーンショットだけ) を取り直す。
     /// 許可を選ぶ前には取らない。許可が要る操作を初めて行うとシステムが許可の確認を出すため、利用者が許可の導線を押す前に確認を出さない
     /// (Apple の文書: 「The first time your app performs an operation that requires authorization, the system automatically and
     /// asynchronously prompts the user for it.」
@@ -197,12 +198,12 @@ func recentScreenshotsTitle(showsOnlyScreenshots: Bool) -> LocalizedStringResour
     }
 }
 
-/// スクリーンショットを 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む。
+/// 写真 (スクリーンショットか、動画を除く写真のすべて) を 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む。
 /// iCloud にだけあること以外の理由で縮小画像を読み出せなかった写真は並べない
 struct ScreenshotGrid: View {
     /// 一覧の見出し
     let title: LocalizedStringResource
-    /// 並べるスクリーンショット。渡した順に左上から並べる
+    /// 並べる写真。渡した順に左上から並べる
     let screenshots: [PHAsset]
     /// 一覧の 1 枚を縮小画像の大きさで読み出す処理。asset は読み出す 1 枚、isNetworkAccessAllowed は iCloud から取ってよいか、
     /// progressHandler は iCloud から取っている間の進み具合 (0〜1) を受け取る (main actor の外から呼ばれる)。
@@ -254,7 +255,7 @@ struct ScreenshotGrid: View {
 
 /// 一覧の 1 枚のセル。縮小画像を読み出せた時はタップで読み取りの画面へ進み、iCloud にだけある時はダウンロードのボタンを出す
 struct ScreenshotGridCell: View {
-    /// 表示するスクリーンショット
+    /// 表示する写真 (スクリーンショットか、動画を除く写真のどれか)
     let screenshot: PHAsset
     /// 利用者がこの 1 枚のダウンロードのボタンを押したか (ScreenshotGrid が持つ。セルが作り直されても残る)
     let isDownloadRequested: Bool

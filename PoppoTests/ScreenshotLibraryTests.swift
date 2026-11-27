@@ -58,34 +58,32 @@ private func photoLibraryAssetValues(mediaType: PHAssetMediaType, mediaSubtypes:
     #expect(recentScreenshotsTitle(showsOnlyScreenshots: false).key == "Recent photos")
 }
 
-/// 写真ライブラリの読み出しの代わりに screenshotThumbnailState へ渡す処理。渡された isNetworkAccessAllowed を控え、決めておいた結果を返す
-@MainActor private final class ScreenshotImageLoaderSpy {
-    /// loadImage に渡された isNetworkAccessAllowed。渡された順
+/// 写真ライブラリの読み出しの代わりに result を返す処理を screenshotThumbnailState へ渡して呼ぶ。
+/// 返す値は、決まった縮小画像の状態 (state) と、読み出しに渡された isNetworkAccessAllowed (requestedNetworkAccess。渡された順)
+private func screenshotThumbnailStateWithStubbedImage(
+    isNetworkAccessAllowed: Bool,
+    result: Result<UIImage, ScreenshotImageUnavailableReason>
+) async -> (state: ScreenshotThumbnailState, requestedNetworkAccess: [Bool]) {
     var requestedNetworkAccess: [Bool] = []
-    /// loadImage が返す結果
-    let result: Result<UIImage, ScreenshotImageUnavailableReason>
-
-    /// loadImage が返す結果 (result) を決めて作る
-    // class は memberwise initializer を持たないため、返す結果を受け取る init を書く
-    init(result: Result<UIImage, ScreenshotImageUnavailableReason>) {
-        self.result = result
-    }
-
-    /// screenshotThumbnailState の loadImage に渡す処理。isNetworkAccessAllowed を控えて result を返す
-    func loadImage(isNetworkAccessAllowed: Bool) async -> Result<UIImage, ScreenshotImageUnavailableReason> {
-        requestedNetworkAccess.append(isNetworkAccessAllowed)
-        return result
-    }
+    // tuple の要素は左から順に評価されるため、requestedNetworkAccess は読み出しが終わった後の値になる
+    return (
+        await screenshotThumbnailState(isNetworkAccessAllowed: isNetworkAccessAllowed) { requestedIsNetworkAccessAllowed in
+            requestedNetworkAccess.append(requestedIsNetworkAccessAllowed)
+            return result
+        },
+        requestedNetworkAccess
+    )
 }
 
 /// 一覧を開いた時の読み出しは iCloud から取らず (isNetworkAccessAllowed は false)、読み出せた画像はそのまま縮小画像にすること
-@MainActor @Test func screenshotThumbnailStateIsLoadedWithoutNetworkAccess() async {
+@Test func screenshotThumbnailStateIsLoadedWithoutNetworkAccess() async {
     let image = UIImage()
-    let loader = ScreenshotImageLoaderSpy(result: .success(image))
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: false,
+        result: .success(image)
+    )
 
-    let state = await screenshotThumbnailState(isNetworkAccessAllowed: false, loadImage: loader.loadImage)
-
-    #expect(loader.requestedNetworkAccess == [false])
+    #expect(requestedNetworkAccess == [false])
     guard case .loaded(let loadedImage) = state else {
         Issue.record("縮小画像の状態にならなかった: \(state)")
         return
@@ -94,12 +92,13 @@ private func photoLibraryAssetValues(mediaType: PHAssetMediaType, mediaSubtypes:
 }
 
 /// 一覧を開いた時に iCloud にだけあった画像は、一覧から外さずダウンロードのボタンを出す状態にすること
-@MainActor @Test func screenshotThumbnailStateNeedsDownloadWhenInCloudOnly() async {
-    let loader = ScreenshotImageLoaderSpy(result: .failure(.inCloudOnly))
+@Test func screenshotThumbnailStateNeedsDownloadWhenInCloudOnly() async {
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: false,
+        result: .failure(.inCloudOnly)
+    )
 
-    let state = await screenshotThumbnailState(isNetworkAccessAllowed: false, loadImage: loader.loadImage)
-
-    #expect(loader.requestedNetworkAccess == [false])
+    #expect(requestedNetworkAccess == [false])
     guard case .needsDownload = state else {
         Issue.record("ダウンロードのボタンを出す状態にならなかった: \(state)")
         return
@@ -114,11 +113,8 @@ private nonisolated let screenshotImageUnavailableReasonsOtherThanInCloud: [Scre
 ]
 
 /// 一覧を開いた時に iCloud にだけあること以外の理由 (取り消し・エラー・理由なし) で読み出せなかった画像は、一覧に出さない状態にすること
-@MainActor @Test(arguments: screenshotImageUnavailableReasonsOtherThanInCloud) func screenshotThumbnailStateIsUnavailableForOtherReasons(reason: ScreenshotImageUnavailableReason) async {
-    let state = await screenshotThumbnailState(
-        isNetworkAccessAllowed: false,
-        loadImage: ScreenshotImageLoaderSpy(result: .failure(reason)).loadImage
-    )
+@Test(arguments: screenshotImageUnavailableReasonsOtherThanInCloud) func screenshotThumbnailStateIsUnavailableForOtherReasons(reason: ScreenshotImageUnavailableReason) async {
+    let (state, _) = await screenshotThumbnailStateWithStubbedImage(isNetworkAccessAllowed: false, result: .failure(reason))
 
     guard case .unavailable = state else {
         Issue.record("一覧に出さない状態にならなかった: \(state)")
@@ -127,13 +123,14 @@ private nonisolated let screenshotImageUnavailableReasonsOtherThanInCloud: [Scre
 }
 
 /// ダウンロードのボタンを押した時の読み出しは iCloud から取り (isNetworkAccessAllowed は true)、取れた画像を縮小画像にすること
-@MainActor @Test func screenshotThumbnailStateIsLoadedAfterDownload() async {
+@Test func screenshotThumbnailStateIsLoadedAfterDownload() async {
     let image = UIImage()
-    let loader = ScreenshotImageLoaderSpy(result: .success(image))
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: true,
+        result: .success(image)
+    )
 
-    let state = await screenshotThumbnailState(isNetworkAccessAllowed: true, loadImage: loader.loadImage)
-
-    #expect(loader.requestedNetworkAccess == [true])
+    #expect(requestedNetworkAccess == [true])
     guard case .loaded(let loadedImage) = state else {
         Issue.record("縮小画像の状態にならなかった: \(state)")
         return
@@ -143,12 +140,13 @@ private nonisolated let screenshotImageUnavailableReasonsOtherThanInCloud: [Scre
 
 /// iCloud から取れなかった時は、どの理由でも一覧から外さず、その理由を出す状態にすること
 /// (iCloud にだけある理由のままでも、ダウンロードのボタンだけの状態に戻さない)
-@MainActor @Test(arguments: [ScreenshotImageUnavailableReason.inCloudOnly] + screenshotImageUnavailableReasonsOtherThanInCloud) func screenshotThumbnailStateIsDownloadFailedWhenDownloadFails(reason: ScreenshotImageUnavailableReason) async {
-    let loader = ScreenshotImageLoaderSpy(result: .failure(reason))
+@Test(arguments: [ScreenshotImageUnavailableReason.inCloudOnly] + screenshotImageUnavailableReasonsOtherThanInCloud) func screenshotThumbnailStateIsDownloadFailedWhenDownloadFails(reason: ScreenshotImageUnavailableReason) async {
+    let (state, requestedNetworkAccess) = await screenshotThumbnailStateWithStubbedImage(
+        isNetworkAccessAllowed: true,
+        result: .failure(reason)
+    )
 
-    let state = await screenshotThumbnailState(isNetworkAccessAllowed: true, loadImage: loader.loadImage)
-
-    #expect(loader.requestedNetworkAccess == [true])
+    #expect(requestedNetworkAccess == [true])
     guard case .downloadFailed(let failedReason) = state else {
         Issue.record("取れなかった理由を出す状態にならなかった: \(state)")
         return
