@@ -10,7 +10,7 @@ struct RecentScreenshotsView: View {
     @Environment(\.openURL) private var openURL
     /// 写真へのアクセスの許可の状態
     @State private var authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    /// 並べるスクリーンショット。新しい順
+    /// 並べる写真。新しい順。showsOnlyScreenshots が true の時はスクリーンショットだけ、false の時は動画を除く写真のすべて
     @State private var screenshots: [PHAsset] = []
     /// スクリーンショットだけを並べるか (false は動画を除く写真のすべて)。端末に保存し、次に開いた時も同じにする。
     // 既定の true: 切り替えを足す前と同じ一覧 (スクリーンショットだけ) から始めるため (https://github.com/bannzai/poppo/issues/66 )
@@ -62,8 +62,13 @@ struct RecentScreenshotsView: View {
                                 Label("No photos yet", systemImage: "photo.on.rectangle")
                             }
                         } description: {
-                            // ja: チャットのスクリーンショットを撮ってからこのアプリを開き直してください
-                            Text("Take a screenshot of a chat and open this app again")
+                            if showsOnlyScreenshots {
+                                // ja: チャットのスクリーンショットを撮ってからこのアプリを開き直してください
+                                Text("Take a screenshot of a chat and open this app again")
+                            } else {
+                                // ja: チャットの画像を写真に保存してからこのアプリを開き直してください
+                                Text("Save a chat image to Photos and open this app again")
+                            }
                         }
                     } else {
                         screenshotGrid
@@ -105,7 +110,7 @@ struct RecentScreenshotsView: View {
         }
     }
 
-    /// 並べるスクリーンショットの一覧。縮小画像は写真ライブラリから読み出す
+    /// screenshots を並べた一覧。縮小画像は写真ライブラリから読み出す
     private var screenshotGrid: some View {
         ScreenshotGrid(
             title: recentScreenshotsTitle(showsOnlyScreenshots: showsOnlyScreenshots),
@@ -127,6 +132,7 @@ struct RecentScreenshotsView: View {
             Text("Screenshots only")
         }
         .padding(.horizontal)
+        // 8pt: 切り替えの行の上下を、下の一覧の見出しとの間より詰めて、切り替えを一覧の上の操作として近くに置くため
         .padding(.vertical, 8)
         .accessibilityIdentifier("shows_only_screenshots_toggle")
     }
@@ -201,6 +207,9 @@ struct ScreenshotGrid: View {
     ) async -> Result<UIImage, ScreenshotImageUnavailableReason>
     /// 縮小画像を読み出せないと分かった写真の localIdentifier。セルが画面の外に出て作り直されても並べないように、一覧の側で持つ
     @State private var unavailableScreenshotIdentifiers: Set<String> = []
+    /// 利用者がダウンロードのボタンを押した写真の localIdentifier。セルが画面の外に出て作り直された時に、
+    /// ボタンを出し直さずに iCloud から取ってよい写真として読み出し直すため、一覧の側で持つ
+    @State private var downloadRequestedScreenshotIdentifiers: Set<String> = []
 
     var body: some View {
         ScrollView {
@@ -218,9 +227,13 @@ struct ScreenshotGrid: View {
                     ) { screenshot in
                         ScreenshotGridCell(
                             screenshot: screenshot,
+                            isDownloadRequested: downloadRequestedScreenshotIdentifiers.contains(screenshot.localIdentifier),
                             loadThumbnailImage: loadThumbnailImage,
                             markUnavailable: {
                                 unavailableScreenshotIdentifiers.insert(screenshot.localIdentifier)
+                            },
+                            markDownloadRequested: {
+                                downloadRequestedScreenshotIdentifiers.insert(screenshot.localIdentifier)
                             }
                         )
                     }
@@ -235,6 +248,8 @@ struct ScreenshotGrid: View {
 struct ScreenshotGridCell: View {
     /// 表示するスクリーンショット
     let screenshot: PHAsset
+    /// 利用者がこの 1 枚のダウンロードのボタンを押したか (ScreenshotGrid が持つ。セルが作り直されても残る)
+    let isDownloadRequested: Bool
     /// 縮小画像を読み出す処理 (ScreenshotGrid の loadThumbnailImage をそのまま受け取る)
     let loadThumbnailImage: (
         _ asset: PHAsset,
@@ -243,6 +258,8 @@ struct ScreenshotGridCell: View {
     ) async -> Result<UIImage, ScreenshotImageUnavailableReason>
     /// iCloud にだけあること以外の理由で読み出せなかった時に呼ぶ。一覧からこの 1 枚を外す
     let markUnavailable: () -> Void
+    /// 利用者がダウンロードのボタンを押した時に呼ぶ。この 1 枚を、iCloud から取ってよい写真として ScreenshotGrid に控える
+    let markDownloadRequested: () -> Void
     /// 縮小画像の状態
     @State private var thumbnailState = ScreenshotThumbnailState.loading
 
@@ -287,16 +304,30 @@ struct ScreenshotGridCell: View {
             }
         }
         .task(id: screenshot.localIdentifier) {
-            // 一覧を開いただけでは iCloud と通信しないため、iCloud から取らずに読み出す
-            thumbnailState = await screenshotThumbnailState(isNetworkAccessAllowed: false, loadImage: loadThumbnail)
+            // セルが画面に出直すたびに task は動き直す。読み出した後と取っている間に動き直した時は、その表示を読み出す前の結果で上書きしない
+            guard case .loading = thumbnailState else {
+                return
+            }
+            // 一覧を開いただけでは iCloud と通信しないため、利用者がこの 1 枚のダウンロードのボタンを押していない時は iCloud から取らずに読み出す。
+            // 押した後にセルが作り直された時は、ボタンを出し直さずに iCloud から取り直す
+            if isDownloadRequested {
+                // 0: 取り直しを始めた直後は進み具合が伝わる前のため、何も進んでいない値から出す
+                thumbnailState = .downloading(fractionCompleted: 0)
+            }
+            thumbnailState = await screenshotThumbnailState(isNetworkAccessAllowed: isDownloadRequested, loadImage: loadThumbnail)
             if case .unavailable = thumbnailState {
                 markUnavailable()
             }
         }
     }
 
-    /// 利用者がダウンロードのボタンを押した時に、iCloud から取って縮小画像を出す。取れなかった時は理由を出す
+    /// 利用者がダウンロードのボタンを押した時に、iCloud から取って縮小画像を出す。取れなかった時は理由を出す。
+    /// ボタンを出していない状態 (取っている間・読み出せた後) で呼ばれた時は何もしない (続けて押した時に同じ 1 枚を 2 本並べて取らないため)
     private func download() async {
+        guard canStartScreenshotDownload(thumbnailState: thumbnailState) else {
+            return
+        }
+        markDownloadRequested()
         // 0: 押した直後は進み具合が伝わる前のため、何も進んでいない値から出す
         thumbnailState = .downloading(fractionCompleted: 0)
         thumbnailState = await screenshotThumbnailState(isNetworkAccessAllowed: true, loadImage: loadThumbnail)
@@ -342,6 +373,7 @@ struct ScreenshotThumbnailFrame: View {
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    // 8pt: 進み具合の棒を枠の左右の端から離し、角の丸みで棒の端が切れないようにするため
                     .padding(8)
                     .accessibilityIdentifier("screenshot_downloading_progress")
                 case .downloadFailed(let reason):
@@ -409,11 +441,15 @@ struct ScreenshotDownloadFailedLabel: View {
                 .font(.title3)
             Text(screenshotDownloadFailedMessage(reason: reason))
                 .accessibilityIdentifier("screenshot_download_failed_message")
+            #if DEBUG
+            // 写真ライブラリが返したエラーのドメイン・コード・説明は、実機で取れない原因を開発者メニューのあるビルドで見分けるためだけに出す
+            // (利用者の行動に効かないため、配布するビルドには出さない)
             if case .failed(let errorDescription) = reason {
-                // 写真ライブラリが返したエラーの説明は、取れなかった理由の詳しい内容として訳さずにそのまま出す
+                // 3 行: 幅 約 118pt の枠に、ドメインとコードと説明の始まりまでを収め、ボタンを枠の外へ押し出さないため
                 Text(verbatim: errorDescription)
                     .lineLimit(3)
             }
+            #endif
             ScreenshotDownloadButton(download: download)
         }
         .font(.caption2)

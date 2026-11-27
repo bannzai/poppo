@@ -351,6 +351,16 @@
         }
       }
     },
+    "Save a chat image to Photos and open this app again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットの画像を写真に保存してからこのアプリを開き直してください"
+          }
+        }
+      }
+    },
     "Screen capture" : {
       "localizations" : {
         "ja" : {

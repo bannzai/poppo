@@ -1,4 +1,5 @@
 import Photos
+import Synchronization
 import Testing
 import UIKit
 
@@ -64,6 +65,7 @@ private func photoLibraryAssetValues(mediaType: PHAssetMediaType, mediaSubtypes:
     /// loadImage が返す結果
     let result: Result<UIImage, ScreenshotImageUnavailableReason>
 
+    /// loadImage が返す結果 (result) を決めて作る
     // class は memberwise initializer を持たないため、返す結果を受け取る init を書く
     init(result: Result<UIImage, ScreenshotImageUnavailableReason>) {
         self.result = result
@@ -171,6 +173,44 @@ private nonisolated let screenshotImageUnavailableReasonsOtherThanInCloud: [Scre
         listedScreenshots(screenshots: screenshotIdentifiers, localIdentifier: { $0 }, unavailableScreenshotIdentifiers: ["absent"])
             == screenshotIdentifiers
     )
+}
+
+/// ダウンロードのボタンを出している状態 (iCloud にだけある・取れなかった) だけ、iCloud から取り始めてよいこと。
+/// 取っている間・読み出せた後・読み出す前・読み出せない時は取り始めない (続けて押した時に 2 本並べて取らないため)
+@Test func canStartScreenshotDownloadOnlyWhileShowingDownloadButton() {
+    #expect(canStartScreenshotDownload(thumbnailState: .needsDownload))
+    #expect(canStartScreenshotDownload(thumbnailState: .downloadFailed(reason: .inCloudOnly)))
+    #expect(canStartScreenshotDownload(thumbnailState: .downloadFailed(reason: .unknown)))
+    #expect(!canStartScreenshotDownload(thumbnailState: .downloading(fractionCompleted: 0)))
+    #expect(!canStartScreenshotDownload(thumbnailState: .downloading(fractionCompleted: 1)))
+    #expect(!canStartScreenshotDownload(thumbnailState: .loaded(image: UIImage())))
+    #expect(!canStartScreenshotDownload(thumbnailState: .loading))
+    #expect(!canStartScreenshotDownload(thumbnailState: .unavailable))
+}
+
+/// 写真ライブラリへ渡す読み出しの条件が、iCloud から取ってよいかをそのまま写し、結果を 1 回だけ返す形にすること
+@Test(arguments: [true, false]) func screenshotImageRequestOptionsCopyNetworkAccess(isNetworkAccessAllowed: Bool) {
+    let options = screenshotImageRequestOptions(isNetworkAccessAllowed: isNetworkAccessAllowed, progressHandler: nil)
+
+    #expect(options.isNetworkAccessAllowed == isNetworkAccessAllowed)
+    #expect(options.deliveryMode == .highQualityFormat)
+    #expect(options.progressHandler == nil)
+}
+
+/// 進み具合を受け取る処理を渡した時は、写真ライブラリが伝えた進み具合をそのまま渡すこと
+@Test func screenshotImageRequestOptionsForwardProgress() throws {
+    let receivedFractions = Mutex<[Double]>([])
+    let progressHandler = try #require(
+        screenshotImageRequestOptions(isNetworkAccessAllowed: true) { fractionCompleted in
+            receivedFractions.withLock { $0.append(fractionCompleted) }
+        }.progressHandler
+    )
+    var stop = ObjCBool(false)
+
+    progressHandler(0.25, nil, &stop, nil)
+    progressHandler(1, nil, &stop, nil)
+
+    #expect(receivedFractions.withLock { $0 } == [0.25, 1])
 }
 
 /// iCloud から取れなかった理由ごとに、セルに出す文を分けること (エラーと理由なしは同じ文で、エラーの説明はセルに別に出す)

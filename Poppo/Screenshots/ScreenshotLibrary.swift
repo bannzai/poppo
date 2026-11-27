@@ -85,6 +85,27 @@ nonisolated func screenshotImageUnavailableReason(info: [AnyHashable: Any]?) -> 
     return .unknown
 }
 
+/// loadScreenshotImage が写真ライブラリへ渡す読み出しの条件。isNetworkAccessAllowed と progressHandler は loadScreenshotImage と同じ。
+/// 結果は 1 回だけ返す (deliveryMode が highQualityFormat)
+nonisolated func screenshotImageRequestOptions(
+    isNetworkAccessAllowed: Bool,
+    progressHandler: (@Sendable (_ fractionCompleted: Double) -> Void)?
+) -> PHImageRequestOptions {
+    let options = PHImageRequestOptions()
+    // 結果を 1 回だけ受け取るため。既定の opportunistic は質の低い画像と本来の画像で resultHandler を複数回呼ぶことがあり、
+    // continuation を 2 回 resume してしまう (PHImageManager.h: highQualityFormat は「client will get one result only」)
+    options.deliveryMode = .highQualityFormat
+    options.isNetworkAccessAllowed = isNetworkAccessAllowed
+    // このクロージャは main actor の外 (この nonisolated の関数の中) で作る。写真ライブラリは進み具合を別のキューから伝えるため、
+    // main actor に隔離したクロージャを渡すと実行時に止まる (createDebugSampleScreenshotAssets の変更のブロックと同じ理由)
+    if let progressHandler {
+        options.progressHandler = { fractionCompleted, _, _, _ in
+            progressHandler(fractionCompleted)
+        }
+    }
+    return options
+}
+
 /// 写真ライブラリの 1 枚を、targetSize に合わせた画像として読み出す。読み出せない時は、その理由を failure で返す。
 /// isNetworkAccessAllowed が true の時だけ、端末に無い画像 (iCloud にだけある) を iCloud から取る
 /// (Apple の文書: 「A Boolean value that specifies whether Photos can download the requested image from iCloud.」
@@ -97,24 +118,12 @@ nonisolated func screenshotImageUnavailableReason(info: [AnyHashable: Any]?) -> 
     isNetworkAccessAllowed: Bool,
     progressHandler: (@Sendable (_ fractionCompleted: Double) -> Void)?
 ) async -> Result<UIImage, ScreenshotImageUnavailableReason> {
-    let options = PHImageRequestOptions()
-    // 結果を 1 回だけ受け取るため。既定の opportunistic は質の低い画像と本来の画像で resultHandler を複数回呼ぶことがあり、
-    // continuation を 2 回 resume してしまう (PHImageManager.h: highQualityFormat は「client will get one result only」)
-    options.deliveryMode = .highQualityFormat
-    options.isNetworkAccessAllowed = isNetworkAccessAllowed
-    // このクロージャは main actor の外 (この関数の中) で作る。写真ライブラリは進み具合を別のキューから伝えるため、
-    // main actor に隔離したクロージャを渡すと実行時に止まる (createDebugSampleScreenshotAssets の変更のブロックと同じ理由)
-    if let progressHandler {
-        options.progressHandler = { fractionCompleted, _, _, _ in
-            progressHandler(fractionCompleted)
-        }
-    }
-    return await withCheckedContinuation { continuation in
+    await withCheckedContinuation { continuation in
         PHImageManager.default().requestImage(
             for: asset,
             targetSize: targetSize,
             contentMode: contentMode,
-            options: options
+            options: screenshotImageRequestOptions(isNetworkAccessAllowed: isNetworkAccessAllowed, progressHandler: progressHandler)
         ) { image, info in
             continuation.resume(returning: image.map { .success($0) } ?? .failure(screenshotImageUnavailableReason(info: info)))
         }
@@ -169,6 +178,17 @@ func screenshotThumbnailState(
         .needsDownload
     case .failure:
         .unavailable
+    }
+}
+
+/// 一覧の 1 枚の縮小画像の状態 (thumbnailState) で、ダウンロードのボタンを押して iCloud から取り始めてよいかを返す。
+/// ボタンを出している状態 (iCloud にだけある・取れなかった) だけ true にする (取っている間や読み出せた後に続けて押されても、同じ 1 枚を 2 本並べて取らないため)
+func canStartScreenshotDownload(thumbnailState: ScreenshotThumbnailState) -> Bool {
+    switch thumbnailState {
+    case .needsDownload, .downloadFailed:
+        true
+    case .loading, .loaded, .downloading, .unavailable:
+        false
     }
 }
 
