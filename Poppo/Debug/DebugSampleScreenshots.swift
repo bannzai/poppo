@@ -390,11 +390,19 @@ func debugSampleChatVideo() -> PHAsset? {
     }
 }
 
-/// 見本のチャットの動画 (writeDebugSampleChatVideo) を写真ライブラリに足す。前に足した動画が残っていれば何もしない。
-/// 同時に 2 回呼ばない前提で、呼び出し側が足している間の再実行を止める。写真ライブラリへの書き込みの許可が要る
+/// 見本のチャットの動画を足している最中か。開発者メニューの画面を閉じて開き直しても残るよう、画面の外に置く
+/// (足している途中に開き直した画面から 2 回目を始め、同じファイルへの書き出しと写真への追加が重ならないようにするため)
+private var isAddingDebugSampleChatVideo = false
+
+/// 見本のチャットの動画 (writeDebugSampleChatVideo) を写真ライブラリに足す。前に足した動画が残っている時と、
+/// 前の呼び出しがまだ足している最中の時は何もしない。写真ライブラリへの書き込みの許可が要る
 func addDebugSampleChatVideo() async throws {
-    guard debugSampleChatVideo() == nil else {
+    guard !isAddingDebugSampleChatVideo, debugSampleChatVideo() == nil else {
         return
+    }
+    isAddingDebugSampleChatVideo = true
+    defer {
+        isAddingDebugSampleChatVideo = false
     }
     let fileURL = FileManager.default.temporaryDirectory.appending(path: "debug-sample-chat.mp4")
     try await writeDebugSampleChatVideo(fileURL: fileURL)

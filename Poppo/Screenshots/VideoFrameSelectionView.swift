@@ -15,16 +15,19 @@ import SwiftUI
     }
 }
 
-/// loadVideoAsset が写真ライブラリへ渡す読み出しの条件。iCloud から取ることを許し、取れた割合を progress に渡す
+/// loadVideoAsset が写真ライブラリへ渡す読み出しの条件。編集を当てる前の元の版を求め、iCloud から取ることを許し、取れた割合を progress に渡す
 nonisolated func videoRequestOptions(progress: @escaping @Sendable (Double) -> Void) -> PHVideoRequestOptions {
     let options = PHVideoRequestOptions()
     options.isNetworkAccessAllowed = true
+    // 編集を当てる前の元の動画を求める。既定の current は編集を当てた版で、写真ライブラリが AVURLAsset 以外 (編集を合成した AVAsset) を
+    // 返しうる (PHImageManager.h の requestAVAsset の結果の型は AVAsset)。loadVideoAsset は AVURLAsset しか受け取れないため、
+    // 1 つのファイルになっている元の版を読む。切り取りなどの編集は場面を選ぶ画面に出ない (チャットの画面を読むのに編集は要らないため)。
+    // 元の版は縮めていない動画のため、読み取る場面の小さい文字も読める (PHImageManager.h: 質を選ぶ deliveryMode は
+    // 「only apply with PHVideoRequestOptionsVersionCurrent」で、元の版には効かない)。元の版でも AVURLAsset が返るかは実機で確かめていない
+    options.version = .original
     options.progressHandler = { fractionCompleted, _, _, _ in
         progress(fractionCompleted)
     }
-    // 読み取る場面の小さい文字を、縮めた動画から読まないため。PHImageManager.h: 既定の automatic は iCloud から取る AVAsset で
-    // 「typ. PHVideoRequestOptionsDeliveryModeMediumQualityFormat」(720p 前後) を選び、highQualityFormat は「best quality」
-    options.deliveryMode = .highQualityFormat
     return options
 }
 
