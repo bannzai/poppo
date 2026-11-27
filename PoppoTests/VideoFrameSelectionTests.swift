@@ -168,14 +168,16 @@ func recognizeTextLinesReadsSelectedVideoFrame(index: Int, sampleChat: DebugSamp
     #expect(durationSeconds == 2)
 }
 
-/// 「この場面を読み取る」は、出している場面が選んだ時刻のものの時だけ押せること
+/// 「この場面を読み取る」は、出している場面が選んだ時刻のもので、画像にできた時だけ押せること
 @Test func canReadVideoFrameOnlyWhenPreviewMatchesSelection() {
-    #expect(canReadVideoFrame(previewSeconds: 1, selectedSeconds: 1))
-    #expect(canReadVideoFrame(previewSeconds: 0, selectedSeconds: 0))
+    #expect(canReadVideoFrame(previewSeconds: 1, previewHasImage: true, selectedSeconds: 1))
+    #expect(canReadVideoFrame(previewSeconds: 0, previewHasImage: true, selectedSeconds: 0))
     // Slider を動かした直後 (前の時刻の場面を出している間)
-    #expect(!canReadVideoFrame(previewSeconds: 1, selectedSeconds: 1.5))
-    // 場面の画像がまだ無い・作れなかった時
-    #expect(!canReadVideoFrame(previewSeconds: nil, selectedSeconds: 1))
+    #expect(!canReadVideoFrame(previewSeconds: 1, previewHasImage: true, selectedSeconds: 1.5))
+    // 場面の画像をまだ作っていない時
+    #expect(!canReadVideoFrame(previewSeconds: nil, previewHasImage: false, selectedSeconds: 1))
+    // 選んだ時刻の場面を画像にできなかった時
+    #expect(!canReadVideoFrame(previewSeconds: 1, previewHasImage: false, selectedSeconds: 1))
 }
 
 /// 見本の動画を同じファイルに 2 回書き出しても失敗せず、2 回目の動画も読めること (開発者メニューの操作を冪等にするため)

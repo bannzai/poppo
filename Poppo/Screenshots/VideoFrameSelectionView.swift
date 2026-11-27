@@ -98,10 +98,11 @@ nonisolated func videoFrameSelectionPhaseAfterProgress(current: VideoFrameSelect
     return current
 }
 
-/// 「この場面を読み取る」を押せるかを返す。previewSeconds は画面に出している場面の時刻 (場面の画像がまだ無い時は nil)、
-/// selectedSeconds は Slider で選んでいる時刻。出している場面が選んだ時刻のものの時だけ押せる (見ている場面と違う場面を読まないため)
-nonisolated func canReadVideoFrame(previewSeconds: Double?, selectedSeconds: Double) -> Bool {
-    previewSeconds == selectedSeconds
+/// 「この場面を読み取る」を押せるかを返す。previewSeconds は画面に出している場面の時刻 (場面の画像をまだ作っていない時は nil)、
+/// previewHasImage はその時刻の場面を画像にできたか、selectedSeconds は Slider で選んでいる時刻。
+/// 出している場面が選んだ時刻のもので、画像にできた時だけ押せる (見ている場面と違う場面と、画像にできない場面を読まないため)
+nonisolated func canReadVideoFrame(previewSeconds: Double?, previewHasImage: Bool, selectedSeconds: Double) -> Bool {
+    previewHasImage && previewSeconds == selectedSeconds
 }
 
 /// 動画の場面を選ぶ画面の状態
@@ -126,9 +127,10 @@ struct VideoFrameSelectionView: View {
     @State private var loadAttempt = 0
     /// 選んでいる場面の時刻 (動画の始まりからの秒)
     @State private var selectedSeconds: Double = 0
-    /// 画面に出している場面の画像 (image) と、その場面の時刻 (seconds。動画の始まりからの秒)。まだ画像にしていない時と、画像にできなかった時は nil。
+    /// 画面に出している場面の画像 (image) と、その場面の時刻 (seconds。動画の始まりからの秒)。まだ画像にしていない時は nil。
+    /// 画像にできなかった時は image が nil (その時刻の場面を読めないことを画面に出すため)。
     /// 時刻を画像と組で持つのは、出している場面が選んだ時刻 (selectedSeconds) のものかを、読み取るボタンで見分けるため
-    @State private var preview: (image: CGImage, seconds: Double)?
+    @State private var preview: (image: CGImage?, seconds: Double)?
 
     var body: some View {
         Group {
@@ -159,10 +161,20 @@ struct VideoFrameSelectionView: View {
                 // 16: 場面の画像・Slider・読み取るボタンの 3 つの塊の間を、塊の中 (Slider と時刻の間の 4) より広げて塊ごとに見分けるため
                 VStack(spacing: 16) {
                     Group {
-                        if let preview {
-                            Image(decorative: preview.image, scale: 1)
+                        if let previewImage = preview?.image {
+                            Image(decorative: previewImage, scale: 1)
                                 .resizable()
                                 .scaledToFit()
+                        } else if preview?.seconds == selectedSeconds {
+                            // ja: この場面を画像にできませんでした
+                            //
+                            // ja: ほかの時刻を選んでください
+                            ContentUnavailableView(
+                                "Couldn't make an image of this frame",
+                                systemImage: "exclamationmark.triangle",
+                                description: Text("Pick another time")
+                            )
+                            .accessibilityIdentifier("video_frame_unavailable")
                         } else {
                             Color(uiColor: .secondarySystemBackground)
                         }
@@ -193,7 +205,7 @@ struct VideoFrameSelectionView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     // 出している場面が選んだ時刻と違う間 (Slider を動かして、新しい場面の画像を作っている間) は押せなくする。見ている場面と読む場面を同じにするため
-                    .disabled(!canReadVideoFrame(previewSeconds: preview?.seconds, selectedSeconds: selectedSeconds))
+                    .disabled(!canReadVideoFrame(previewSeconds: preview?.seconds, previewHasImage: preview?.image != nil, selectedSeconds: selectedSeconds))
                     #if DEBUG
                     // 動画では、読み取りの画面を開くのはこのボタンのため、ここで押した時刻を控える (一覧のセルのタップと同じく、表示までの時間を測るため)
                     .simultaneousGesture(
@@ -212,7 +224,7 @@ struct VideoFrameSelectionView: View {
                     // 幅 1206・高さ 2622: iPhone 17 Pro の画面のピクセル数。画面に収めて見せるだけなので、これより大きい画像は作らない
                     let image = try? await videoFrameImage(asset: asset, seconds: selectedSeconds, maximumSize: CGSize(width: 1206, height: 2622))
                     if !Task.isCancelled {
-                        preview = image.map { (image: $0, seconds: selectedSeconds) }
+                        preview = (image: image, seconds: selectedSeconds)
                     }
                 }
             }

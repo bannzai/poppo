@@ -151,6 +151,16 @@
         }
       }
     },
+    "Couldn't make an image of this frame" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この場面を画像にできませんでした"
+          }
+        }
+      }
+    },
     "Couldn't read this screenshot" : {
       "localizations" : {
         "ja" : {
@@ -417,6 +427,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットを選んで翻訳"
+          }
+        }
+      }
+    },
+    "Pick another time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの時刻を選んでください"
           }
         }
       }
