@@ -111,11 +111,29 @@ func recentScreenshotFetchOptionsLimitCount(mediaKinds: PhotoLibraryMediaKinds) 
     #expect(recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds).fetchLimit == 30)
 }
 
-/// 「ほかの写真」か「ほかの動画」を、同じ画像・動画のもう一方を選ばずに選んだ時は、問い合わせを件数で限らないこと
-/// (0 は PHFetchOptions の「限らない」。述語が選ぶ項目から種類で除いた後に件数を残すため)
+/// 「ほかの写真」か「ほかの動画」を、同じ画像・動画のもう一方を選ばずに選んだ時は、問い合わせを並べる件数ではなく
+/// 読む件数の上限 (photoLibraryUnfilteredFetchLimit) で限ること (述語が選ぶ項目から種類で除いた後に件数を残しつつ、読む件数を限るため)
 @Test(arguments: [PhotoLibraryMediaKinds.otherPhotos, .otherVideos, [.screenshots, .otherVideos], [.otherPhotos, .screenRecordings]])
-func recentScreenshotFetchOptionsDoesNotLimitWhenPredicateIsBroader(mediaKinds: PhotoLibraryMediaKinds) {
-    #expect(recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds).fetchLimit == 0)
+func recentScreenshotFetchOptionsLimitsScanWhenPredicateIsBroader(mediaKinds: PhotoLibraryMediaKinds) {
+    #expect(recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds).fetchLimit == 1000)
+    // 並べる件数が読む件数の上限より多い時は、並べる件数まで読む
+    #expect(recentScreenshotFetchOptions(limit: 2000, mediaKinds: mediaKinds).fetchLimit == 2000)
+}
+
+/// 画面収録だけの時は、述語だけで画面収録の動画を選び、ほかの動画を選ばないこと (件数で限るのは述語が種類だけを選ぶ時のため。
+/// 取得後の絞り込みに隠れて述語が広がっても気づけるよう、述語そのものを確かめる)
+@Test func screenRecordingsPredicateSelectsOnlyScreenRecordings() {
+    #expect(photoLibraryMediaKindsPredicateSelects(mediaKinds: .screenRecordings, mediaType: .video, mediaSubtypes: .videoScreenRecording))
+    #expect(!photoLibraryMediaKindsPredicateSelects(mediaKinds: .screenRecordings, mediaType: .video, mediaSubtypes: []))
+    #expect(!photoLibraryMediaKindsPredicateSelects(mediaKinds: .screenRecordings, mediaType: .image, mediaSubtypes: .videoScreenRecording))
+}
+
+/// 種類ごとの名前が、絞り込みの画面の 4 つの切り替えでそれぞれ違うこと
+@Test func photoLibraryMediaKindNameIsDistinctPerKind() {
+    #expect(photoLibraryMediaKindName(mediaKind: .screenshots).key == "Screenshots")
+    #expect(photoLibraryMediaKindName(mediaKind: .otherPhotos).key == "Other photos")
+    #expect(photoLibraryMediaKindName(mediaKind: .screenRecordings).key == "Screen recordings")
+    #expect(photoLibraryMediaKindName(mediaKind: .otherVideos).key == "Other videos")
 }
 
 /// 絞り込みの切り替えが、選ぶと種類を足し、外すと種類を除くこと

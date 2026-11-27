@@ -105,16 +105,20 @@ nonisolated func photoLibraryMediaKind(mediaType: PHAssetMediaType, mediaSubtype
     }
 }
 
+/// 述語が mediaKinds の種類だけを選べない時 (photoLibraryMediaKindsPredicateIsExact が false) に、写真ライブラリから読む項目の数の上限。
+/// 種類で除く前の項目を、上限なしに main actor で読み続けないため。直近の 1000 件にした理由: 一覧が並べるのは直近の
+/// recentScreenshotsLimit 件で、それより古い項目を探して一覧を止めないため。この件数を読む時間は実機で測っていない
+nonisolated let photoLibraryUnfilteredFetchLimit = 1000
+
 /// 写真ライブラリへの問い合わせの条件。mediaKinds の種類に当たる項目を含む項目を、撮った日時の新しい順に取る。
-/// 述語が mediaKinds の種類だけを選べる時は limit 件までに限り、選べない時 (photoLibraryMediaKindsPredicate の「ほか」の種類) は限らない
-/// (述語が選んだ項目から、呼び出し側が種類で除いた後に limit 件を残すため)
+/// 述語が mediaKinds の種類だけを選べる時は limit 件まで、選べない時 (photoLibraryMediaKindsPredicate の「ほか」の種類) は
+/// photoLibraryUnfilteredFetchLimit 件までに限る (述語が選んだ項目から、呼び出し側が種類で除いた後に limit 件を残すため。
+/// 直近の photoLibraryUnfilteredFetchLimit 件に当たる種類が limit 件より少ない時は、一覧に並ぶのも limit 件より少ない)
 func recentScreenshotFetchOptions(limit: Int, mediaKinds: PhotoLibraryMediaKinds) -> PHFetchOptions {
     let options = PHFetchOptions()
     options.predicate = photoLibraryMediaKindsPredicate(mediaKinds: mediaKinds)
     options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-    if photoLibraryMediaKindsPredicateIsExact(mediaKinds: mediaKinds) {
-        options.fetchLimit = limit
-    }
+    options.fetchLimit = photoLibraryMediaKindsPredicateIsExact(mediaKinds: mediaKinds) ? limit : max(limit, photoLibraryUnfilteredFetchLimit)
     return options
 }
 

@@ -88,12 +88,13 @@ struct VideoFrameSelectionView: View {
     let video: PHAsset
     /// 画面の状態
     @State private var phase = VideoFrameSelectionPhase.loading(progress: nil)
-    /// 動画を読み出した回数。「もう一度読み込む」を押すと増やし、読み出しをやり直す
+    /// 動画を読み出した回数。読み込めなかった時のやり直しのボタンを押すと増やし、読み出しをやり直す
     @State private var loadAttempt = 0
     /// 選んでいる場面の時刻 (動画の始まりからの秒)
     @State private var selectedSeconds: Double = 0
-    /// 選んでいる場面の画像。まだ画像にしていない時と、画像にできなかった時は nil
-    @State private var previewImage: CGImage?
+    /// 画面に出している場面の画像 (image) と、その場面の時刻 (seconds。動画の始まりからの秒)。まだ画像にしていない時と、画像にできなかった時は nil。
+    /// 時刻を画像と組で持つのは、出している場面が選んだ時刻 (selectedSeconds) のものかを、読み取るボタンで見分けるため
+    @State private var preview: (image: CGImage, seconds: Double)?
 
     var body: some View {
         Group {
@@ -124,8 +125,8 @@ struct VideoFrameSelectionView: View {
                 // 16: 場面の画像・Slider・読み取るボタンの 3 つの塊の間を、塊の中 (Slider と時刻の間の 4) より広げて塊ごとに見分けるため
                 VStack(spacing: 16) {
                     Group {
-                        if let previewImage {
-                            Image(decorative: previewImage, scale: 1)
+                        if let preview {
+                            Image(decorative: preview.image, scale: 1)
                                 .resizable()
                                 .scaledToFit()
                         } else {
@@ -157,6 +158,8 @@ struct VideoFrameSelectionView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    // 出している場面が選んだ時刻と違う間 (Slider を動かして、新しい場面の画像を作っている間) は押せなくする。見ている場面と読む場面を同じにするため
+                    .disabled(preview?.seconds != selectedSeconds)
                     #if DEBUG
                     // 動画では、読み取りの画面を開くのはこのボタンのため、ここで押した時刻を控える (一覧のセルのタップと同じく、表示までの時間を測るため)
                     .simultaneousGesture(
@@ -173,7 +176,7 @@ struct VideoFrameSelectionView: View {
                     // 幅 1206・高さ 2622: iPhone 17 Pro の画面のピクセル数。画面に収めて見せるだけなので、これより大きい画像は作らない
                     let image = try? await videoFrameImage(asset: asset, seconds: selectedSeconds, maximumSize: CGSize(width: 1206, height: 2622))
                     if !Task.isCancelled {
-                        previewImage = image
+                        preview = image.map { (image: $0, seconds: selectedSeconds) }
                     }
                 }
             }
