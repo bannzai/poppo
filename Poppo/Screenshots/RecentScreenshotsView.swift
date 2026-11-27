@@ -200,11 +200,12 @@ struct ScreenshotGrid: View {
     /// 一覧の 1 枚を縮小画像の大きさで読み出す処理。asset は読み出す 1 枚、isNetworkAccessAllowed は iCloud から取ってよいか、
     /// progressHandler は iCloud から取っている間の進み具合 (0〜1) を受け取る (main actor の外から呼ばれる)。
     /// 本物は loadScreenshotThumbnailImage(asset:isNetworkAccessAllowed:progressHandler:)。開発者メニューは iCloud にだけある見本を作る処理を渡す
-    let loadThumbnailImage: (
-        _ asset: PHAsset,
-        _ isNetworkAccessAllowed: Bool,
-        _ progressHandler: @escaping @Sendable (_ fractionCompleted: Double) -> Void
-    ) async -> Result<UIImage, ScreenshotImageUnavailableReason>
+    let loadThumbnailImage:
+        (
+            _ asset: PHAsset,
+            _ isNetworkAccessAllowed: Bool,
+            _ progressHandler: @escaping @Sendable (_ fractionCompleted: Double) -> Void
+        ) async -> Result<UIImage, ScreenshotImageUnavailableReason>
     /// 縮小画像を読み出せないと分かった写真の localIdentifier。セルが画面の外に出て作り直されても並べないように、一覧の側で持つ
     @State private var unavailableScreenshotIdentifiers: Set<String> = []
     /// 利用者がダウンロードのボタンを押した写真の localIdentifier。セルが画面の外に出て作り直された時に、
@@ -251,11 +252,12 @@ struct ScreenshotGridCell: View {
     /// 利用者がこの 1 枚のダウンロードのボタンを押したか (ScreenshotGrid が持つ。セルが作り直されても残る)
     let isDownloadRequested: Bool
     /// 縮小画像を読み出す処理 (ScreenshotGrid の loadThumbnailImage をそのまま受け取る)
-    let loadThumbnailImage: (
-        _ asset: PHAsset,
-        _ isNetworkAccessAllowed: Bool,
-        _ progressHandler: @escaping @Sendable (_ fractionCompleted: Double) -> Void
-    ) async -> Result<UIImage, ScreenshotImageUnavailableReason>
+    let loadThumbnailImage:
+        (
+            _ asset: PHAsset,
+            _ isNetworkAccessAllowed: Bool,
+            _ progressHandler: @escaping @Sendable (_ fractionCompleted: Double) -> Void
+        ) async -> Result<UIImage, ScreenshotImageUnavailableReason>
     /// iCloud にだけあること以外の理由で読み出せなかった時に呼ぶ。一覧からこの 1 枚を外す
     let markUnavailable: () -> Void
     /// 利用者がダウンロードのボタンを押した時に呼ぶ。この 1 枚を、iCloud から取ってよい写真として ScreenshotGrid に控える
