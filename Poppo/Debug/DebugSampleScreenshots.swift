@@ -1,5 +1,6 @@
 #if DEBUG
 import AVFoundation
+import CoreVideo
 import ImageIO
 import Photos
 import UIKit
@@ -331,28 +332,16 @@ func writeDebugSampleChatVideo(fileURL: URL) async throws {
             AVVideoHeightKey: Int(pixelSize.height),
         ]
     )
-    input.expectsMediaDataInRealTime = false
-    let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
-    writer.add(input)
-    guard writer.startWriting() else {
-        throw writer.error ?? CocoaError(.fileWriteUnknown)
-    }
+    let receiver = writer.inputPixelBufferReceiver(for: input, pixelBufferAttributes: nil)
+    try writer.start()
     writer.startSession(atSourceTime: .zero)
     for (index, image) in images.enumerated() {
-        while !input.isReadyForMoreMediaData {
-            // 10 ミリ秒: 書き出しの待ちを、2 枚の画像を書く間の短い間隔で確かめるため
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        guard
-            adaptor.append(
-                try debugPixelBuffer(image: image),
-                withPresentationTime: CMTime(value: CMTimeValue(index * debugSampleChatVideoSecondsPerChat), timescale: 1)
-            )
-        else {
-            throw writer.error ?? CocoaError(.fileWriteUnknown)
-        }
+        try await receiver.append(
+            CVReadOnlyPixelBuffer(unsafeBuffer: try debugPixelBuffer(image: image)),
+            with: CMTime(value: CMTimeValue(index * debugSampleChatVideoSecondsPerChat), timescale: 1)
+        )
     }
-    input.markAsFinished()
+    receiver.finish()
     writer.endSession(atSourceTime: CMTime(value: CMTimeValue(images.count * debugSampleChatVideoSecondsPerChat), timescale: 1))
     await writer.finishWriting()
     guard writer.status == .completed else {
