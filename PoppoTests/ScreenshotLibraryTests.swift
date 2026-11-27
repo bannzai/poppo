@@ -21,6 +21,8 @@ private func photoLibraryAssetValues(mediaType: PHAssetMediaType, mediaSubtypes:
     #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: [])))
     #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: [])))
     #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .videoHighFrameRate)))
+    // 種別のビットがスクリーンショットと同じでも、動画は画像ではないため選ばない (述語が mediaType を見ていることを確かめるため)
+    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .photoScreenshot)))
 }
 
 /// 写真のすべてを並べる時の問い合わせが、種別を問わず画像を選び (スクリーンショット・Live Photo・種別の無い画像)、動画と音声は選ばないこと
