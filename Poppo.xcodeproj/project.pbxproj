@@ -298,7 +298,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = "Config/Poppo-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Poppo;
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Poppo lists your recent screenshots or photos so you can pick one to translate. Images are read only on this device.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Poppo lists your recent screenshots, photos, or videos so you can pick one to translate. Images and videos are read only on this device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -323,7 +323,7 @@
 				"CODE_SIGN_STYLE[sdk=iphoneos*]" = Manual;
 				INFOPLIST_FILE = "Config/Poppo-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Poppo;
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Poppo lists your recent screenshots or photos so you can pick one to translate. Images are read only on this device.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Poppo lists your recent screenshots, photos, or videos so you can pick one to translate. Images and videos are read only on this device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;

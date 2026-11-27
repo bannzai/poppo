@@ -10,11 +10,13 @@ struct RecentScreenshotsView: View {
     @Environment(\.openURL) private var openURL
     /// 写真へのアクセスの許可の状態
     @State private var authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    /// 並べる写真。新しい順。showsOnlyScreenshots が true の時はスクリーンショットだけ、false の時は動画を除く写真のすべて
+    /// 並べる写真と動画。新しい順。mediaKinds の種類に当たるもの
     @State private var screenshots: [PHAsset] = []
-    /// スクリーンショットだけを並べるか (false は動画を除く写真のすべて)。端末に保存し、次に開いた時も同じにする。
-    // 既定の true: 切り替えを足す前と同じ一覧 (スクリーンショットだけ) から始めるため (https://github.com/bannzai/poppo/issues/66 )
-    @AppStorage(showsOnlyScreenshotsUserDefaultsKey) private var showsOnlyScreenshots = true
+    /// 並べる種類の組。端末に保存し、次に開いた時も同じにする。
+    // 既定のスクリーンショットだけ: 絞り込みの画面を足す前と同じ一覧から始めるため (https://github.com/bannzai/poppo/issues/66 の既定と同じ)
+    @AppStorage(listedPhotoLibraryMediaKindsUserDefaultsKey) private var mediaKinds = PhotoLibraryMediaKinds.screenshots
+    /// 絞り込みの画面を開いているか
+    @State private var isMediaKindsFilterPresented = false
 
     var body: some View {
         Group {
@@ -52,23 +54,23 @@ struct RecentScreenshotsView: View {
             case .allowed:
                 // 0: 切り替えの行の上下の余白は切り替え自身が持つため、切り替えと一覧の間に余白を足さない (選んだ写真だけの時の VStack と同じ)
                 VStack(spacing: 0) {
-                    showsOnlyScreenshotsToggle
+                    mediaKindsFilterRow
                     if screenshots.isEmpty {
                         ContentUnavailableView {
-                            if showsOnlyScreenshots {
+                            if mediaKinds == .screenshots {
                                 // ja: スクリーンショットがまだありません
                                 Label("No screenshots yet", systemImage: "photo.on.rectangle")
                             } else {
-                                // ja: 写真がまだありません
-                                Label("No photos yet", systemImage: "photo.on.rectangle")
+                                // ja: 選んだ種類の写真と動画がまだありません
+                                Label("No photos or videos of the selected kinds yet", systemImage: "photo.on.rectangle")
                             }
                         } description: {
-                            if showsOnlyScreenshots {
+                            if mediaKinds == .screenshots {
                                 // ja: チャットのスクリーンショットを撮ってからこのアプリを開き直してください
                                 Text("Take a screenshot of a chat and open this app again")
                             } else {
-                                // ja: チャットの画像を写真に保存してからこのアプリを開き直してください
-                                Text("Save a chat image to Photos and open this app again")
+                                // ja: 絞り込みで種類を変えるかチャットの画像か動画を写真に保存してからこのアプリを開き直してください
+                                Text("Change the filter or save a chat image or video to Photos and open this app again")
                             }
                         }
                     } else {
@@ -82,12 +84,12 @@ struct RecentScreenshotsView: View {
                         Text("Only the photos you selected are shown")
                             .font(.subheadline.bold())
                         Group {
-                            if showsOnlyScreenshots {
+                            if mediaKinds == .screenshots {
                                 // ja: 新しく撮ったスクリーンショットを並べるには設定ですべての写真へのアクセスを許可してください
                                 Text("Allow access to all photos in Settings to see new screenshots")
                             } else {
-                                // ja: 新しく保存した写真を並べるには設定ですべての写真へのアクセスを許可してください
-                                Text("Allow access to all photos in Settings to see new photos")
+                                // ja: 新しく保存した写真と動画を並べるには設定ですべての写真へのアクセスを許可してください
+                                Text("Allow access to all photos in Settings to see new photos and videos")
                             }
                         }
                         .font(.footnote)
@@ -96,7 +98,7 @@ struct RecentScreenshotsView: View {
                         openSettingsButton
                     }
                     .padding()
-                    showsOnlyScreenshotsToggle
+                    mediaKindsFilterRow
                     if screenshots.isEmpty {
                         Spacer()
                     } else {
@@ -105,8 +107,11 @@ struct RecentScreenshotsView: View {
                 }
             }
         }
-        .onChange(of: showsOnlyScreenshots) {
+        .onChange(of: mediaKinds) {
             loadScreenshots()
+        }
+        .sheet(isPresented: $isMediaKindsFilterPresented) {
+            PhotoLibraryMediaKindsFilterView(mediaKinds: $mediaKinds)
         }
         // 利用者がスクリーンショットを撮ってから本体アプリへ戻った時に、撮ったばかりの 1 枚を並べるため、前面に戻るたびに取り直す
         .onChange(of: scenePhase, initial: true) { _, newScenePhase in
@@ -121,7 +126,7 @@ struct RecentScreenshotsView: View {
     /// screenshots を並べた一覧。縮小画像は写真ライブラリから読み出す
     private var screenshotGrid: some View {
         ScreenshotGrid(
-            title: recentScreenshotsTitle(showsOnlyScreenshots: showsOnlyScreenshots),
+            title: recentScreenshotsTitle(mediaKinds: mediaKinds),
             screenshots: screenshots,
             loadThumbnailImage: { asset, isNetworkAccessAllowed, progressHandler in
                 await loadScreenshotThumbnailImage(
@@ -133,16 +138,26 @@ struct RecentScreenshotsView: View {
         )
     }
 
-    /// 一覧の上に置く、スクリーンショットだけを並べるかの切り替え。一覧が空の時も出す (スクリーンショットが無くても写真のすべてへ切り替えられるように)
-    private var showsOnlyScreenshotsToggle: some View {
-        Toggle(isOn: $showsOnlyScreenshots) {
-            // ja: スクリーンショットだけ
-            Text("Screenshots only")
+    /// 一覧の上に置く、並べている種類と、絞り込みの画面を開くボタンの行。一覧が空の時も出す (並ぶものが無くても種類を変えられるように)
+    private var mediaKindsFilterRow: some View {
+        HStack {
+            Text(verbatim: photoLibraryMediaKindsSummary(mediaKinds: mediaKinds))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .accessibilityIdentifier("media_kinds_summary")
+            Spacer()
+            Button {
+                isMediaKindsFilterPresented = true
+            } label: {
+                // ja: 絞り込み
+                Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+            }
+            .accessibilityIdentifier("media_kinds_filter_button")
         }
         .padding(.horizontal)
-        // 8pt: 切り替えの行の上下を、下の一覧の見出しとの間より詰めて、切り替えを一覧の上の操作として近くに置くため
+        // 8pt: 行の上下を、下の一覧の見出しとの間より詰めて、絞り込みを一覧の上の操作として近くに置くため
         .padding(.vertical, 8)
-        .accessibilityIdentifier("shows_only_screenshots_toggle")
     }
 
     /// 設定アプリの、本体アプリの画面を開くボタン。利用者が写真へのアクセスの許可を変えられるように出す
@@ -159,7 +174,7 @@ struct RecentScreenshotsView: View {
         }
     }
 
-    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近の写真 (showsOnlyScreenshots が true の時はスクリーンショットだけ) を取り直す。
+    /// 写真へのアクセスが許可されている時 (選んだ写真だけの許可を含む) に、直近の写真と動画 (mediaKinds の種類に当たるもの) を取り直す。
     /// 許可を選ぶ前には取らない。許可が要る操作を初めて行うとシステムが許可の確認を出すため、利用者が許可の導線を押す前に確認を出さない
     /// (Apple の文書: 「The first time your app performs an operation that requires authorization, the system automatically and
     /// asynchronously prompts the user for it.」
@@ -167,7 +182,7 @@ struct RecentScreenshotsView: View {
     private func loadScreenshots() {
         switch screenshotAccess(authorizationStatus: authorizationStatus) {
         case .allowed, .limited:
-            screenshots = fetchRecentScreenshots(limit: recentScreenshotsLimit, showsOnlyScreenshots: showsOnlyScreenshots)
+            screenshots = fetchRecentScreenshots(limit: recentScreenshotsLimit, mediaKinds: mediaKinds)
         case .notRequested, .denied:
             return
         }
@@ -187,18 +202,115 @@ let screenshotGridColumns = Array(repeating: GridItem(.flexible(), spacing: scre
 /// 一覧の縮小画像の枠の形。見た目を切る形とタップを受ける形を同じにするため 1 か所に置く。角丸 8pt はセルの間隔と揃える
 let screenshotThumbnailShape = RoundedRectangle(cornerRadius: screenshotGridSpacing)
 
-/// 一覧の見出し。showsOnlyScreenshots はスクリーンショットだけを並べているか (false は写真のすべて)
-func recentScreenshotsTitle(showsOnlyScreenshots: Bool) -> LocalizedStringResource {
-    if showsOnlyScreenshots {
+/// 一覧の見出し。mediaKinds は並べている種類の組
+func recentScreenshotsTitle(mediaKinds: PhotoLibraryMediaKinds) -> LocalizedStringResource {
+    if mediaKinds == .screenshots {
         // ja: 直近のスクリーンショット
         "Recent screenshots"
-    } else {
+    } else if mediaKinds.isSubset(of: [.screenshots, .otherPhotos]) {
         // ja: 直近の写真
         "Recent photos"
+    } else if mediaKinds.isSubset(of: [.screenRecordings, .otherVideos]) {
+        // ja: 直近の動画
+        "Recent videos"
+    } else {
+        // ja: 直近の写真と動画
+        "Recent photos and videos"
     }
 }
 
-/// 写真 (スクリーンショットか、動画を除く写真のすべて) を 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面へ進む。
+/// 絞り込みの画面に並べる種類の、上からの順。写真の 2 つ、動画の 2 つの順
+let photoLibraryMediaKindsInFilterOrder: [PhotoLibraryMediaKinds] = [.screenshots, .otherPhotos, .screenRecordings, .otherVideos]
+
+/// 種類 (mediaKind。1 つの種類) の、絞り込みの画面と一覧の上の行に出す名前
+func photoLibraryMediaKindName(mediaKind: PhotoLibraryMediaKinds) -> LocalizedStringResource {
+    switch mediaKind {
+    case .screenshots:
+        // ja: スクリーンショット
+        "Screenshots"
+    case .otherPhotos:
+        // ja: ほかの写真
+        "Other photos"
+    case .screenRecordings:
+        // ja: 画面収録
+        "Screen recordings"
+    default:
+        // ja: ほかの動画
+        "Other videos"
+    }
+}
+
+/// 一覧の上の行に出す、並べている種類の組 (mediaKinds) の名前を、絞り込みの画面の順に並べてつないだ文
+func photoLibraryMediaKindsSummary(mediaKinds: PhotoLibraryMediaKinds) -> String {
+    photoLibraryMediaKindsInFilterOrder
+        .filter { mediaKinds.contains($0) }
+        .map { String(localized: photoLibraryMediaKindName(mediaKind: $0)) }
+        .formatted(.list(type: .and))
+}
+
+/// 一覧に並べる種類を選ぶ画面。種類ごとに切り替えを置き、選んだ組を mediaKinds に書く。最後に残った 1 つは外せない (何も並ばない一覧にしないため)
+struct PhotoLibraryMediaKindsFilterView: View {
+    /// 並べる種類の組 (端末に保存してある選択)
+    @Binding var mediaKinds: PhotoLibraryMediaKinds
+    /// 画面を閉じるために使う
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    mediaKindToggle(mediaKind: .screenshots)
+                    mediaKindToggle(mediaKind: .otherPhotos)
+                } header: {
+                    // ja: 写真
+                    Text("Photos")
+                }
+                Section {
+                    mediaKindToggle(mediaKind: .screenRecordings)
+                    mediaKindToggle(mediaKind: .otherVideos)
+                } header: {
+                    // ja: 動画
+                    Text("Videos")
+                } footer: {
+                    // ja: 動画は選んだ 1 つの場面を読み取ります
+                    Text("For a video you pick one frame to read")
+                }
+            }
+            // ja: 絞り込み
+            .navigationTitle("Filter")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        // ja: 完了
+                        Text("Done")
+                    }
+                    .accessibilityIdentifier("media_kinds_filter_done_button")
+                }
+            }
+        }
+        // 4 つの切り替えと見出しが収まる高さ。一覧を後ろに見せたまま選べるようにするため、画面の全体を覆わない
+        .presentationDetents([.medium])
+    }
+
+    /// 種類 (mediaKind) を選ぶ・外す切り替え。選んでいる種類が mediaKind だけの時は外せないよう操作を止める
+    private func mediaKindToggle(mediaKind: PhotoLibraryMediaKinds) -> some View {
+        Toggle(
+            isOn: Binding(
+                get: { mediaKinds.contains(mediaKind) },
+                set: { mediaKinds = toggledPhotoLibraryMediaKinds(current: mediaKinds, mediaKind: mediaKind, isOn: $0) }
+            )
+        ) {
+            Text(photoLibraryMediaKindName(mediaKind: mediaKind))
+        }
+        .disabled(mediaKinds == mediaKind)
+        .accessibilityIdentifier("media_kind_toggle_\(mediaKind.rawValue)")
+    }
+}
+
+/// 写真と動画 (利用者が絞り込みで選んだ種類のもの) を 3 列に並べた一覧。1 枚を選ぶと、その読み取りの画面 (動画は場面を選ぶ画面) へ進む。
 /// iCloud にだけあること以外の理由で縮小画像を読み出せなかった写真は並べない
 struct ScreenshotGrid: View {
     /// 一覧の見出し
@@ -264,7 +376,7 @@ struct ScreenshotGrid: View {
 
 /// 一覧の 1 枚のセル。縮小画像を読み出せた時はタップで読み取りの画面へ進み、iCloud にだけある時はダウンロードのボタンを出す
 struct ScreenshotGridCell: View {
-    /// 表示する写真 (スクリーンショットか、動画を除く写真のどれか)
+    /// 表示する写真か動画
     let screenshot: PHAsset
     /// 利用者がこの 1 枚のダウンロードのボタンを押したか (ScreenshotGrid が持つ。セルが作り直されても残る)
     let isDownloadRequested: Bool
@@ -286,11 +398,15 @@ struct ScreenshotGridCell: View {
         Group {
             if case .loaded = thumbnailState {
                 NavigationLink {
-                    ChatReadingView(
-                        screenshot: screenshot,
-                        recognizeTextLines: { try await recognizeTextLines(screenshot: screenshot) },
-                        readChatContent: { try await readChat(lines: $0) }
-                    )
+                    if screenshot.mediaType == .video {
+                        VideoFrameSelectionView(video: screenshot)
+                    } else {
+                        ChatReadingView(
+                            screenshot: screenshot,
+                            recognizeTextLines: { try await recognizeTextLines(screenshot: screenshot) },
+                            readChatContent: { try await readChat(lines: $0) }
+                        )
+                    }
                 } label: {
                     ScreenshotThumbnailFrame(thumbnailState: thumbnailState, download: {})
                 }

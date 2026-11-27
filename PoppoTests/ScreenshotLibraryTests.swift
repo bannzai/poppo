@@ -10,52 +10,116 @@ private func photoLibraryAssetValues(mediaType: PHAssetMediaType, mediaSubtypes:
     ["mediaType": mediaType.rawValue, "mediaSubtypes": mediaSubtypes.rawValue]
 }
 
-/// スクリーンショットだけを並べる時の問い合わせが、スクリーンショットの種別を持つ画像だけを選ぶこと。
-/// スクリーンショットとほかの種別を併せ持つ画像は選び、ほかの種別だけの画像 (Live Photo・パノラマ)・種別の無い画像・動画は選ばない
-@Test func recentScreenshotFetchOptionsSelectOnlyScreenshotsWhenShowingOnlyScreenshots() throws {
-    let predicate = try #require(recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: true).predicate)
-
-    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoScreenshot)))
-    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: [.photoScreenshot, .photoHDR])))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoLive)))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoPanorama)))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: [])))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: [])))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .videoHighFrameRate)))
-    // 種別のビットがスクリーンショットと同じでも、動画は画像ではないため選ばない (述語が mediaType を見ていることを確かめるため)
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .photoScreenshot)))
+/// 種類の組 mediaKinds で問い合わせる時の述語が、項目 (mediaType と mediaSubtypes) を選ぶかを返す
+private func photoLibraryMediaKindsPredicateSelects(
+    mediaKinds: PhotoLibraryMediaKinds,
+    mediaType: PHAssetMediaType,
+    mediaSubtypes: PHAssetMediaSubtype
+) -> Bool {
+    recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds).predicate?
+        .evaluate(with: photoLibraryAssetValues(mediaType: mediaType, mediaSubtypes: mediaSubtypes)) == true
 }
 
-/// 写真のすべてを並べる時の問い合わせが、種別を問わず画像を選び (スクリーンショット・Live Photo・種別の無い画像)、動画と音声は選ばないこと
-@Test func recentScreenshotFetchOptionsSelectAllImagesWhenShowingAllPhotos() throws {
-    let predicate = try #require(recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: false).predicate)
+/// 写真ライブラリの項目の見本と、その項目が当たる種類。どの種類にも当たらない音声は nil
+private nonisolated let photoLibraryItemSamples: [(mediaType: PHAssetMediaType, mediaSubtypes: PHAssetMediaSubtype, mediaKind: PhotoLibraryMediaKinds?)] = [
+    (.image, .photoScreenshot, .screenshots),
+    // スクリーンショットとほかの種別を併せ持つ画像はスクリーンショット
+    (.image, [.photoScreenshot, .photoHDR], .screenshots),
+    (.image, .photoLive, .otherPhotos),
+    (.image, .photoPanorama, .otherPhotos),
+    (.image, [], .otherPhotos),
+    (.video, .videoScreenRecording, .screenRecordings),
+    (.video, [.videoScreenRecording, .videoHighFrameRate], .screenRecordings),
+    (.video, [], .otherVideos),
+    (.video, .videoHighFrameRate, .otherVideos),
+    // 種別のビットがスクリーンショットと同じでも動画は画像ではなく、画面収録と同じでも画像は動画ではない (述語が mediaType を見ていることを確かめるため)
+    (.video, .photoScreenshot, .otherVideos),
+    (.image, .videoScreenRecording, .otherPhotos),
+    (.audio, [], nil),
+]
 
-    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoScreenshot)))
-    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: .photoLive)))
-    #expect(predicate.evaluate(with: photoLibraryAssetValues(mediaType: .image, mediaSubtypes: [])))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: [])))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .video, mediaSubtypes: .videoHighFrameRate)))
-    #expect(!predicate.evaluate(with: photoLibraryAssetValues(mediaType: .audio, mediaSubtypes: [])))
+/// 種類の組のすべて (空を除く 15 通り) で、問い合わせの述語が、組に入っている種類の項目だけを選ぶこと
+@Test(arguments: 1..<16) func recentScreenshotFetchOptionsSelectOnlyListedMediaKinds(mediaKindsRawValue: Int) {
+    let mediaKinds = PhotoLibraryMediaKinds(rawValue: mediaKindsRawValue)
+    for sample in photoLibraryItemSamples {
+        #expect(
+            photoLibraryMediaKindsPredicateSelects(mediaKinds: mediaKinds, mediaType: sample.mediaType, mediaSubtypes: sample.mediaSubtypes)
+                == sample.mediaKind.map { mediaKinds.contains($0) } ?? false,
+            "種類の組 \(mediaKindsRawValue) で \(sample)"
+        )
+    }
 }
 
-/// 写真ライブラリへの問い合わせが、どちらの並べ方でも撮った日時の新しい順に並べること
-@Test(arguments: [true, false]) func recentScreenshotFetchOptionsSortNewestFirst(showsOnlyScreenshots: Bool) {
-    let options = recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: showsOnlyScreenshots)
+/// スクリーンショットだけの時の述語が、種類の組を足す前 (スクリーンショットだけの切り替え) と同じ書式であること。
+/// 実機で動いていた問い合わせを変えないため
+@Test func recentScreenshotFetchOptionsKeepScreenshotsOnlyPredicate() {
+    #expect(
+        recentScreenshotFetchOptions(limit: 30, mediaKinds: .screenshots).predicate?.predicateFormat
+            == NSPredicate(
+                format: "mediaType == %d AND (mediaSubtypes & %d) != 0",
+                PHAssetMediaType.image.rawValue,
+                PHAssetMediaSubtype.photoScreenshot.rawValue
+            ).predicateFormat
+    )
+}
+
+/// 写真ライブラリへの問い合わせが、どの種類の組でも撮った日時の新しい順に並べること
+@Test(arguments: [PhotoLibraryMediaKinds.screenshots, [.screenshots, .otherVideos], [.otherPhotos, .screenRecordings, .otherVideos]])
+func recentScreenshotFetchOptionsSortNewestFirst(mediaKinds: PhotoLibraryMediaKinds) {
+    let options = recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds)
 
     #expect(options.sortDescriptors?.map(\.key) == ["creationDate"])
     #expect(options.sortDescriptors?.map(\.ascending) == [false])
 }
 
-/// 写真ライブラリへの問い合わせが、どちらの並べ方でも渡した枚数までに限ること (1 枚と 30 枚)
-@Test(arguments: [true, false]) func recentScreenshotFetchOptionsLimitCount(showsOnlyScreenshots: Bool) {
-    #expect(recentScreenshotFetchOptions(limit: 1, showsOnlyScreenshots: showsOnlyScreenshots).fetchLimit == 1)
-    #expect(recentScreenshotFetchOptions(limit: 30, showsOnlyScreenshots: showsOnlyScreenshots).fetchLimit == 30)
+/// 写真ライブラリへの問い合わせが、どの種類の組でも渡した件数までに限ること (1 件と 30 件)
+@Test(arguments: [PhotoLibraryMediaKinds.screenshots, [.screenshots, .otherVideos]])
+func recentScreenshotFetchOptionsLimitCount(mediaKinds: PhotoLibraryMediaKinds) {
+    #expect(recentScreenshotFetchOptions(limit: 1, mediaKinds: mediaKinds).fetchLimit == 1)
+    #expect(recentScreenshotFetchOptions(limit: 30, mediaKinds: mediaKinds).fetchLimit == 30)
 }
 
-/// 一覧の見出しは、スクリーンショットだけの時は「直近のスクリーンショット」、写真のすべての時は「直近の写真」にすること
-@Test func recentScreenshotsTitleFollowsShowsOnlyScreenshots() {
-    #expect(recentScreenshotsTitle(showsOnlyScreenshots: true).key == "Recent screenshots")
-    #expect(recentScreenshotsTitle(showsOnlyScreenshots: false).key == "Recent photos")
+/// 絞り込みの切り替えが、選ぶと種類を足し、外すと種類を除くこと
+@Test func toggledPhotoLibraryMediaKindsAddsAndRemoves() {
+    #expect(toggledPhotoLibraryMediaKinds(current: .screenshots, mediaKind: .screenRecordings, isOn: true) == [.screenshots, .screenRecordings])
+    #expect(toggledPhotoLibraryMediaKinds(current: [.screenshots, .screenRecordings], mediaKind: .screenshots, isOn: false) == .screenRecordings)
+    // 選んでいる種類を選び直しても、選んでいない種類を外しても、組は変わらない
+    #expect(toggledPhotoLibraryMediaKinds(current: .screenshots, mediaKind: .screenshots, isOn: true) == .screenshots)
+    #expect(toggledPhotoLibraryMediaKinds(current: .screenshots, mediaKind: .otherVideos, isOn: false) == .screenshots)
+}
+
+/// 絞り込みの切り替えで最後に残った種類を外しても、組を空にしないこと (何も並ばない一覧にしないため)
+@Test func toggledPhotoLibraryMediaKindsKeepsLastKind() {
+    #expect(toggledPhotoLibraryMediaKinds(current: .otherVideos, mediaKind: .otherVideos, isOn: false) == .otherVideos)
+}
+
+/// 種類ごとのビットの位置が、端末に保存した選択を読み直せる値のままであること (変えると、前に保存した選択が別の種類として読まれるため)
+@Test func photoLibraryMediaKindsRawValuesAreStable() {
+    #expect(PhotoLibraryMediaKinds.screenshots.rawValue == 1)
+    #expect(PhotoLibraryMediaKinds.otherPhotos.rawValue == 2)
+    #expect(PhotoLibraryMediaKinds.screenRecordings.rawValue == 4)
+    #expect(PhotoLibraryMediaKinds.otherVideos.rawValue == 8)
+}
+
+/// 一覧の見出しが、スクリーンショットだけ・写真だけ・動画だけ・写真と動画の組で変わること
+@Test func recentScreenshotsTitleFollowsMediaKinds() {
+    #expect(recentScreenshotsTitle(mediaKinds: .screenshots).key == "Recent screenshots")
+    #expect(recentScreenshotsTitle(mediaKinds: .otherPhotos).key == "Recent photos")
+    #expect(recentScreenshotsTitle(mediaKinds: [.screenshots, .otherPhotos]).key == "Recent photos")
+    #expect(recentScreenshotsTitle(mediaKinds: .screenRecordings).key == "Recent videos")
+    #expect(recentScreenshotsTitle(mediaKinds: [.screenRecordings, .otherVideos]).key == "Recent videos")
+    #expect(recentScreenshotsTitle(mediaKinds: [.screenshots, .screenRecordings]).key == "Recent photos and videos")
+}
+
+/// 一覧の上の行が、選んでいる種類の名前だけを、絞り込みの画面と同じ順に並べること
+@Test func photoLibraryMediaKindsSummaryListsSelectedKindsInFilterOrder() throws {
+    let summary = photoLibraryMediaKindsSummary(mediaKinds: [.otherVideos, .screenshots])
+
+    #expect(summary.contains("Screenshots"))
+    #expect(summary.contains("Other videos"))
+    #expect(!summary.contains("Other photos"))
+    #expect(!summary.contains("Screen recordings"))
+    #expect(try #require(summary.range(of: "Screenshots")).lowerBound < (try #require(summary.range(of: "Other videos")).lowerBound))
 }
 
 /// 写真ライブラリの読み出しの代わりに result を返す処理を screenshotThumbnailState へ渡して呼ぶ。
