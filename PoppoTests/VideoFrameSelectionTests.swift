@@ -4,8 +4,8 @@ import Testing
 
 @testable import Poppo
 
-/// 見本のチャットの動画 (writeDebugSampleChatVideo) をテストごとの一時ファイルに書き出し、AVAsset として返す
-private func writtenDebugSampleChatVideoAsset() async throws -> AVAsset {
+/// 見本のチャットの動画 (writeDebugSampleChatVideo) をテストごとの一時ファイルに書き出し、AVURLAsset として返す
+private func writtenDebugSampleChatVideoAsset() async throws -> AVURLAsset {
     let fileURL = FileManager.default.temporaryDirectory.appending(path: "video-frame-selection-\(UUID().uuidString).mp4")
     try await writeDebugSampleChatVideo(fileURL: fileURL)
     return AVURLAsset(url: fileURL)

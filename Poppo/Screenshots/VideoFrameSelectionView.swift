@@ -2,9 +2,11 @@ import AVFoundation
 import Photos
 import SwiftUI
 
-/// 写真ライブラリの動画 (video) を、再生や読み出しに使える AVAsset として読み出す。読み出せない時は nil を返す。
+/// 写真ライブラリの動画 (video) を、1 つのファイルの動画 (AVURLAsset) として読み出す。読み出せない時と、
+/// 写真ライブラリが AVURLAsset 以外の AVAsset を返した時は nil を返す (AVURLAsset は AVFoundation が Sendable と宣言していて、
+/// 場面を画像にする処理へ渡せるが、AVAsset は宣言していないため。どの動画で AVURLAsset 以外が返るかは Apple の文書に記述が無く未確認)。
 /// 端末に無い時は iCloud から取る (利用者が読み取る 1 本として選んだ動画のため。documents/DIRECTION.md「決めたこと」2026-11-27 の、タップした 1 枚を取る行と同じ扱い)
-@concurrent nonisolated func loadVideoAsset(video: PHAsset) async -> AVAsset? {
+@concurrent nonisolated func loadVideoAsset(video: PHAsset) async -> AVURLAsset? {
     await withCheckedContinuation { continuation in
         let options = PHVideoRequestOptions()
         options.isNetworkAccessAllowed = true
@@ -12,19 +14,19 @@ import SwiftUI
         // 「typ. PHVideoRequestOptionsDeliveryModeMediumQualityFormat」(720p 前後) を選び、highQualityFormat は「best quality」
         options.deliveryMode = .highQualityFormat
         PHImageManager.default().requestAVAsset(forVideo: video, options: options) { asset, _, _ in
-            continuation.resume(returning: asset)
+            continuation.resume(returning: asset as? AVURLAsset)
         }
     }
 }
 
 /// 動画 (asset) の長さを秒で返す
-@concurrent nonisolated func videoDurationSeconds(asset: AVAsset) async throws -> Double {
+@concurrent nonisolated func videoDurationSeconds(asset: AVURLAsset) async throws -> Double {
     try await asset.load(.duration).seconds
 }
 
 /// 動画 (asset) の、始まりから seconds 秒の場面を画像にして返す。maximumSize は画像の大きさの上限で、.zero は動画の大きさのまま。
 /// 指定した時刻からずれた場面を返さない (一覧で見せた場面と、読み取る場面を同じにするため)。画像にできない時は AVFoundation のエラーを投げる
-@concurrent nonisolated func videoFrameImage(asset: AVAsset, seconds: Double, maximumSize: CGSize) async throws -> CGImage {
+@concurrent nonisolated func videoFrameImage(asset: AVURLAsset, seconds: Double, maximumSize: CGSize) async throws -> CGImage {
     let generator = AVAssetImageGenerator(asset: asset)
     // 縦向きで撮った画面収録が横に倒れた画像にならないよう、動画の向きの情報を当てる
     generator.appliesPreferredTrackTransform = true
@@ -37,7 +39,7 @@ import SwiftUI
 
 /// 動画 (asset) の始まりから seconds 秒の場面を画像にし、写っている文字を行ごとに読んで返す。
 /// 画像にできない時は ChatReadingError.imageUnavailable を、ほかは recognizeTextLines(image:) と同じエラーを投げる
-func recognizeTextLines(videoAsset: AVAsset, seconds: Double) async throws -> [RecognizedTextLine] {
+func recognizeTextLines(videoAsset: AVURLAsset, seconds: Double) async throws -> [RecognizedTextLine] {
     // .zero: 動画の大きさのまま読む (縮めると小さい文字を読めなくなるため)
     guard let image = try? await videoFrameImage(asset: videoAsset, seconds: seconds, maximumSize: .zero) else {
         throw ChatReadingError.imageUnavailable
@@ -63,7 +65,7 @@ enum VideoFrameSelectionPhase {
     /// 動画を読み出している
     case loading
     /// 動画を読み出せた。asset は動画、durationSeconds はその長さ
-    case loaded(asset: AVAsset, durationSeconds: Double)
+    case loaded(asset: AVURLAsset, durationSeconds: Double)
     /// 動画を読み出せなかった
     case failed
 }
