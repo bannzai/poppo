@@ -30,31 +30,144 @@ nonisolated func screenshotAccess(authorizationStatus: PHAuthorizationStatus) ->
     }
 }
 
-/// スクリーンショットの一覧に、スクリーンショットだけを並べるか (false は動画を除く写真のすべて) の選択を保存する、UserDefaults のキー
-let showsOnlyScreenshotsUserDefaultsKey = "showsOnlyScreenshots"
+/// スクリーンショットの一覧に並べる、写真ライブラリの項目の種類の組。利用者が絞り込みの画面で選ぶ
+nonisolated struct PhotoLibraryMediaKinds: OptionSet, Hashable {
+    /// 種類ごとのビットの組。端末に保存するため、各種類のビットの位置は変えない
+    let rawValue: Int
 
-/// 写真ライブラリから、直近の画像を新しい順に limit 枚まで取る。showsOnlyScreenshots が true の時はスクリーンショットだけ、false の時は動画を除く写真のすべて。
-/// 写真へのアクセスが許可されている時に呼ぶ
-func fetchRecentScreenshots(limit: Int, showsOnlyScreenshots: Bool) -> [PHAsset] {
-    let fetchResult = PHAsset.fetchAssets(with: recentScreenshotFetchOptions(limit: limit, showsOnlyScreenshots: showsOnlyScreenshots))
-    return fetchResult.objects(at: IndexSet(integersIn: 0..<fetchResult.count))
+    /// スクリーンショットの種別を持つ画像
+    static let screenshots = PhotoLibraryMediaKinds(rawValue: 1 << 0)
+    /// スクリーンショットの種別を持たない画像 (保存したチャットの画像・切り抜いた画像・カメラの写真)
+    static let otherPhotos = PhotoLibraryMediaKinds(rawValue: 1 << 1)
+    /// 画面収録の種別を持つ動画
+    static let screenRecordings = PhotoLibraryMediaKinds(rawValue: 1 << 2)
+    /// 画面収録の種別を持たない動画
+    static let otherVideos = PhotoLibraryMediaKinds(rawValue: 1 << 3)
 }
 
-/// 写真ライブラリへの問い合わせの条件。画像 (動画を除く) を、撮った日時の新しい順に、limit 枚まで取る。
-/// showsOnlyScreenshots が true の時は、そのうちスクリーンショットの種別を持つものだけを取る
-func recentScreenshotFetchOptions(limit: Int, showsOnlyScreenshots: Bool) -> PHFetchOptions {
+/// スクリーンショットの一覧に並べる種類の組 (PhotoLibraryMediaKinds) の選択を保存する、UserDefaults のキー
+let listedPhotoLibraryMediaKindsUserDefaultsKey = "listedPhotoLibraryMediaKinds"
+
+/// 絞り込みの画面で、種類 (mediaKind) を選ぶ・外す (isOn) 操作をした後の種類の組を返す。current は操作の前の組。
+/// 外すと組が空になる時は current のまま返す (何も並ばない一覧にしないため)
+nonisolated func toggledPhotoLibraryMediaKinds(
+    current: PhotoLibraryMediaKinds,
+    mediaKind: PhotoLibraryMediaKinds,
+    isOn: Bool
+) -> PhotoLibraryMediaKinds {
+    let toggled = isOn ? current.union(mediaKind) : current.subtracting(mediaKind)
+    return toggled.isEmpty ? current : toggled
+}
+
+/// 写真ライブラリから、直近の項目を新しい順に limit 件まで取る。mediaKinds は並べる種類の組。
+/// 写真へのアクセスが許可されている時に呼ぶ
+func fetchRecentScreenshots(limit: Int, mediaKinds: PhotoLibraryMediaKinds) -> [PHAsset] {
+    let fetchResult = PHAsset.fetchAssets(with: recentScreenshotFetchOptions(limit: limit, mediaKinds: mediaKinds))
+    // PHFetchResult は項目を読む時に読み出すため、limit 件に達した所で読むのをやめる
+    return listedPhotoLibraryItems(
+        items: (0..<fetchResult.count).lazy.map { fetchResult.object(at: $0) },
+        limit: limit,
+        mediaKinds: mediaKinds,
+        mediaKind: { photoLibraryMediaKind(mediaType: $0.mediaType, mediaSubtypes: $0.mediaSubtypes) }
+    )
+}
+
+/// 新しい順の項目 (items) から、種類 (mediaKind で求める) が mediaKinds に入っているものを、先頭から limit 件まで返す。
+/// 問い合わせの述語 (photoLibraryMediaKindsPredicate) が選んだ項目から、述語では絞れない種類を除くために使う
+nonisolated func listedPhotoLibraryItems<Item>(
+    items: some Sequence<Item>,
+    limit: Int,
+    mediaKinds: PhotoLibraryMediaKinds,
+    mediaKind: (Item) -> PhotoLibraryMediaKinds?
+) -> [Item] {
+    var listedItems: [Item] = []
+    for item in items {
+        // limit 件に達したら残りを読まない (items が写真ライブラリの項目を読む時に読み出す列のため)
+        guard listedItems.count < limit else {
+            break
+        }
+        if let itemMediaKind = mediaKind(item), mediaKinds.contains(itemMediaKind) {
+            listedItems.append(item)
+        }
+    }
+    return listedItems
+}
+
+/// 写真ライブラリの項目 (mediaType と mediaSubtypes) が当たる種類を返す。画像と動画のどちらでもない (音声等) 時は nil
+nonisolated func photoLibraryMediaKind(mediaType: PHAssetMediaType, mediaSubtypes: PHAssetMediaSubtype) -> PhotoLibraryMediaKinds? {
+    switch mediaType {
+    case .image:
+        mediaSubtypes.contains(.photoScreenshot) ? .screenshots : .otherPhotos
+    case .video:
+        mediaSubtypes.contains(.videoScreenRecording) ? .screenRecordings : .otherVideos
+    default:
+        nil
+    }
+}
+
+/// 述語が mediaKinds の種類だけを選べない時 (photoLibraryMediaKindsPredicateIsExact が false) に、写真ライブラリから読む項目の数の上限。
+/// 種類で除く前の項目を、上限なしに main actor で読み続けないため。直近の 1000 件にした理由: 一覧が並べるのは直近の
+/// recentScreenshotsLimit 件で、それより古い項目を探して一覧を止めないため。この件数を読む時間は実機で測っていない
+nonisolated let photoLibraryUnfilteredFetchLimit = 1000
+
+/// 写真ライブラリへの問い合わせの条件。mediaKinds の種類に当たる項目を含む項目を、撮った日時の新しい順に取る。
+/// 述語が mediaKinds の種類だけを選べる時は limit 件まで、選べない時 (photoLibraryMediaKindsPredicate の「ほか」の種類) は
+/// photoLibraryUnfilteredFetchLimit 件までに限る (述語が選んだ項目から、呼び出し側が種類で除いた後に limit 件を残すため。
+/// 直近の photoLibraryUnfilteredFetchLimit 件に当たる種類が limit 件より少ない時は、一覧に並ぶのも limit 件より少ない)
+func recentScreenshotFetchOptions(limit: Int, mediaKinds: PhotoLibraryMediaKinds) -> PHFetchOptions {
     let options = PHFetchOptions()
-    options.predicate =
-        showsOnlyScreenshots
-        ? NSPredicate(
-            format: "mediaType == %d AND (mediaSubtypes & %d) != 0",
-            PHAssetMediaType.image.rawValue,
-            PHAssetMediaSubtype.photoScreenshot.rawValue
-        )
-        : NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+    options.predicate = photoLibraryMediaKindsPredicate(mediaKinds: mediaKinds)
     options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-    options.fetchLimit = limit
+    options.fetchLimit = photoLibraryMediaKindsPredicateIsExact(mediaKinds: mediaKinds) ? limit : max(limit, photoLibraryUnfilteredFetchLimit)
     return options
+}
+
+/// photoLibraryMediaKindsPredicate が、mediaKinds の種類の項目だけを選ぶか (ほかの種類の項目を含めないか) を返す。
+/// 「ほかの写真」か「ほかの動画」を、同じ画像・動画のもう一方の種類を選ばずに選んだ時は、述語がその画像・動画のすべてを選ぶため false
+nonisolated func photoLibraryMediaKindsPredicateIsExact(mediaKinds: PhotoLibraryMediaKinds) -> Bool {
+    !(mediaKinds.contains(.otherPhotos) && !mediaKinds.contains(.screenshots))
+        && !(mediaKinds.contains(.otherVideos) && !mediaKinds.contains(.screenRecordings))
+}
+
+/// 種類の組 mediaKinds に当たる項目を含む項目を選ぶ、写真ライブラリへの問い合わせの述語。画像と動画の述語を OR でつなぐ。
+/// 片方だけの時は OR でつながずにその述語を返す (スクリーンショットだけの時に、種類の組を足す前と同じ述語で問い合わせるため)
+nonisolated func photoLibraryMediaKindsPredicate(mediaKinds: PhotoLibraryMediaKinds) -> NSPredicate {
+    let subpredicates = [
+        mediaTypePredicate(
+            mediaType: .image,
+            mediaSubtype: .photoScreenshot,
+            includesSubtype: mediaKinds.contains(.screenshots),
+            includesOthers: mediaKinds.contains(.otherPhotos)
+        ),
+        mediaTypePredicate(
+            mediaType: .video,
+            mediaSubtype: .videoScreenRecording,
+            includesSubtype: mediaKinds.contains(.screenRecordings),
+            includesOthers: mediaKinds.contains(.otherVideos)
+        ),
+    ].compactMap { $0 }
+    return subpredicates.count == 1 ? subpredicates[0] : NSCompoundPredicate(orPredicateWithSubpredicates: subpredicates)
+}
+
+/// mediaType の項目のうち、種別 mediaSubtype を持つもの (includesSubtype) と持たないもの (includesOthers) を含む項目を選ぶ述語。
+/// 持たないものだけを選ぶ時も種別を見ずに mediaType のすべてを選ぶ。写真ライブラリは「種別を持たない」の述語
+/// (`(mediaSubtypes & %d) == 0`) で 1 件も返さなかったため (2026-11-27 に iOS 27.2 の simulator で、種別を持たない動画が
+/// この述語では並ばず、mediaType だけの述語では並んだ。https://github.com/bannzai/poppo/pull/71 )。持つものを除くのは呼び出し側が行う。
+/// どちらも選ばない時は nil
+nonisolated private func mediaTypePredicate(
+    mediaType: PHAssetMediaType,
+    mediaSubtype: PHAssetMediaSubtype,
+    includesSubtype: Bool,
+    includesOthers: Bool
+) -> NSPredicate? {
+    switch (includesSubtype, includesOthers) {
+    case (true, true), (false, true):
+        NSPredicate(format: "mediaType == %d", mediaType.rawValue)
+    case (true, false):
+        NSPredicate(format: "mediaType == %d AND (mediaSubtypes & %d) != 0", mediaType.rawValue, mediaSubtype.rawValue)
+    case (false, false):
+        nil
+    }
 }
 
 /// 写真ライブラリの 1 枚を読み出せなかった理由。PHImageManager が結果に添える info (PHImageManager.h の「Result's handler info dictionary keys」) から決める

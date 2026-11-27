@@ -11,12 +11,12 @@
         }
       }
     },
-    "Allow access to all photos in Settings to see new photos" : {
+    "Allow access to all photos in Settings to see new photos and videos" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新しく保存した写真を並べるには設定ですべての写真へのアクセスを許可してください"
+            "value" : "新しく保存した写真と動画を並べるには設定ですべての写真へのアクセスを許可してください"
           }
         }
       }
@@ -67,6 +67,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面を取り込んでいます"
+          }
+        }
+      }
+    },
+    "Change the filter or save a chat image or video to Photos and open this app again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絞り込みで種類を変えるかチャットの画像か動画を写真に保存してからこのアプリを開き直してください"
           }
         }
       }
@@ -131,6 +141,26 @@
         }
       }
     },
+    "Couldn't load this video" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この動画を読み込めませんでした"
+          }
+        }
+      }
+    },
+    "Couldn't make an image of this frame" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この場面を画像にできませんでした"
+          }
+        }
+      }
+    },
     "Couldn't read this screenshot" : {
       "localizations" : {
         "ja" : {
@@ -157,6 +187,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仕事の仲間"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
           }
         }
       }
@@ -211,12 +251,62 @@
         }
       }
     },
+    "Filter" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絞り込み"
+          }
+        }
+      }
+    },
+    "For a video you pick one frame to read" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動画は選んだ 1 つの場面を読み取ります"
+          }
+        }
+      }
+    },
+    "Frame to read" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取る場面"
+          }
+        }
+      }
+    },
     "Friend or family" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "友人・家族"
+          }
+        }
+      }
+    },
+    "If the video is in iCloud try again when you're online" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud にある動画は通信できる時にもう一度読み込んでください"
+          }
+        }
+      }
+    },
+    "Loading the video" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動画を読み込んでいます"
           }
         }
       }
@@ -231,12 +321,12 @@
         }
       }
     },
-    "No photos yet" : {
+    "No photos or videos of the selected kinds yet" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写真がまだありません"
+            "value" : "選んだ種類の写真と動画がまだありません"
           }
         }
       }
@@ -281,6 +371,26 @@
         }
       }
     },
+    "Other photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの写真"
+          }
+        }
+      }
+    },
+    "Other videos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの動画"
+          }
+        }
+      }
+    },
     "Photo access is turned off" : {
       "localizations" : {
         "ja" : {
@@ -291,12 +401,52 @@
         }
       }
     },
+    "Photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真"
+          }
+        }
+      }
+    },
+    "Pick a frame" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場面を選ぶ"
+          }
+        }
+      }
+    },
     "Pick a screenshot to translate" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットを選んで翻訳"
+          }
+        }
+      }
+    },
+    "Pick another time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの時刻を選んでください"
+          }
+        }
+      }
+    },
+    "Read this frame" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この場面を読み取る"
           }
         }
       }
@@ -321,12 +471,32 @@
         }
       }
     },
+    "Recent photos and videos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近の写真と動画"
+          }
+        }
+      }
+    },
     "Recent screenshots" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "直近のスクリーンショット"
+          }
+        }
+      }
+    },
+    "Recent videos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近の動画"
           }
         }
       }
@@ -361,16 +531,6 @@
         }
       }
     },
-    "Save a chat image to Photos and open this app again" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "チャットの画像を写真に保存してからこのアプリを開き直してください"
-          }
-        }
-      }
-    },
     "Screen capture" : {
       "localizations" : {
         "ja" : {
@@ -391,6 +551,16 @@
         }
       }
     },
+    "Screen recordings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面収録"
+          }
+        }
+      }
+    },
     "Screenshot" : {
       "localizations" : {
         "ja" : {
@@ -401,12 +571,12 @@
         }
       }
     },
-    "Screenshots only" : {
+    "Screenshots" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スクリーンショットだけ"
+            "value" : "スクリーンショット"
           }
         }
       }
@@ -537,6 +707,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定で写真へのアクセスをオンにすると直近のスクリーンショットがここに並びます"
+          }
+        }
+      }
+    },
+    "Videos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動画"
           }
         }
       }

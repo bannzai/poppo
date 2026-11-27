@@ -8,13 +8,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Poppo lists your recent screenshots or photos so you can pick one to translate. Images are read only on this device."
+            "value" : "Poppo lists your recent screenshots, photos, or videos so you can pick one to translate. Images and videos are read only on this device."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "直近のスクリーンショットか写真を並べて、翻訳する 1 枚を選べるようにします。画像はこの端末の中でだけ読み取ります。"
+            "value" : "直近のスクリーンショット・写真・動画を並べて、翻訳するものを選べるようにします。画像と動画はこの端末の中でだけ読み取ります。"
           }
         }
       }

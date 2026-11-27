@@ -38,6 +38,14 @@ struct DebugMenuView: View {
     @State private var sampleScreenshotError: String?
     /// 見本のスクリーンショットを足している間は true。足し終わるまで次の追加を始めず、見本が 2 組入らないようにする
     @State private var isAddingSampleScreenshots = false
+    /// 写真ライブラリに見本のチャットの動画が残っているか。この画面の操作の後と、画面を開いた時に読み直す
+    @State private var hasSampleChatVideo = false
+    /// 見本のチャットの動画に、写真アプリが画面収録の種別を付けたか。hasSampleChatVideo と同じ時に読み直す
+    @State private var sampleChatVideoIsScreenRecording = false
+    /// 直前の見本のチャットの動画の追加が失敗した時のエラーの説明。成功した時と、まだ操作していない時は nil
+    @State private var sampleChatVideoError: String?
+    /// 見本のチャットの動画を足している間は true。足し終わるまで次の追加を始めず、動画が 2 本入らないようにする
+    @State private var isAddingSampleChatVideo = false
 
     /// 残っているスクリーンショットからの読み取りの記録の数。この画面の操作の後と、画面を開いた時に読み直す
     @State private var screenshotReadingChoiceCount = 0
@@ -85,13 +93,37 @@ struct DebugMenuView: View {
         } catch {
             sampleScreenshotError = error.localizedDescription
         }
-        reloadSampleScreenshotCounts()
+        reloadSampleStates()
     }
 
-    /// 写真ライブラリに残っている見本のスクリーンショットの数を読み直す
-    private func reloadSampleScreenshotCounts() {
+    /// 写真ライブラリに残っている見本のスクリーンショットの数と、見本のチャットの動画が残っているかを読み直す
+    private func reloadSampleStates() {
         sampleScreenshotCount = debugSampleScreenshots().count
         sampleScreenshotMarkedCount = debugSampleScreenshotsMarkedAsScreenshotCount()
+        hasSampleChatVideo = debugSampleChatVideo() != nil
+        sampleChatVideoIsScreenRecording = debugSampleChatVideo()?.mediaSubtypes.contains(.videoScreenRecording) == true
+    }
+
+    /// 写真ライブラリへのアクセスの許可を (まだ選んでいなければ) 求めてから、見本のチャットの動画を足す。
+    /// 足せなかった時は、エラーの説明を sampleChatVideoError に入れる。足している途中に呼ばれた時は何もしない
+    private func addSampleChatVideo() async {
+        guard !isAddingSampleChatVideo else {
+            return
+        }
+        isAddingSampleChatVideo = true
+        defer {
+            isAddingSampleChatVideo = false
+        }
+        if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
+            _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        }
+        do {
+            try await addDebugSampleChatVideo()
+            sampleChatVideoError = nil
+        } catch {
+            sampleChatVideoError = error.localizedDescription
+        }
+        reloadSampleStates()
     }
 
     /// 返信案を作るモデルとして selectingReplyModel を選んだことを保存し、この画面の表示を保存した後の値にする
@@ -322,7 +354,7 @@ struct DebugMenuView: View {
                 .accessibilityIdentifier("debug_sample_screenshots_state")
                 NavigationLink {
                     ScreenshotGrid(
-                        title: recentScreenshotsTitle(showsOnlyScreenshots: true),
+                        title: recentScreenshotsTitle(mediaKinds: .screenshots),
                         screenshots: debugSampleScreenshots(),
                         loadThumbnailImage: { asset, isNetworkAccessAllowed, progressHandler in
                             await loadScreenshotThumbnailImage(
@@ -338,7 +370,7 @@ struct DebugMenuView: View {
                 .accessibilityIdentifier("debug_open_sample_screenshot_grid")
                 NavigationLink {
                     ScreenshotGrid(
-                        title: recentScreenshotsTitle(showsOnlyScreenshots: true),
+                        title: recentScreenshotsTitle(mediaKinds: .screenshots),
                         screenshots: debugSampleScreenshots(),
                         loadThumbnailImage: { asset, isNetworkAccessAllowed, progressHandler in
                             await debugSampleScreenshotThumbnailImage(
@@ -381,12 +413,32 @@ struct DebugMenuView: View {
                         .foregroundStyle(.red)
                         .accessibilityIdentifier("debug_sample_screenshots_error")
                 }
+                Button {
+                    Task {
+                        await addSampleChatVideo()
+                    }
+                } label: {
+                    Text(verbatim: "見本のチャットの動画を写真に足す")
+                }
+                .disabled(isAddingSampleChatVideo)
+                .accessibilityIdentifier("debug_add_sample_chat_video")
+                LabeledContent {
+                    Text(verbatim: hasSampleChatVideo ? "あり (種別: \(sampleChatVideoIsScreenRecording ? "画面収録" : "ほかの動画"))" : "なし")
+                } label: {
+                    Text(verbatim: "写真にある見本の動画")
+                }
+                .accessibilityIdentifier("debug_sample_chat_video_state")
+                if let sampleChatVideoError {
+                    Text(verbatim: sampleChatVideoError)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("debug_sample_chat_video_error")
+                }
             } header: {
                 Text(verbatim: "スクリーンショットの一覧")
             } footer: {
                 Text(
                     verbatim:
-                        "simulator の写真にはスクリーンショットが無いため、番号を書いた見本を足して一覧とタップを確かめる。1 番が最も新しく、2 番は横長、5 番は正方形、ほかは縦長。足した見本は写真アプリで消す (すべて残っていれば足し直さない。一部を消した時は 1 組を足し直すので、残りも写真アプリで消す)。スクリーンショットの種別が付かなかった時は「見本だけの一覧を開く」で、同じ一覧の画面に見本を並べる。iCloud にだけある見本と読み出せない見本を混ぜた一覧では、3 番と 4 番を iCloud にだけある画像として扱い (3 番はダウンロードのボタンを押すと 2 秒かけて取れ、4 番は取れない)、7 番は読み出せない画像として一覧から外す"
+                        "simulator の写真にはスクリーンショットが無いため、番号を書いた見本を足して一覧とタップを確かめる。1 番が最も新しく、2 番は横長、5 番は正方形、ほかは縦長。足した見本は写真アプリで消す (すべて残っていれば足し直さない。一部を消した時は 1 組を足し直すので、残りも写真アプリで消す)。スクリーンショットの種別が付かなかった時は「見本だけの一覧を開く」で、同じ一覧の画面に見本を並べる。iCloud にだけある見本と読み出せない見本を混ぜた一覧では、3 番と 4 番を iCloud にだけある画像として扱い (3 番はダウンロードのボタンを押すと 2 秒かけて取れ、4 番は取れない)、7 番は読み出せない画像として一覧から外す。見本のチャットの動画は、\(DebugSampleChat.allCases.map { "「\($0.title)」" }.joined(separator: "・")) の画面を \(debugSampleChatVideoSecondsPerChat) 秒ずつ順に映し、一覧の絞り込みで動画を選ぶと並ぶ (画面収録の種別が付くかは状態の行の「種別」で見る)。すでに残っていれば足し直さない"
                 )
             }
             Section {
@@ -505,7 +557,7 @@ struct DebugMenuView: View {
             reloadSavedLatestReading()
             replyModel = selectedReplyModel(userDefaults: .standard)
             reloadReplyModelsWithSavedAPIKey()
-            reloadSampleScreenshotCounts()
+            reloadSampleStates()
             reloadScreenshotReadingChoiceCount()
         }
         .alert(

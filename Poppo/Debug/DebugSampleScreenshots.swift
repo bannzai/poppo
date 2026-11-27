@@ -1,4 +1,6 @@
 #if DEBUG
+import AVFoundation
+import CoreVideo
 import ImageIO
 import Photos
 import UIKit
@@ -304,5 +306,119 @@ func debugSampleScreenshotPNGData(number: Int) throws -> Data {
         throw CocoaError(.fileWriteUnknown)
     }
     return exifPNGData as Data
+}
+
+/// 開発者メニューで写真ライブラリに足した、見本のチャットの動画の localIdentifier を控える UserDefaults のキー
+private let debugSampleChatVideoIdentifierKey = "debugSampleChatVideoIdentifier"
+
+/// 見本のチャットの動画で、1 つのチャットの画面を映し続ける秒数。
+/// 1 秒: 場面を選ぶ画面の Slider で、2 つの画面のどちらの場面も選べる長さにしつつ、書き出しを短くするため
+nonisolated let debugSampleChatVideoSecondsPerChat = 1
+
+/// 見本のチャットの画面を順に映す動画を、fileURL に MP4 で書き出す。DebugSampleChat.allCases の順に、1 つの画面を debugSampleChatVideoSecondsPerChat 秒ずつ映す
+/// (場面を選ぶと、選んだ時刻の画面を読むかを確かめるため)。fileURL に既にファイルがあれば置き換える。書き出せなかった時は AVFoundation のエラーか CocoaError.fileWriteUnknown を投げる
+func writeDebugSampleChatVideo(fileURL: URL) async throws {
+    let images = try DebugSampleChat.allCases.map { try debugSampleChatScreenImage(sampleChat: $0) }
+    // 前に書き出したファイルが無い時は消せずに失敗するが、無ければ消す必要も無いため、失敗を無視する
+    try? FileManager.default.removeItem(at: fileURL)
+    let pixelSize = DebugSampleScreenshotShape.portrait.pixelSize
+    let writer = try AVAssetWriter(outputURL: fileURL, fileType: .mp4)
+    let receiver = writer.inputPixelBufferReceiver(
+        for: AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                // H.264: iPhone の画面収録と同じく、写真ライブラリと AVFoundation がそのまま読める形式にするため
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: Int(pixelSize.width),
+                AVVideoHeightKey: Int(pixelSize.height),
+            ]
+        ),
+        pixelBufferAttributes: nil
+    )
+    try writer.start()
+    writer.startSession(atSourceTime: .zero)
+    for (index, image) in images.enumerated() {
+        try await receiver.append(
+            CVReadOnlyPixelBuffer(unsafeBuffer: try debugPixelBuffer(image: image)),
+            with: CMTime(value: CMTimeValue(index * debugSampleChatVideoSecondsPerChat), timescale: 1)
+        )
+    }
+    receiver.finish()
+    writer.endSession(atSourceTime: CMTime(value: CMTimeValue(images.count * debugSampleChatVideoSecondsPerChat), timescale: 1))
+    await writer.finishWriting()
+    guard writer.status == .completed else {
+        throw writer.error ?? CocoaError(.fileWriteUnknown)
+    }
+}
+
+/// 画像 (image) を、動画に書くための同じ大きさの BGRA の pixel buffer にして返す。作れなかった時は CocoaError.fileWriteUnknown を投げる
+nonisolated private func debugPixelBuffer(image: CGImage) throws -> CVPixelBuffer {
+    var createdPixelBuffer: CVPixelBuffer?
+    guard
+        CVPixelBufferCreate(kCFAllocatorDefault, image.width, image.height, kCVPixelFormatType_32BGRA, nil, &createdPixelBuffer) == kCVReturnSuccess,
+        let pixelBuffer = createdPixelBuffer
+    else {
+        throw CocoaError(.fileWriteUnknown)
+    }
+    CVPixelBufferLockBaseAddress(pixelBuffer, [])
+    defer {
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
+    }
+    guard
+        let context = CGContext(
+            data: CVPixelBufferGetBaseAddress(pixelBuffer),
+            width: image.width,
+            height: image.height,
+            // 8: BGRA の 1 色を 1 バイトで持つ形式 (kCVPixelFormatType_32BGRA) のため
+            bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+            space: CGColorSpaceCreateDeviceRGB(),
+            // BGRA の並び (リトルエンディアンの 32 ビットで、アルファが先頭) に合わせる
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        )
+    else {
+        throw CocoaError(.fileWriteUnknown)
+    }
+    context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    return pixelBuffer
+}
+
+/// 前に足した見本のチャットの動画のうち、写真ライブラリに残っているもの。足していない時と、写真アプリで消された時は nil
+func debugSampleChatVideo() -> PHAsset? {
+    UserDefaults.standard.string(forKey: debugSampleChatVideoIdentifierKey).flatMap {
+        PHAsset.fetchAssets(withLocalIdentifiers: [$0], options: nil).firstObject
+    }
+}
+
+/// 見本のチャットの動画を足している最中か。開発者メニューの画面を閉じて開き直しても残るよう、画面の外に置く
+/// (足している途中に開き直した画面から 2 回目を始め、同じファイルへの書き出しと写真への追加が重ならないようにするため)
+private var isAddingDebugSampleChatVideo = false
+
+/// 見本のチャットの動画 (writeDebugSampleChatVideo) を写真ライブラリに足す。前に足した動画が残っている時と、
+/// 前の呼び出しがまだ足している最中の時は何もしない。写真ライブラリへの書き込みの許可が要る
+func addDebugSampleChatVideo() async throws {
+    guard !isAddingDebugSampleChatVideo, debugSampleChatVideo() == nil else {
+        return
+    }
+    isAddingDebugSampleChatVideo = true
+    defer {
+        isAddingDebugSampleChatVideo = false
+    }
+    let fileURL = FileManager.default.temporaryDirectory.appending(path: "debug-sample-chat.mp4")
+    try await writeDebugSampleChatVideo(fileURL: fileURL)
+    UserDefaults.standard.set(try await createDebugSampleVideoAsset(fileURL: fileURL), forKey: debugSampleChatVideoIdentifierKey)
+}
+
+/// fileURL の動画を写真ライブラリに足し、足した asset の localIdentifier を返す。
+/// main actor の外に置く理由は createDebugSampleScreenshotAssets と同じ (写真ライブラリは変更のブロックを別のキューで呼ぶ)
+nonisolated private func createDebugSampleVideoAsset(fileURL: URL) async throws -> String? {
+    // 変更のブロックは performChanges が戻る前に 1 度だけ呼ばれ、ほかから同時に触られないため、検査の対象から外す
+    nonisolated(unsafe) var createdIdentifier: String?
+    try await PHPhotoLibrary.shared().performChanges {
+        let request = PHAssetCreationRequest.forAsset()
+        request.addResource(with: .video, fileURL: fileURL, options: nil)
+        createdIdentifier = request.placeholderForCreatedAsset?.localIdentifier
+    }
+    return createdIdentifier
 }
 #endif
