@@ -188,6 +188,31 @@ private nonisolated let screenshotImageUnavailableReasonsOtherThanInCloud: [Scre
     #expect(!canStartScreenshotDownload(thumbnailState: .unavailable))
 }
 
+/// 初めの読み出しの結果は、読み出しを始めた時の状態のままの時だけ書くこと。
+/// ボタンを押していない時は読み出す前の状態、押した後に作り直されたセルでは取っている状態の時だけ書く
+@Test func canApplyInitialScreenshotThumbnailStateOnlyWhenStateIsUnchanged() {
+    #expect(canApplyInitialScreenshotThumbnailState(currentThumbnailState: .loading, isDownloadRequested: false))
+    #expect(canApplyInitialScreenshotThumbnailState(currentThumbnailState: .downloading(fractionCompleted: 0.5), isDownloadRequested: true))
+}
+
+/// 待っている間に状態が変わった時は、初めの読み出しの結果を書かないこと
+/// (ボタンを押していない読み出しの間に取り始めた時、読み出せた後、ボタンを出した後、取れなかった後、一覧から外した後)
+@Test func canApplyInitialScreenshotThumbnailStateRejectsChangedState() {
+    #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .downloading(fractionCompleted: 0), isDownloadRequested: false))
+    #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .loading, isDownloadRequested: true))
+    for isDownloadRequested in [true, false] {
+        #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .loaded(image: UIImage()), isDownloadRequested: isDownloadRequested))
+        #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .needsDownload, isDownloadRequested: isDownloadRequested))
+        #expect(
+            !canApplyInitialScreenshotThumbnailState(
+                currentThumbnailState: .downloadFailed(reason: .inCloudOnly),
+                isDownloadRequested: isDownloadRequested
+            )
+        )
+        #expect(!canApplyInitialScreenshotThumbnailState(currentThumbnailState: .unavailable, isDownloadRequested: isDownloadRequested))
+    }
+}
+
 /// 写真ライブラリへ渡す読み出しの条件が、iCloud から取ってよいかをそのまま写し、結果を 1 回だけ返す形にすること
 @Test(arguments: [true, false]) func screenshotImageRequestOptionsCopyNetworkAccess(isNetworkAccessAllowed: Bool) {
     let options = screenshotImageRequestOptions(isNetworkAccessAllowed: isNetworkAccessAllowed, progressHandler: nil)

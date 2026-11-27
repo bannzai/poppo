@@ -11,6 +11,16 @@
         }
       }
     },
+    "Allow access to all photos in Settings to see new photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく保存した写真を並べるには設定ですべての写真へのアクセスを許可してください"
+          }
+        }
+      }
+    },
     "Allow access to all photos in Settings to see new screenshots" : {
       "localizations" : {
         "ja" : {

@@ -192,6 +192,24 @@ func canStartScreenshotDownload(thumbnailState: ScreenshotThumbnailState) -> Boo
     }
 }
 
+/// セルが画面に出た時の初めの読み出しの結果を、読み出しを待った後の今の状態 (currentThumbnailState) に書いてよいかを返す。
+/// isDownloadRequested は、読み出しを始めた時に利用者がその 1 枚のダウンロードのボタンを押していたか (true の時は取っている状態から読み出した)。
+/// 読み出しを始めた時の状態のままの時だけ true にする。待っている間に利用者がダウンロードのボタンを押して取り始めた時は、
+/// iCloud から取らずに読み出した結果 (ダウンロードのボタンを出す状態) で、取っている表示を上書きしないため
+func canApplyInitialScreenshotThumbnailState(
+    currentThumbnailState: ScreenshotThumbnailState,
+    isDownloadRequested: Bool
+) -> Bool {
+    switch currentThumbnailState {
+    case .loading:
+        !isDownloadRequested
+    case .downloading:
+        isDownloadRequested
+    case .loaded, .needsDownload, .downloadFailed, .unavailable:
+        false
+    }
+}
+
 /// 一覧に並べる写真 (screenshots) から、読み出せないと分かった写真 (localIdentifier が unavailableScreenshotIdentifiers にあるもの) を除いて返す。
 /// 残りは渡した順のまま。localIdentifier は写真の localIdentifier を返す (テストで PHAsset を作らずに確かめるため、取り出し方を受け取る)
 func listedScreenshots<Screenshot>(

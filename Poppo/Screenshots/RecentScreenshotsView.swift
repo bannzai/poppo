@@ -80,11 +80,18 @@ struct RecentScreenshotsView: View {
                         // ja: 選んだ写真だけを表示しています
                         Text("Only the photos you selected are shown")
                             .font(.subheadline.bold())
-                        // ja: 新しく撮ったスクリーンショットを並べるには設定ですべての写真へのアクセスを許可してください
-                        Text("Allow access to all photos in Settings to see new screenshots")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
+                        Group {
+                            if showsOnlyScreenshots {
+                                // ja: 新しく撮ったスクリーンショットを並べるには設定ですべての写真へのアクセスを許可してください
+                                Text("Allow access to all photos in Settings to see new screenshots")
+                            } else {
+                                // ja: 新しく保存した写真を並べるには設定ですべての写真へのアクセスを許可してください
+                                Text("Allow access to all photos in Settings to see new photos")
+                            }
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                         openSettingsButton
                     }
                     .padding()
@@ -316,7 +323,21 @@ struct ScreenshotGridCell: View {
                 // 0: 取り直しを始めた直後は進み具合が伝わる前のため、何も進んでいない値から出す
                 thumbnailState = .downloading(fractionCompleted: 0)
             }
-            thumbnailState = await screenshotThumbnailState(isNetworkAccessAllowed: isDownloadRequested, loadImage: loadThumbnail)
+            let loadedThumbnailState = await screenshotThumbnailState(
+                isNetworkAccessAllowed: isDownloadRequested,
+                loadImage: loadThumbnail
+            )
+            // 待っている間に task が取りやめられた時と、利用者がダウンロードのボタンを押して取り始めた時は、その表示を読み出す前の結果で上書きしない
+            // (読み出しを待つ前に畳むと、待った後の状態を確かめられないため、結果を変数で受ける)
+            guard !Task.isCancelled,
+                canApplyInitialScreenshotThumbnailState(
+                    currentThumbnailState: thumbnailState,
+                    isDownloadRequested: isDownloadRequested
+                )
+            else {
+                return
+            }
+            thumbnailState = loadedThumbnailState
             if case .unavailable = thumbnailState {
                 markUnavailable()
             }
@@ -407,6 +428,7 @@ struct ScreenshotDownloadButton: View {
             }
             .font(.caption2)
             .multilineTextAlignment(.center)
+            // 4pt: 幅 約 118pt の枠の中で、文が枠の端に触れない最小の余白にするため
             .padding(4)
         }
         .buttonStyle(.borderless)
@@ -457,6 +479,7 @@ struct ScreenshotDownloadFailedLabel: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
+        // 4pt: 幅 約 118pt の枠の中で、文が枠の端に触れない最小の余白にするため
         .padding(4)
     }
 }
