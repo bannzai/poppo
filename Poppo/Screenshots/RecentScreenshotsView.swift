@@ -214,6 +214,8 @@ struct ScreenshotGrid: View {
             _ isNetworkAccessAllowed: Bool,
             _ progressHandler: @escaping @Sendable (_ fractionCompleted: Double) -> Void
         ) async -> Result<UIImage, ScreenshotImageUnavailableReason>
+    /// 本体アプリが前面にいるか。前面に戻った時に、一覧から外した写真を読み出し直すために見る
+    @Environment(\.scenePhase) private var scenePhase
     /// 縮小画像を読み出せないと分かった写真の localIdentifier。セルが画面の外に出て作り直されても並べないように、一覧の側で持つ
     @State private var unavailableScreenshotIdentifiers: Set<String> = []
     /// 利用者がダウンロードのボタンを押した写真の localIdentifier。セルが画面の外に出て作り直された時に、
@@ -249,6 +251,13 @@ struct ScreenshotGrid: View {
                 }
             }
             .padding()
+        }
+        // 写真の同期中のように一時的な理由で読み出せなかった写真も、本体アプリが前面に戻った時に読み出し直して並べるため、
+        // 前面に戻るたびに一覧から外した写真の控えを空にする (RecentScreenshotsView が写真を取り直すのと同じ時点)
+        .onChange(of: scenePhase) { _, newScenePhase in
+            if newScenePhase == .active {
+                unavailableScreenshotIdentifiers = []
+            }
         }
     }
 }
