@@ -80,7 +80,17 @@ nonisolated func listedPhotoLibraryItems<Item>(
     mediaKinds: PhotoLibraryMediaKinds,
     mediaKind: (Item) -> PhotoLibraryMediaKinds?
 ) -> [Item] {
-    Array(items.lazy.filter { mediaKind($0).map { mediaKinds.contains($0) } ?? false }.prefix(limit))
+    var listedItems: [Item] = []
+    for item in items {
+        // limit 件に達したら残りを読まない (items が写真ライブラリの項目を読む時に読み出す列のため)
+        guard listedItems.count < limit else {
+            break
+        }
+        if let itemMediaKind = mediaKind(item), mediaKinds.contains(itemMediaKind) {
+            listedItems.append(item)
+        }
+    }
+    return listedItems
 }
 
 /// 写真ライブラリの項目 (mediaType と mediaSubtypes) が当たる種類を返す。画像と動画のどちらでもない (音声等) 時は nil
