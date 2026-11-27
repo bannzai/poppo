@@ -252,8 +252,8 @@ struct ScreenshotGrid: View {
             }
             .padding()
         }
-        // 写真の同期中のように一時的な理由で読み出せなかった写真も、本体アプリが前面に戻った時に読み出し直して並べるため、
-        // 前面に戻るたびに一覧から外した写真の控えを空にする (RecentScreenshotsView が写真を取り直すのと同じ時点)
+        // 読み出せなかった理由が後で無くなるかは確かめていないため、本体アプリが前面に戻るたびに一覧から外した写真の控えを空にして読み出し直す
+        // (RecentScreenshotsView が写真を取り直すのと同じ時点)
         .onChange(of: scenePhase) { _, newScenePhase in
             if newScenePhase == .active {
                 unavailableScreenshotIdentifiers = []
