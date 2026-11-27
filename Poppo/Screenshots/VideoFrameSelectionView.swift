@@ -66,11 +66,13 @@ nonisolated func selectableVideoDurationSeconds(durationSeconds: Double) -> Doub
 /// 真ん中にする: 画面収録はコントロールセンターから始めて止めるため、始まりと終わりの場面にはコントロールセンターが写りやすい
 /// (Apple の画面収録の手順: 「In Control Center, you can start a screen recording」「Or open Control Center and tap the red Record button」
 /// https://support.apple.com/en-us/102653 2026-11-27 に読んだ)
+/// 長さが 0 以下か有限でない時は 0 (動画の始まり) を返す。始まりは長さによらず必ずある時刻のため
 nonisolated func initialVideoFrameSeconds(durationSeconds: Double) -> Double {
     durationSeconds.isFinite && durationSeconds > 0 ? durationSeconds / 2 : 0
 }
 
-/// 秒 (seconds) を、場面を選ぶ画面に出す「分:秒」の文にして返す
+/// 秒 (seconds) を、場面を選ぶ画面に出す「分:秒」の文にして返す。負の値と有限でない値は 0 秒として出す
+/// (場面の時刻は動画の始まりより前にならず、読めない値を「0:00」より意味のある時刻で出す手段が無いため)
 nonisolated func videoTimeText(seconds: Double) -> String {
     Duration.seconds(seconds.isFinite ? max(seconds, 0) : 0).formatted(.time(pattern: .minuteSecond))
 }
@@ -201,7 +203,9 @@ struct VideoFrameSelectionView: View {
                 }
                 .padding()
                 // 場面を選び直すたびに、その場面の画像を作り直す。前の場面の画像を作っている途中なら、その結果は捨てる
-                .task(id: selectedSeconds) {
+                .task(id: selectedSeconds) { [selectedSeconds] in
+                    // 画像を作り始めた時の時刻を、await の前に捕まえて画像と組にする (await の後に読んだ時刻と組にすると、
+                    // 古い場面の画像に新しい時刻を付けてしまい、見ている場面と違う場面を読めるようになるため)
                     // 幅 1206・高さ 2622: iPhone 17 Pro の画面のピクセル数。画面に収めて見せるだけなので、これより大きい画像は作らない
                     let image = try? await videoFrameImage(asset: asset, seconds: selectedSeconds, maximumSize: CGSize(width: 1206, height: 2622))
                     if !Task.isCancelled {

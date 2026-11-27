@@ -117,7 +117,7 @@ func recognizeTextLinesReadsSelectedVideoFrame(index: Int, sampleChat: DebugSamp
 /// 動画の読み出しの条件が、iCloud から取ることを許し、縮めていない質の動画を求め、取れた割合を渡すこと
 @Test func videoRequestOptionsAllowNetworkAndHighQuality() throws {
     let receivedProgress = Mutex<[Double]>([])
-    let options = videoRequestOptions(progress: { value in receivedProgress.withLock { $0.append(value) } })
+    let options = videoRequestOptions(progress: { fractionCompleted in receivedProgress.withLock { $0.append(fractionCompleted) } })
 
     #expect(options.isNetworkAccessAllowed)
     #expect(options.deliveryMode == .highQualityFormat)
