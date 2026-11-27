@@ -103,7 +103,7 @@ private func photoLibraryAssetValues(mediaType: PHAssetMediaType, mediaSubtypes:
 }
 
 /// iCloud にだけあること以外の、縮小画像を読み出せなかった理由 (取り消し・エラー・理由なし)
-private let screenshotImageUnavailableReasonsOtherThanInCloud: [ScreenshotImageUnavailableReason] = [
+private nonisolated let screenshotImageUnavailableReasonsOtherThanInCloud: [ScreenshotImageUnavailableReason] = [
     .cancelled,
     .failed(errorDescription: "PHPhotosErrorDomain 3164: network"),
     .unknown,
