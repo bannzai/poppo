@@ -15,19 +15,37 @@ private nonisolated func liveAPIKeyEnvironmentName(replyModel: ReplyModel) -> St
     }
 }
 
-/// 環境変数に replyModel の API キーが入っていればその値を、入っていない (空を含む) 時は nil を返す
-private nonisolated func liveAPIKey(replyModel: ReplyModel) -> String? {
+/// environment (環境変数の名前と値) に replyModel の API キーが入っていればその値を、入っていない時は nil を返す。
+/// 空文字は入っていない扱いにする (GitHub Actions は、登録していない Secret を空文字で渡すため)
+private nonisolated func liveAPIKey(replyModel: ReplyModel, environment: [String: String]) -> String? {
     liveAPIKeyEnvironmentName(replyModel: replyModel)
-        .flatMap { ProcessInfo.processInfo.environment[$0] }
+        .flatMap { environment[$0] }
         .flatMap { $0.isEmpty ? nil : $0 }
+}
+
+/// environment (環境変数の名前と値) に、OpenAI と Gemini の両方の API キーが入っているかを返す。
+/// 実際の API を呼ぶテストは、両方がある時だけ動かす (片方だけで動かすと、もう片方のモデルのテストがキーなしで落ちるため)
+private nonisolated func hasLiveAPIKeys(environment: [String: String]) -> Bool {
+    liveAPIKey(replyModel: .openAI, environment: environment) != nil && liveAPIKey(replyModel: .gemini, environment: environment) != nil
+}
+
+/// 誤ったキーのテストで保存する、どの提供元のキーでもない文字列
+private nonisolated let wrongAPIKey = "poppo-live-test-wrong-key"
+
+/// 実際の API を呼ぶテストを動かす条件: 両方のキーが空でなく入っている時だけ動かし、片方だけ・空文字・未設定では動かさないこと
+@Test func liveAPITestsRunOnlyWithBothNonEmptyKeys() {
+    #expect(hasLiveAPIKeys(environment: ["OPENAI_API_KEY": "a", "GEMINI_API_KEY": "b"]) == true)
+    #expect(hasLiveAPIKeys(environment: ["OPENAI_API_KEY": "a"]) == false)
+    #expect(hasLiveAPIKeys(environment: ["GEMINI_API_KEY": "b"]) == false)
+    #expect(hasLiveAPIKeys(environment: ["OPENAI_API_KEY": "a", "GEMINI_API_KEY": ""]) == false)
+    #expect(hasLiveAPIKeys(environment: ["OPENAI_API_KEY": "", "GEMINI_API_KEY": "b"]) == false)
+    #expect(hasLiveAPIKeys(environment: [:]) == false)
 }
 
 /// OpenAI と Gemini の実際の API を呼んで、返信案を作る経路を端から端まで確かめるテスト。
 /// 費用がかかり、API キーが要るため、環境変数に OpenAI と Gemini の両方のキーがある時だけ動く
-/// (手動で起動する .github/workflows/verify-reply-model-apis.yml だけがキーを渡す。PR の CI では動かない)。
-/// 通信を差し替えるテスト (ChatCompletionsRequestTests) と同じプロセスで動くと、要求が差し替えの側へ届くため、
-/// workflow はこの suite だけを指定して実行する
-@Suite(.serialized, .enabled(if: liveAPIKey(replyModel: .openAI) != nil && liveAPIKey(replyModel: .gemini) != nil))
+/// (手動で起動する .github/workflows/verify-reply-model-apis.yml だけがキーを渡す。PR の CI では動かない)
+@Suite(.serialized, .enabled(if: hasLiveAPIKeys(environment: ProcessInfo.processInfo.environment)))
 struct LiveReplyModelAPITests {
     /// API キーを置く、このテストだけの Keychain の service
     private let keychainService = "LiveReplyModelAPITests-\(UUID().uuidString)"
@@ -39,7 +57,7 @@ struct LiveReplyModelAPITests {
         defer {
             try? deleteAPIKey(replyModel: replyModel, keychainService: keychainService)
         }
-        try save(apiKey: try #require(liveAPIKey(replyModel: replyModel)), replyModel: replyModel, keychainService: keychainService)
+        try save(apiKey: try #require(liveAPIKey(replyModel: replyModel, environment: ProcessInfo.processInfo.environment)), replyModel: replyModel, keychainService: keychainService)
 
         let replyTexts = try await generateReplyTexts(
             messages: [
@@ -62,7 +80,7 @@ struct LiveReplyModelAPITests {
         defer {
             try? deleteAPIKey(replyModel: replyModel, keychainService: keychainService)
         }
-        try save(apiKey: "poppo-live-test-wrong-key", replyModel: replyModel, keychainService: keychainService)
+        try save(apiKey: wrongAPIKey, replyModel: replyModel, keychainService: keychainService)
 
         let thrownError = try #require(
             await #expect(throws: ChatCompletionsError.self) {
@@ -82,6 +100,6 @@ struct LiveReplyModelAPITests {
             return
         }
         #expect((400..<500).contains(try #require(statusCode)))
-        #expect(screenReadingFailureDescription(error: thrownError).contains("poppo-live-test-wrong-key") == false)
+        #expect(screenReadingFailureDescription(error: thrownError).contains(wrongAPIKey) == false)
     }
 }
