@@ -19,8 +19,8 @@ import SwiftUI
 nonisolated func videoRequestOptions(progress: @escaping @Sendable (Double) -> Void) -> PHVideoRequestOptions {
     let options = PHVideoRequestOptions()
     options.isNetworkAccessAllowed = true
-    options.progressHandler = { value, _, _, _ in
-        progress(value)
+    options.progressHandler = { fractionCompleted, _, _, _ in
+        progress(fractionCompleted)
     }
     // 読み取る場面の小さい文字を、縮めた動画から読まないため。PHImageManager.h: 既定の automatic は iCloud から取る AVAsset で
     // 「typ. PHVideoRequestOptionsDeliveryModeMediumQualityFormat」(720p 前後) を選び、highQualityFormat は「best quality」
@@ -75,8 +75,32 @@ nonisolated func videoTimeText(seconds: Double) -> String {
     Duration.seconds(seconds.isFinite ? max(seconds, 0) : 0).formatted(.time(pattern: .minuteSecond))
 }
 
+/// 動画の読み出しの結果から、場面を選ぶ画面の状態を返す。asset は読み出した動画 (読み出せなかった時は nil)、
+/// durationSeconds は AVFoundation が返した長さ (取れなかった時は nil)。動画が無い・長さが無い・場面を選べる長さでない時は .failed
+nonisolated func videoFrameSelectionPhase(asset: AVURLAsset?, durationSeconds: Double?) -> VideoFrameSelectionPhase {
+    guard let asset, let selectableDurationSeconds = durationSeconds.flatMap({ selectableVideoDurationSeconds(durationSeconds: $0) }) else {
+        return .failed
+    }
+    return .loaded(asset: asset, durationSeconds: selectableDurationSeconds)
+}
+
+/// 読み出しの進み具合 (progress。0 から 1) が届いた時の、場面を選ぶ画面の状態を返す。current は届いた時の状態。
+/// 読み込み中の時だけ進み具合を反映し、ほかの状態ではそのまま返す (読み出しが終わった後に遅れて届いた割合で、読み込み中の表示に戻さないため)
+nonisolated func videoFrameSelectionPhaseAfterProgress(current: VideoFrameSelectionPhase, progress: Double) -> VideoFrameSelectionPhase {
+    if case .loading = current {
+        return .loading(progress: progress)
+    }
+    return current
+}
+
+/// 「この場面を読み取る」を押せるかを返す。previewSeconds は画面に出している場面の時刻 (場面の画像がまだ無い時は nil)、
+/// selectedSeconds は Slider で選んでいる時刻。出している場面が選んだ時刻のものの時だけ押せる (見ている場面と違う場面を読まないため)
+nonisolated func canReadVideoFrame(previewSeconds: Double?, selectedSeconds: Double) -> Bool {
+    previewSeconds == selectedSeconds
+}
+
 /// 動画の場面を選ぶ画面の状態
-enum VideoFrameSelectionPhase {
+nonisolated enum VideoFrameSelectionPhase {
     /// 動画を読み出している。progress は iCloud から取れた割合 (0 から 1)。iCloud から取っていない間は nil
     case loading(progress: Double?)
     /// 動画を読み出せた。asset は動画、durationSeconds はその長さ (selectableVideoDurationSeconds を通した、0 より大きい有限の秒)
@@ -164,7 +188,7 @@ struct VideoFrameSelectionView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     // 出している場面が選んだ時刻と違う間 (Slider を動かして、新しい場面の画像を作っている間) は押せなくする。見ている場面と読む場面を同じにするため
-                    .disabled(preview?.seconds != selectedSeconds)
+                    .disabled(!canReadVideoFrame(previewSeconds: preview?.seconds, selectedSeconds: selectedSeconds))
                     #if DEBUG
                     // 動画では、読み取りの画面を開くのはこのボタンのため、ここで押した時刻を控える (一覧のセルのタップと同じく、表示までの時間を測るため)
                     .simultaneousGesture(
@@ -193,25 +217,20 @@ struct VideoFrameSelectionView: View {
             guard case .loading = phase else {
                 return
             }
-            guard
-                let asset = await loadVideoAsset(
-                    video: video,
-                    progress: { progress in
-                        Task { @MainActor in
-                            // 読み出しが終わった後に遅れて届いた割合で、読み込み中の表示に戻さないため
-                            if case .loading = phase {
-                                phase = .loading(progress: progress)
-                            }
-                        }
+            let asset = await loadVideoAsset(
+                video: video,
+                progress: { progress in
+                    Task { @MainActor in
+                        phase = videoFrameSelectionPhaseAfterProgress(current: phase, progress: progress)
                     }
-                ),
-                let durationSeconds = (try? await videoDurationSeconds(asset: asset)).flatMap({ selectableVideoDurationSeconds(durationSeconds: $0) })
-            else {
-                phase = .failed
-                return
+                }
+            )
+            // Optional の map は async の閉包を取れないため、if の式で長さを取る
+            let durationSeconds: Double? = if let asset { try? await videoDurationSeconds(asset: asset) } else { nil }
+            phase = videoFrameSelectionPhase(asset: asset, durationSeconds: durationSeconds)
+            if case .loaded(_, let durationSeconds) = phase {
+                selectedSeconds = initialVideoFrameSeconds(durationSeconds: durationSeconds)
             }
-            selectedSeconds = initialVideoFrameSeconds(durationSeconds: durationSeconds)
-            phase = .loaded(asset: asset, durationSeconds: durationSeconds)
         }
     }
 }

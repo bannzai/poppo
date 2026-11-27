@@ -121,7 +121,72 @@ func recognizeTextLinesReadsSelectedVideoFrame(index: Int, sampleChat: DebugSamp
 
     #expect(options.isNetworkAccessAllowed)
     #expect(options.deliveryMode == .highQualityFormat)
-    var stop: ObjCBool = false
-    try #require(options.progressHandler)(0.25, nil, &stop, nil)
+    let progressHandler = try #require(options.progressHandler)
+    var stop = ObjCBool(false)
+
+    progressHandler(0.25, nil, &stop, nil)
     #expect(receivedProgress.withLock { $0 } == [0.25])
+}
+
+/// 読み出しの結果から画面の状態を決める判定が、動画と選べる長さがある時だけ読み出せた状態にし、ほかは失敗の状態にすること
+@Test func videoFrameSelectionPhaseFailsWithoutAssetOrSelectableDuration() async throws {
+    let asset = try await writtenDebugSampleChatVideoAsset()
+
+    guard case .loaded(_, let durationSeconds) = videoFrameSelectionPhase(asset: asset, durationSeconds: 2) else {
+        Issue.record("動画と長さがあるのに読み出せた状態にならなかった")
+        return
+    }
+    #expect(durationSeconds == 2)
+    for (testAsset, testDurationSeconds) in [(nil, 2), (asset, nil), (asset, 0), (asset, .nan), (asset, .infinity)] as [(AVURLAsset?, Double?)] {
+        guard case .failed = videoFrameSelectionPhase(asset: testAsset, durationSeconds: testDurationSeconds) else {
+            Issue.record("動画 \(testAsset == nil ? "なし" : "あり")・長さ \(String(describing: testDurationSeconds)) で失敗の状態にならなかった")
+            continue
+        }
+    }
+}
+
+/// 進み具合は読み込み中の時だけ反映し、読み出しが終わった後 (読み出せた・失敗した) に届いた進み具合では状態を変えないこと
+@Test func videoFrameSelectionPhaseAfterProgressUpdatesOnlyWhileLoading() async throws {
+    guard case .loading(let progress) = videoFrameSelectionPhaseAfterProgress(current: .loading(progress: nil), progress: 0.5) else {
+        Issue.record("読み込み中に進み具合が反映されなかった")
+        return
+    }
+    #expect(progress == 0.5)
+    guard case .failed = videoFrameSelectionPhaseAfterProgress(current: .failed, progress: 0.5) else {
+        Issue.record("失敗の後に届いた進み具合で状態が変わった")
+        return
+    }
+    guard
+        case .loaded(_, let durationSeconds) = videoFrameSelectionPhaseAfterProgress(
+            current: .loaded(asset: try await writtenDebugSampleChatVideoAsset(), durationSeconds: 2),
+            progress: 0.5
+        )
+    else {
+        Issue.record("読み出せた後に届いた進み具合で状態が変わった")
+        return
+    }
+    #expect(durationSeconds == 2)
+}
+
+/// 「この場面を読み取る」は、出している場面が選んだ時刻のものの時だけ押せること
+@Test func canReadVideoFrameOnlyWhenPreviewMatchesSelection() {
+    #expect(canReadVideoFrame(previewSeconds: 1, selectedSeconds: 1))
+    #expect(canReadVideoFrame(previewSeconds: 0, selectedSeconds: 0))
+    // Slider を動かした直後 (前の時刻の場面を出している間)
+    #expect(!canReadVideoFrame(previewSeconds: 1, selectedSeconds: 1.5))
+    // 場面の画像がまだ無い・作れなかった時
+    #expect(!canReadVideoFrame(previewSeconds: nil, selectedSeconds: 1))
+}
+
+/// 見本の動画を同じファイルに 2 回書き出しても失敗せず、2 回目の動画も読めること (開発者メニューの操作を冪等にするため)
+@Test func writeDebugSampleChatVideoReplacesExistingFile() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appending(path: "video-frame-selection-replace-\(UUID().uuidString).mp4")
+
+    try await writeDebugSampleChatVideo(fileURL: fileURL)
+    try await writeDebugSampleChatVideo(fileURL: fileURL)
+
+    #expect(
+        try await videoDurationSeconds(asset: AVURLAsset(url: fileURL))
+            == Double(DebugSampleChat.allCases.count * debugSampleChatVideoSecondsPerChat)
+    )
 }

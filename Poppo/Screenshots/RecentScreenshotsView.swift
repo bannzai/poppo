@@ -321,7 +321,7 @@ struct PhotoLibraryMediaKindsFilterView: View {
 struct ScreenshotGrid: View {
     /// 一覧の見出し
     let title: LocalizedStringResource
-    /// 並べる写真。渡した順に左上から並べる
+    /// 並べる写真と動画。渡した順に左上から並べる
     let screenshots: [PHAsset]
     /// 一覧の 1 枚を縮小画像の大きさで読み出す処理。asset は読み出す 1 枚、isNetworkAccessAllowed は iCloud から取ってよいか、
     /// progressHandler は iCloud から取っている間の進み具合 (0〜1) を受け取る (main actor の外から呼ばれる)。
