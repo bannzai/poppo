@@ -1,0 +1,40 @@
+# OpenAI と Gemini の実際の API を呼んで、返信案を作る経路 (PoppoTests/LiveReplyModelAPITests.swift) を確かめる。
+# 呼ぶたびに owner の API キーに費用がかかるため、手動でだけ起動する (1 回の実行で要求は 4 つ)
+name: verify-reply-model-apis
+
+on:
+  workflow_dispatch: # fork の PR に Secrets を渡さないため workflow_dispatch のみ
+
+permissions:
+  contents: read
+
+jobs:
+  live-api-tests:
+    # iOS 27 の SDK と simulator が入っている GitHub-hosted runner は xcode-27 だけ (ci.yml と同じ)
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # xcodebuild は、名前が TEST_RUNNER_ で始まる環境変数を、接頭辞を外してテストのプロセスに渡す。
+      # キーは環境変数でだけ渡し、コマンドの引数に書かない (引数はログに出るため)。
+      # -only-testing でこの suite だけにする: 通信を差し替えるテストが同じプロセスで動くと、要求が実際の API へ届かないため
+      - name: 実際の API を呼ぶテスト
+        env:
+          TEST_RUNNER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TEST_RUNNER_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -o pipefail
+          [ -n "$TEST_RUNNER_OPENAI_API_KEY" ] && [ -n "$TEST_RUNNER_GEMINI_API_KEY" ] || {
+            echo "::error::Secrets の OPENAI_API_KEY か GEMINI_API_KEY が空です (テストが動かずに成功になるため中止します)"
+            exit 1
+          }
+          mkdir -p tmp
+          xcodebuild -project Poppo.xcodeproj -scheme Poppo -derivedDataPath tmp/DerivedData \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            -only-testing:PoppoTests/LiveReplyModelAPITests test | tee tmp/live-api-tests.log
+          # テストが 1 つも動かなかった実行 (suite の名前の誤り・条件で飛ばされた) を成功にしない
+          grep -q 'realAPIReturnsThreeReplyTexts.*passed' tmp/live-api-tests.log || {
+            echo "::error::実際の API を呼ぶテストが通った記録がログにありません"
+            exit 1
+          }
