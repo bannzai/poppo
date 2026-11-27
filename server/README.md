@@ -21,7 +21,7 @@ Node.js は 22 以降。
 
 自分の API キーで実際のモデルを呼んで試す時だけ使う。利用料がかかる。呼び出しの確かめ (認証・回数の制限) が無いため、このマシンの中からだけ届くアドレス (127.0.0.1) で待ち受け、Host ヘッダーが `127.0.0.1:<port>` か `localhost:<port>` の要求だけを受ける (ブラウザで開いたほかのページから呼ばれないようにするため)。
 
-API キーは環境変数で渡す (`ANTHROPIC_API_KEY`・`OPENAI_API_KEY`・`GEMINI_API_KEY`)。値をファイルに書いてコミットしない。持っている提供元の分だけでよく、キーの無い提供元を指定した呼び出しは失敗する。
+API キーは環境変数で渡す (`ANTHROPIC_API_KEY`・`OPENAI_API_KEY`・`GEMINI_API_KEY`)。値をファイルに書いてコミットしない。持っている提供元の分だけでよく、キーの無い提供元を指定した呼び出しは失敗する。OpenAI と Gemini の Poppo 用のキーは 1Password の vault `poppo` にあり、リポジトリ直下の `.env.1password` (参照だけで、値は無い) で渡せる: `op run --env-file ../.env.1password -- <コマンド>` (例: `op run --env-file ../.env.1password -- npm run benchmark --silent`)。
 
 ```sh
 cd server
