@@ -60,3 +60,53 @@ func recognizeTextLinesReadsSelectedVideoFrame(index: Int, sampleChat: DebugSamp
     #expect(videoTimeText(seconds: -3) == "0:00")
     #expect(videoTimeText(seconds: .nan) == "0:00")
 }
+
+/// 場面を選べる長さは、0 より大きい有限の秒だけで、0 以下・NaN・無限大は選べない (場面を選ぶ範囲を作れないため)
+@Test func selectableVideoDurationSecondsAcceptsOnlyPositiveFiniteDuration() {
+    #expect(selectableVideoDurationSeconds(durationSeconds: 2) == 2)
+    #expect(selectableVideoDurationSeconds(durationSeconds: 0.001) == 0.001)
+    #expect(selectableVideoDurationSeconds(durationSeconds: 0) == nil)
+    #expect(selectableVideoDurationSeconds(durationSeconds: -1) == nil)
+    #expect(selectableVideoDurationSeconds(durationSeconds: .nan) == nil)
+    #expect(selectableVideoDurationSeconds(durationSeconds: .infinity) == nil)
+}
+
+/// 動画でないファイルの場面を読もうとすると、読み取りの画面が読めなかった表示にするエラー (imageUnavailable) を投げること
+@Test func recognizeTextLinesThrowsImageUnavailableForNonVideoFile() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appending(path: "video-frame-selection-not-video-\(UUID().uuidString).mp4")
+    try Data("not a video".utf8).write(to: fileURL)
+
+    await #expect(throws: ChatReadingError.imageUnavailable) {
+        try await recognizeTextLines(videoAsset: AVURLAsset(url: fileURL), seconds: 0)
+    }
+}
+
+/// Slider で選べる範囲の始まり (0 秒) は 1 つ目のチャットの画面を、1 つ目と 2 つ目の画面の境目 (1 秒) は 2 つ目の画面を読むこと
+@Test func recognizeTextLinesReadsFramesAtBoundaries() async throws {
+    let asset = try await writtenDebugSampleChatVideoAsset()
+
+    #expect(chatTitleReadFromScreen(lines: try await recognizeTextLines(videoAsset: asset, seconds: 0)) == DebugSampleChat.allCases[0].title)
+    #expect(
+        chatTitleReadFromScreen(lines: try await recognizeTextLines(videoAsset: asset, seconds: Double(debugSampleChatVideoSecondsPerChat)))
+            == DebugSampleChat.allCases[1].title
+    )
+}
+
+/// Slider で選べる範囲の終わり (動画の長さちょうど) を選んでも、最後のチャットの画面を読むこと
+@Test func recognizeTextLinesReadsLastFrameAtVideoEnd() async throws {
+    let asset = try await writtenDebugSampleChatVideoAsset()
+
+    #expect(
+        chatTitleReadFromScreen(lines: try await recognizeTextLines(videoAsset: asset, seconds: try await videoDurationSeconds(asset: asset)))
+            == DebugSampleChat.allCases[DebugSampleChat.allCases.count - 1].title
+    )
+}
+
+/// 大きさの上限を渡すと、場面の画像を縦横の比を保ったまま上限の中に縮めること (一覧に見せる画像を大きく作らないため)
+@Test func videoFrameImageFitsWithinMaximumSize() async throws {
+    // 幅 300・高さ 300: 見本の動画 (1206 × 2622) より小さく、縦長の画像なら高さで縮む上限
+    let image = try await videoFrameImage(asset: try await writtenDebugSampleChatVideoAsset(), seconds: 0.5, maximumSize: CGSize(width: 300, height: 300))
+
+    #expect(image.height == 300)
+    #expect(image.width < 300)
+}

@@ -52,7 +52,7 @@ struct RecentScreenshotsView: View {
                     openSettingsButton
                 }
             case .allowed:
-                // 0: 切り替えの行の上下の余白は切り替え自身が持つため、切り替えと一覧の間に余白を足さない (選んだ写真だけの時の VStack と同じ)
+                // 0: 絞り込みの行の上下の余白は絞り込みの行自身が持つため、絞り込みの行と一覧の間に余白を足さない (選んだ写真だけの時の VStack と同じ)
                 VStack(spacing: 0) {
                     mediaKindsFilterRow
                     if screenshots.isEmpty {
@@ -144,6 +144,7 @@ struct RecentScreenshotsView: View {
             Text(verbatim: photoLibraryMediaKindsSummary(mediaKinds: mediaKinds))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                // 1 行: 4 つの種類を選んで要約が長くなっても、絞り込みのボタンを同じ行に残し、一覧の位置を種類の数で動かさないため (全文は絞り込みの画面で見られる)
                 .lineLimit(1)
                 .accessibilityIdentifier("media_kinds_summary")
             Spacer()
@@ -219,8 +220,11 @@ func recentScreenshotsTitle(mediaKinds: PhotoLibraryMediaKinds) -> LocalizedStri
     }
 }
 
-/// 絞り込みの画面に並べる種類の、上からの順。写真の 2 つ、動画の 2 つの順
-let photoLibraryMediaKindsInFilterOrder: [PhotoLibraryMediaKinds] = [.screenshots, .otherPhotos, .screenRecordings, .otherVideos]
+/// 絞り込みの画面の「写真」の見出しの下に並べる種類の、上からの順
+let photoMediaKindsInFilterOrder: [PhotoLibraryMediaKinds] = [.screenshots, .otherPhotos]
+
+/// 絞り込みの画面の「動画」の見出しの下に並べる種類の、上からの順
+let videoMediaKindsInFilterOrder: [PhotoLibraryMediaKinds] = [.screenRecordings, .otherVideos]
 
 /// 種類 (mediaKind。1 つの種類) の、絞り込みの画面と一覧の上の行に出す名前
 func photoLibraryMediaKindName(mediaKind: PhotoLibraryMediaKinds) -> LocalizedStringResource {
@@ -242,7 +246,7 @@ func photoLibraryMediaKindName(mediaKind: PhotoLibraryMediaKinds) -> LocalizedSt
 
 /// 一覧の上の行に出す、並べている種類の組 (mediaKinds) の名前を、絞り込みの画面の順に並べてつないだ文
 func photoLibraryMediaKindsSummary(mediaKinds: PhotoLibraryMediaKinds) -> String {
-    photoLibraryMediaKindsInFilterOrder
+    (photoMediaKindsInFilterOrder + videoMediaKindsInFilterOrder)
         .filter { mediaKinds.contains($0) }
         .map { String(localized: photoLibraryMediaKindName(mediaKind: $0)) }
         .formatted(.list(type: .and))
@@ -259,15 +263,17 @@ struct PhotoLibraryMediaKindsFilterView: View {
         NavigationStack {
             Form {
                 Section {
-                    mediaKindToggle(mediaKind: .screenshots)
-                    mediaKindToggle(mediaKind: .otherPhotos)
+                    ForEach(photoMediaKindsInFilterOrder, id: \.rawValue) {
+                        mediaKindToggle(mediaKind: $0)
+                    }
                 } header: {
                     // ja: 写真
                     Text("Photos")
                 }
                 Section {
-                    mediaKindToggle(mediaKind: .screenRecordings)
-                    mediaKindToggle(mediaKind: .otherVideos)
+                    ForEach(videoMediaKindsInFilterOrder, id: \.rawValue) {
+                        mediaKindToggle(mediaKind: $0)
+                    }
                 } header: {
                     // ja: 動画
                     Text("Videos")

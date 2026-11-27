@@ -93,11 +93,11 @@ struct DebugMenuView: View {
         } catch {
             sampleScreenshotError = error.localizedDescription
         }
-        reloadSampleScreenshotCounts()
+        reloadSampleStates()
     }
 
     /// 写真ライブラリに残っている見本のスクリーンショットの数と、見本のチャットの動画が残っているかを読み直す
-    private func reloadSampleScreenshotCounts() {
+    private func reloadSampleStates() {
         sampleScreenshotCount = debugSampleScreenshots().count
         sampleScreenshotMarkedCount = debugSampleScreenshotsMarkedAsScreenshotCount()
         hasSampleChatVideo = debugSampleChatVideo() != nil
@@ -123,7 +123,7 @@ struct DebugMenuView: View {
         } catch {
             sampleChatVideoError = error.localizedDescription
         }
-        reloadSampleScreenshotCounts()
+        reloadSampleStates()
     }
 
     /// 返信案を作るモデルとして selectingReplyModel を選んだことを保存し、この画面の表示を保存した後の値にする
@@ -557,7 +557,7 @@ struct DebugMenuView: View {
             reloadSavedLatestReading()
             replyModel = selectedReplyModel(userDefaults: .standard)
             reloadReplyModelsWithSavedAPIKey()
-            reloadSampleScreenshotCounts()
+            reloadSampleStates()
             reloadScreenshotReadingChoiceCount()
         }
         .alert(

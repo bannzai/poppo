@@ -281,6 +281,16 @@
         }
       }
     },
+    "If the video is in iCloud try again when you're online" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud にある動画は通信できる時にもう一度読み込んでください"
+          }
+        }
+      }
+    },
     "Loading the video" : {
       "localizations" : {
         "ja" : {

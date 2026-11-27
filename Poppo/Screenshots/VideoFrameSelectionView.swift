@@ -5,11 +5,15 @@ import SwiftUI
 /// 写真ライブラリの動画 (video) を、1 つのファイルの動画 (AVURLAsset) として読み出す。読み出せない時と、
 /// 写真ライブラリが AVURLAsset 以外の AVAsset を返した時は nil を返す (AVURLAsset は AVFoundation が Sendable と宣言していて、
 /// 場面を画像にする処理へ渡せるが、AVAsset は宣言していないため。どの動画で AVURLAsset 以外が返るかは Apple の文書に記述が無く未確認)。
-/// 端末に無い時は iCloud から取る (利用者が読み取る 1 本として選んだ動画のため。documents/DIRECTION.md「決めたこと」2026-11-27 の、タップした 1 枚を取る行と同じ扱い)
-@concurrent nonisolated func loadVideoAsset(video: PHAsset) async -> AVURLAsset? {
+/// 端末に無い時は iCloud から取る (利用者が読み取る 1 本として選んだ動画のため。documents/DIRECTION.md「決めたこと」2026-11-27 の、タップした 1 枚を取る行と同じ扱い)。
+/// iCloud から取っている間は、取れた割合 (0 から 1) を progress に渡す (写真ライブラリが決めた別のキューから呼ばれる)
+@concurrent nonisolated func loadVideoAsset(video: PHAsset, progress: @escaping @Sendable (Double) -> Void) async -> AVURLAsset? {
     await withCheckedContinuation { continuation in
         let options = PHVideoRequestOptions()
         options.isNetworkAccessAllowed = true
+        options.progressHandler = { value, _, _, _ in
+            progress(value)
+        }
         // 読み取る場面の小さい文字を、縮めた動画から読まないため。PHImageManager.h: 既定の automatic は iCloud から取る AVAsset で
         // 「typ. PHVideoRequestOptionsDeliveryModeMediumQualityFormat」(720p 前後) を選び、highQualityFormat は「best quality」
         options.deliveryMode = .highQualityFormat
@@ -47,6 +51,12 @@ func recognizeTextLines(videoAsset: AVURLAsset, seconds: Double) async throws ->
     return try await recognizeTextLines(image: image)
 }
 
+/// 動画の長さ (durationSeconds。AVFoundation が返した秒) が、場面を選べる長さなら、その長さを返す。
+/// 長さが 0 以下と、有限でない (NaN・無限大。長さの決まらない動画で AVFoundation が返しうる) 時は nil を返す (場面を選ぶ範囲を作れないため)
+nonisolated func selectableVideoDurationSeconds(durationSeconds: Double) -> Double? {
+    durationSeconds.isFinite && durationSeconds > 0 ? durationSeconds : nil
+}
+
 /// 動画を選んだ時に、最初に見せる場面の時刻 (秒) を返す。durationSeconds は動画の長さ。
 /// 真ん中にする: 画面収録はコントロールセンターから始めて止めるため、始まりと終わりの場面にはコントロールセンターが写りやすい
 /// (Apple の画面収録の手順: 「In Control Center, you can start a screen recording」「Or open Control Center and tap the red Record button」
@@ -62,11 +72,11 @@ nonisolated func videoTimeText(seconds: Double) -> String {
 
 /// 動画の場面を選ぶ画面の状態
 enum VideoFrameSelectionPhase {
-    /// 動画を読み出している
-    case loading
-    /// 動画を読み出せた。asset は動画、durationSeconds はその長さ
+    /// 動画を読み出している。progress は iCloud から取れた割合 (0 から 1)。iCloud から取っていない間は nil
+    case loading(progress: Double?)
+    /// 動画を読み出せた。asset は動画、durationSeconds はその長さ (selectableVideoDurationSeconds を通した、0 より大きい有限の秒)
     case loaded(asset: AVURLAsset, durationSeconds: Double)
-    /// 動画を読み出せなかった
+    /// 動画を読み出せなかった (iCloud から取れなかった・写真ライブラリが AVURLAsset 以外を返した・場面を選べる長さでない)
     case failed
 }
 
@@ -77,7 +87,9 @@ struct VideoFrameSelectionView: View {
     /// 選んだ動画
     let video: PHAsset
     /// 画面の状態
-    @State private var phase = VideoFrameSelectionPhase.loading
+    @State private var phase = VideoFrameSelectionPhase.loading(progress: nil)
+    /// 動画を読み出した回数。「もう一度読み込む」を押すと増やし、読み出しをやり直す
+    @State private var loadAttempt = 0
     /// 選んでいる場面の時刻 (動画の始まりからの秒)
     @State private var selectedSeconds: Double = 0
     /// 選んでいる場面の画像。まだ画像にしていない時と、画像にできなかった時は nil
@@ -86,13 +98,30 @@ struct VideoFrameSelectionView: View {
     var body: some View {
         Group {
             switch phase {
-            case .loading:
+            case .loading(let progress):
                 // ja: 動画を読み込んでいます
-                ProgressView("Loading the video")
+                ProgressView("Loading the video", value: progress)
+                    .padding()
+                    .accessibilityIdentifier("video_loading_progress")
             case .failed:
-                // ja: この動画を読み込めませんでした
-                ContentUnavailableView("Couldn't load this video", systemImage: "exclamationmark.triangle")
+                ContentUnavailableView {
+                    // ja: この動画を読み込めませんでした
+                    Label("Couldn't load this video", systemImage: "exclamationmark.triangle")
+                } description: {
+                    // ja: iCloud にある動画は通信できる時にもう一度読み込んでください
+                    Text("If the video is in iCloud try again when you're online")
+                } actions: {
+                    Button {
+                        phase = .loading(progress: nil)
+                        loadAttempt += 1
+                    } label: {
+                        // ja: もう一度試す
+                        Text("Try again")
+                    }
+                    .accessibilityIdentifier("video_load_retry_button")
+                }
             case .loaded(let asset, let durationSeconds):
+                // 16: 場面の画像・Slider・読み取るボタンの 3 つの塊の間を、塊の中 (Slider と時刻の間の 4) より広げて塊ごとに見分けるため
                 VStack(spacing: 16) {
                     Group {
                         if let previewImage {
@@ -105,8 +134,9 @@ struct VideoFrameSelectionView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("video_frame_preview")
+                    // 4: 時刻の文を、その時刻を選ぶ Slider の注記として近くに置くため
                     VStack(spacing: 4) {
-                        Slider(value: $selectedSeconds, in: 0...max(durationSeconds, 0)) {
+                        Slider(value: $selectedSeconds, in: 0...durationSeconds) {
                             // ja: 読み取る場面
                             Text("Frame to read")
                         }
@@ -127,6 +157,14 @@ struct VideoFrameSelectionView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    #if DEBUG
+                    // 動画では、読み取りの画面を開くのはこのボタンのため、ここで押した時刻を控える (一覧のセルのタップと同じく、表示までの時間を測るため)
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            debugLastScreenshotTapUptime = ProcessInfo.processInfo.systemUptime
+                        }
+                    )
+                    #endif
                     .accessibilityIdentifier("video_frame_read_button")
                 }
                 .padding()
@@ -143,11 +181,24 @@ struct VideoFrameSelectionView: View {
         // ja: 場面を選ぶ
         .navigationTitle("Pick a frame")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: video.localIdentifier) {
+        .task(id: loadAttempt) {
             guard case .loading = phase else {
                 return
             }
-            guard let asset = await loadVideoAsset(video: video), let durationSeconds = try? await videoDurationSeconds(asset: asset) else {
+            guard
+                let asset = await loadVideoAsset(
+                    video: video,
+                    progress: { progress in
+                        Task { @MainActor in
+                            // 読み出しが終わった後に遅れて届いた割合で、読み込み中の表示に戻さないため
+                            if case .loading = phase {
+                                phase = .loading(progress: progress)
+                            }
+                        }
+                    }
+                ),
+                let durationSeconds = (try? await videoDurationSeconds(asset: asset)).flatMap({ selectableVideoDurationSeconds(durationSeconds: $0) })
+            else {
                 phase = .failed
                 return
             }
