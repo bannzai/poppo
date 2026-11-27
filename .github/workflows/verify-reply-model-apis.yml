@@ -24,17 +24,11 @@ jobs:
           TEST_RUNNER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TEST_RUNNER_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          set -o pipefail
-          [ -n "$TEST_RUNNER_OPENAI_API_KEY" ] && [ -n "$TEST_RUNNER_GEMINI_API_KEY" ] || {
-            echo "::error::Secrets の OPENAI_API_KEY か GEMINI_API_KEY が空です (テストが動かずに成功になるため中止します)"
-            exit 1
-          }
+          set -eo pipefail
+          bash scripts/check-live-reply-model-api-run.sh keys
           mkdir -p tmp
           xcodebuild -project Poppo.xcodeproj -scheme Poppo -derivedDataPath tmp/DerivedData \
             -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
             -only-testing:PoppoTests/LiveReplyModelAPITests test | tee tmp/live-api-tests.log
           # テストが 1 つも動かなかった実行 (suite の名前の誤り・条件で飛ばされた) を成功にしない
-          grep -q 'realAPIReturnsThreeReplyTexts.*passed' tmp/live-api-tests.log || {
-            echo "::error::実際の API を呼ぶテストが通った記録がログにありません"
-            exit 1
-          }
+          bash scripts/check-live-reply-model-api-run.sh log tmp/live-api-tests.log

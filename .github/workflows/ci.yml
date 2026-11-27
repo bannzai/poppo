@@ -31,6 +31,9 @@ jobs:
       - name: Makefile の実機向け target のテスト
         run: bash scripts/test/test-makefile-device-targets.sh
 
+      - name: 実際の API を呼ぶテストの、実行の前と後の検査のテスト
+        run: bash scripts/test/test-check-live-reply-model-api-run.sh
+
       - name: 本体アプリとキーボード拡張の App Group の設定のテスト
         run: bash scripts/test/test-app-group-entitlements.sh
 
