@@ -6,6 +6,10 @@
 
 見本ごとの記録は `chat-screen-samples.json` に置く (項目の意味は `PoppoTests/ChatScreenSampleTests.swift` の `ChatScreenSample`)。出どころ (`source`)・利用の条件 (`usageTerms`)・画面に映っている発言 (`messages`) を、画像のファイル名 (`imageFileName`) ごとに書く。
 
+`chatTitle` には、画面の上部 (ナビゲーションバー) に出ているチャットの名前を、画面に出ているとおりに書く (戻るボタンの「‹」は含めない)。テストは、`chatTitleReadFromScreen(lines:)` が読んだ名前を、別のスクリーンショットの名前と比べる形 (`comparableClueText(text:)`) にそろえて比べる。
+
+`speakerNames` には、`speakerNames(lines:)` が読むべき名前を、画面の上から下の順に、同じ名前は 1 つにして書く。名前は、名前と時刻を Vision が別の行に読む見出しからだけ読む (1 つの行に読まれた見出しは、「Meet me at 10:42」のような時刻で終わる本文と見分けられないため)。そのため、見出しの無い吹き出しのチャットと、Vision が見出しを 1 つの行 (「Mira Solberg 10:42 AM」) に読むスレッドの見本 (英語・日本語。CI の実測: run ID 45881931854) は空にする。テストは読んだ名前を `comparableClueText(text:)` の形にそろえて比べる。
+
 `messages` には、画像を目で見て分かる発言を、画面の上から下の順に書く。今の実装が返す値を写さない。書き方は `documents/DIRECTION.md`「決めたこと」に合わせる。
 
 - 画面で複数の行にわたる発言は、行を改行でつなぐ

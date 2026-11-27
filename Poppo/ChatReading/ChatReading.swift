@@ -15,22 +15,21 @@ nonisolated enum ChatReadingError: Error, Equatable {
     case incompleteTranslation
 }
 
-/// 画像 1 枚から、写っている発言ごとの原文と訳文と、返信案を作る。
+/// 画像 1 枚から読んだ行 (lines) から、写っている発言ごとの原文と訳文と、返信案を作る。
 /// 発言は画面の上から下の順に、利用者自身の発言も含めてすべて返す (どの発言を訳すかは translateTexts が決める)。
 /// 返信案は replyModel (選ばれている、返信案を作るモデル) で作る。canGenerateReplies に replyModel を渡して true が返った時だけ作り、
 /// 作れなかった時 (モデルが使えない・生成に失敗した) は返信案を空にして翻訳だけを返す。ほかのモデルに切り替えて作ることはしない
 /// (どのモデルが作った返信案かが分からなくなるため)。
-/// 文字の読み取り・翻訳・返信の文の生成は引数で受け取る (simulator では翻訳と生成が動かないため、テストで差し替える)。
+/// 翻訳・返信の文の生成は引数で受け取る (simulator では翻訳と生成が動かないため、テストで差し替える)。
 /// 発言を読み取れない時と、翻訳できない時は ChatReadingError か、引数の処理が投げたエラーを投げる
 func readChat(
-    image: CGImage,
-    recognizeTextLines: @MainActor (CGImage) async throws -> [RecognizedTextLine],
+    lines: [RecognizedTextLine],
     translateTexts: @MainActor ([String]) async throws -> [String],
     replyModel: ReplyModel,
     canGenerateReplies: @MainActor (ReplyModel) -> Bool,
     generateReplyTexts: @MainActor ([ExtractedMessage], ReplyModel) async throws -> [String]
 ) async throws -> (messages: [TranslatedMessage], replySuggestions: [ReplySuggestion]) {
-    let extractedMessages = extractMessages(lines: try await recognizeTextLines(image))
+    let extractedMessages = extractMessages(lines: lines)
     guard !extractedMessages.isEmpty else {
         throw ChatReadingError.noMessages
     }

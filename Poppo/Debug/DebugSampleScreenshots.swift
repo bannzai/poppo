@@ -18,6 +18,83 @@ nonisolated func debugTapToAppearText(milliseconds: Int?) -> String {
     "タップから表示まで: \(milliseconds.map { "\($0) ms" } ?? "なし")"
 }
 
+/// 開発者メニューで読む、見本のチャットの画面。前に読んだ同じ相手のスクリーンショットの選択が既定になるかを、
+/// 2 つの相手を交互に読んで見比べるために 2 つ置く (1 つだけでは、直前の選択が既定になる動きと見分けられないため)
+nonisolated enum DebugSampleChat: CaseIterable {
+    /// 全員の発言が左に並ぶチャンネル (Slack に似せた形)
+    case designReview
+    /// 1 対 1 の相手とのチャット (店とのやり取り)
+    case harborBooks
+
+    /// 画面の上部に出すチャットの名前
+    var title: String {
+        switch self {
+        case .designReview:
+            "# design-review"
+        case .harborBooks:
+            "Harbor Books"
+        }
+    }
+
+    /// 画面に並べる発言。見出し行 (名前と時刻) と本文の組で、上から下の順
+    var messages: [(header: String, body: String)] {
+        switch self {
+        case .designReview:
+            [
+                (header: "Mira Solberg 10:42 AM", body: "Can someone review the onboarding flow?"),
+                (header: "Tobias Lindqvist 10:45 AM", body: "Sure, I will take a look after lunch."),
+            ]
+        case .harborBooks:
+            [
+                (header: "Harbor Books 9:12 AM", body: "Your order has arrived at the store."),
+                (header: "Harbor Books 9:13 AM", body: "We are open until 7 pm today."),
+            ]
+        }
+    }
+}
+
+/// 見本のチャット (sampleChat) の画面の画像を、iPhone 17 Pro のスクリーンショットと同じ大きさで描いて返す。
+/// ステータスバーの時刻・上部のチャットの名前・発言の見出し行と本文を、文字の読み取り (Vision) が読める大きさで描く。描けなかった時は CocoaError.fileWriteUnknown を投げる
+func debugSampleChatScreenImage(sampleChat: DebugSampleChat) throws -> CGImage {
+    let pixelSize = DebugSampleScreenshotShape.portrait.pixelSize
+    let format = UIGraphicsImageRendererFormat()
+    // ピクセル数を pixelSize のままにするため
+    format.scale = 1
+    guard
+        let cgImage = UIGraphicsImageRenderer(size: pixelSize, format: format).image(actions: { _ in
+            UIColor.white.setFill()
+            UIRectFill(CGRect(origin: .zero, size: pixelSize))
+            // 位置と大きさは、見本の画像 (PoppoTests/ChatScreenSamples/chat-screen-sample-thread-light-english.png) の配置に合わせる:
+            // ステータスバーの文字の中心が高さの 3% 前後、チャットの名前の中心が 9% 前後、発言は 18% から下
+            ("9:41" as NSString).draw(
+                at: CGPoint(x: 90, y: 50),
+                withAttributes: [.font: UIFont.boldSystemFont(ofSize: 48), .foregroundColor: UIColor.black]
+            )
+            let titleAttributes: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 52), .foregroundColor: UIColor.black]
+            let titleSize = (sampleChat.title as NSString).size(withAttributes: titleAttributes)
+            (sampleChat.title as NSString).draw(
+                at: CGPoint(x: (pixelSize.width - titleSize.width) / 2, y: pixelSize.height * 0.09 - titleSize.height / 2),
+                withAttributes: titleAttributes
+            )
+            for (index, message) in sampleChat.messages.enumerated() {
+                // 1 つの発言の高さ 260px: 見出し行と本文の 2 行と、発言の間の余白
+                let messageTop = pixelSize.height * 0.18 + CGFloat(index) * 260
+                (message.header as NSString).draw(
+                    at: CGPoint(x: 190, y: messageTop),
+                    withAttributes: [.font: UIFont.boldSystemFont(ofSize: 46), .foregroundColor: UIColor.black]
+                )
+                (message.body as NSString).draw(
+                    at: CGPoint(x: 190, y: messageTop + 70),
+                    withAttributes: [.font: UIFont.systemFont(ofSize: 46), .foregroundColor: UIColor.black]
+                )
+            }
+        }).cgImage
+    else {
+        throw CocoaError(.fileWriteUnknown)
+    }
+    return cgImage
+}
+
 /// 開発者メニューで写真ライブラリに足した、見本のスクリーンショットの localIdentifier を控える UserDefaults のキー
 private let debugSampleScreenshotIdentifiersKey = "debugSampleScreenshotIdentifiers"
 

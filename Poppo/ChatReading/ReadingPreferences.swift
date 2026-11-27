@@ -2,8 +2,8 @@ import Foundation
 
 /// 読み取った発言を書いた相手が、利用者にとってどういう相手か。返信案の口調を分けるためだけに使う (翻訳には使わない)。
 /// 選べる関係の一覧は、この enum の case だけに置く。何も選んでいない状態は、この型の Optional の nil で表す。
-/// 生の値は、選んだ関係の保存 (selectedChatPartnerRelationshipUserDefaultsKey) に書くため、変えない
-nonisolated enum ChatPartnerRelationship: String, CaseIterable {
+/// 生の値は、選んだ関係の保存 (selectedChatPartnerRelationshipUserDefaultsKey) とスクリーンショットからの読み取りの記録 (ScreenshotReadingChoice) に書くため、変えない
+nonisolated enum ChatPartnerRelationship: String, CaseIterable, Codable {
     /// 友人・家族
     case friendOrFamily
     /// 仕事の仲間
@@ -27,6 +27,12 @@ func selectedTargetLanguage(userDefaults: UserDefaults, preferredLanguages: [Str
         savedIdentifier: userDefaults.string(forKey: selectedTargetLanguageUserDefaultsKey),
         preferredLanguages: preferredLanguages
     )
+}
+
+/// 端末に保存してある訳す先の言語の識別子 (savedIdentifier。空文字は未選択) を、スクリーンショットからの読み取りの記録
+/// (ScreenshotReadingChoice.targetLanguageIdentifier) に残す形にして返す。未選択の時は nil
+nonisolated func recordedTargetLanguageIdentifier(savedIdentifier: String) -> String? {
+    savedIdentifier.isEmpty ? nil : savedIdentifier
 }
 
 /// 保存してある訳す先の言語の識別子 (savedIdentifier。nil か空文字は未選択) から、訳す先の言語を返す。

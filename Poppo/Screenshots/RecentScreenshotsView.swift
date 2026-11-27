@@ -146,7 +146,11 @@ struct ScreenshotGrid: View {
                 LazyVGrid(columns: screenshotGridColumns, spacing: screenshotGridSpacing) {
                     ForEach(screenshots, id: \.localIdentifier) { screenshot in
                         NavigationLink {
-                            ChatReadingView(screenshot: screenshot, readChatContent: { try await readChat(screenshot: screenshot) })
+                            ChatReadingView(
+                                screenshot: screenshot,
+                                recognizeTextLines: { try await recognizeTextLines(screenshot: screenshot) },
+                                readChatContent: { try await readChat(lines: $0) }
+                            )
                         } label: {
                             ScreenshotThumbnail(screenshot: screenshot)
                         }

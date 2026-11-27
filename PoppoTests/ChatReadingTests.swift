@@ -1,22 +1,8 @@
 import CoreGraphics
 import Foundation
 import Testing
-@testable import Poppo
 
-/// テストで readChat に渡す 1 ピクセルの画像。文字の読み取りは偽物に差し替えるため、中身は使われない
-private func makeTestImage() throws -> CGImage {
-    try #require(
-        CGContext(
-            data: nil,
-            width: 1,
-            height: 1,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )?.makeImage()
-    )
-}
+@testable import Poppo
 
 /// 文字の読み取りの偽物が返す、相手の発言 1 つと利用者の発言 1 つが写った画面の行
 private let recognizedChatLines = [
@@ -27,8 +13,7 @@ private let recognizedChatLines = [
 /// 画像 1 枚から、発言ごとの原文と訳文を画面の上から下の順に返し、返信案には返信の文と、その文を訳した意味を入れること
 @Test func readChatReturnsTranslatedMessagesAndReplySuggestions() async throws {
     let reading = try await readChat(
-        image: makeTestImage(),
-        recognizeTextLines: { _ in recognizedChatLines },
+        lines: recognizedChatLines,
         translateTexts: { texts in texts.map { "訳: " + $0 } },
         replyModel: .onDevice,
         canGenerateReplies: { _ in true },
@@ -45,8 +30,7 @@ private let recognizedChatLines = [
 @Test func readChatPassesEveryMessageWithItsSpeakerToReplyGeneration() async throws {
     var receivedMessages: [ExtractedMessage] = []
     _ = try await readChat(
-        image: makeTestImage(),
-        recognizeTextLines: { _ in recognizedChatLines },
+        lines: recognizedChatLines,
         translateTexts: { $0 },
         replyModel: .onDevice,
         canGenerateReplies: { _ in true },
@@ -65,8 +49,7 @@ private let recognizedChatLines = [
 @Test(arguments: ReplyModel.allCases) func readChatReturnsOnlyTranslationWhenSelectedModelIsUnavailable(replyModel: ReplyModel) async throws {
     var replyGenerationCallCount = 0
     let reading = try await readChat(
-        image: makeTestImage(),
-        recognizeTextLines: { _ in recognizedChatLines },
+        lines: recognizedChatLines,
         translateTexts: { texts in texts.map { "訳: " + $0 } },
         replyModel: replyModel,
         canGenerateReplies: { $0 != replyModel },
@@ -87,8 +70,7 @@ private let recognizedChatLines = [
     var availabilityCheckedModels: [ReplyModel] = []
     var replyGeneratedModels: [ReplyModel] = []
     let reading = try await readChat(
-        image: makeTestImage(),
-        recognizeTextLines: { _ in recognizedChatLines },
+        lines: recognizedChatLines,
         translateTexts: { $0 },
         replyModel: replyModel,
         canGenerateReplies: {
@@ -109,8 +91,7 @@ private let recognizedChatLines = [
 /// 返信の文の生成が失敗した時は、翻訳を失わず、返信案を空にして返すこと
 @Test func readChatReturnsOnlyTranslationWhenReplyGenerationFails() async throws {
     let reading = try await readChat(
-        image: makeTestImage(),
-        recognizeTextLines: { _ in recognizedChatLines },
+        lines: recognizedChatLines,
         translateTexts: { texts in texts.map { "訳: " + $0 } },
         replyModel: .onDevice,
         canGenerateReplies: { _ in true },
@@ -125,8 +106,7 @@ private let recognizedChatLines = [
 @Test func readChatReturnsOnlyTranslationWhenReplyMeaningTranslationFails() async throws {
     var translationCallCount = 0
     let reading = try await readChat(
-        image: makeTestImage(),
-        recognizeTextLines: { _ in recognizedChatLines },
+        lines: recognizedChatLines,
         translateTexts: { texts in
             translationCallCount += 1
             guard translationCallCount == 1 else {
@@ -147,8 +127,7 @@ private let recognizedChatLines = [
 @Test func readChatReturnsNoReplySuggestionsWhenReplyMeaningsAreIncomplete() async throws {
     var translationCallCount = 0
     let reading = try await readChat(
-        image: makeTestImage(),
-        recognizeTextLines: { _ in recognizedChatLines },
+        lines: recognizedChatLines,
         translateTexts: { texts in
             translationCallCount += 1
             return translationCallCount == 1 ? texts.map { "訳: " + $0 } : ["訳: Sounds good"]
@@ -164,11 +143,9 @@ private let recognizedChatLines = [
 
 /// 画像から文字を 1 行も読み取れなかった時は、発言が無いことを表すエラーを投げること
 @Test func readChatThrowsNoMessagesWhenNoTextIsRecognized() async throws {
-    let image = try makeTestImage()
     await #expect(throws: ChatReadingError.noMessages) {
         _ = try await readChat(
-            image: image,
-            recognizeTextLines: { _ in [] },
+            lines: [],
             translateTexts: { $0 },
             replyModel: .onDevice,
             canGenerateReplies: { _ in true },
@@ -179,11 +156,9 @@ private let recognizedChatLines = [
 
 /// 訳文が発言の数より少なく返った時は、発言の一部だけを出さず、訳文が足りないことを表すエラーを投げること
 @Test func readChatThrowsIncompleteTranslationWhenTranslationsAreMissing() async throws {
-    let image = try makeTestImage()
     await #expect(throws: ChatReadingError.incompleteTranslation) {
         _ = try await readChat(
-            image: image,
-            recognizeTextLines: { _ in recognizedChatLines },
+            lines: recognizedChatLines,
             translateTexts: { _ in ["訳: Are you free today?"] },
             replyModel: .onDevice,
             canGenerateReplies: { _ in true },
@@ -194,7 +169,6 @@ private let recognizedChatLines = [
 
 /// 訳す言語が端末に入っていない失敗は、言語の組を保ったまま呼び出し元へ伝えること (画面が言語のダウンロードを促すために使う)
 @Test func readChatRethrowsLanguageNotInstalled() async throws {
-    let image = try makeTestImage()
     await #expect(
         throws: ChatReadingError.languageNotInstalled(
             source: Locale.Language(identifier: "en"),
@@ -202,8 +176,7 @@ private let recognizedChatLines = [
         )
     ) {
         _ = try await readChat(
-            image: image,
-            recognizeTextLines: { _ in recognizedChatLines },
+            lines: recognizedChatLines,
             translateTexts: { _ in
                 throw ChatReadingError.languageNotInstalled(
                     source: Locale.Language(identifier: "en"),
