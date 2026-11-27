@@ -101,12 +101,22 @@
         }
       }
     },
-    "Couldn't load" : {
+    "Couldn't download" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "読み込めません"
+            "value" : "ダウンロードできませんでした"
+          }
+        }
+      }
+    },
+    "Couldn't get it from iCloud" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud から取れませんでした"
           }
         }
       }
@@ -141,6 +151,16 @@
         }
       }
     },
+    "Download from iCloud" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud からダウンロード"
+          }
+        }
+      }
+    },
     "Download language" : {
       "localizations" : {
         "ja" : {
@@ -157,6 +177,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末で翻訳するには言語のダウンロードが必要です"
+          }
+        }
+      }
+    },
+    "Download was canceled" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロードが取り消されました"
+          }
+        }
+      }
+    },
+    "Downloading" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード中"
           }
         }
       }
@@ -181,22 +221,22 @@
         }
       }
     },
+    "No photos yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真がまだありません"
+          }
+        }
+      }
+    },
     "No screenshots yet" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットがまだありません"
-          }
-        }
-      }
-    },
-    "Not on this iPhone" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この iPhone にありません"
           }
         }
       }
@@ -257,6 +297,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショットを読み取っています"
+          }
+        }
+      }
+    },
+    "Recent photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近の写真"
           }
         }
       }
@@ -327,6 +377,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スクリーンショット"
+          }
+        }
+      }
+    },
+    "Screenshots only" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットだけ"
           }
         }
       }

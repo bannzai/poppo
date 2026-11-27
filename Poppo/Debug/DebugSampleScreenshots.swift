@@ -203,6 +203,64 @@ func debugSampleScreenshots() -> [PHAsset] {
     return fetchResult.objects(at: IndexSet(integersIn: 0..<fetchResult.count))
 }
 
+/// 見本のスクリーンショットの縮小画像の読み出しで、number 枚目 (1 が最も新しい) をどう扱うか
+nonisolated enum DebugSampleScreenshotAvailability: Equatable {
+    /// 端末にある画像として、写真ライブラリから読み出す
+    case onDevice
+    /// iCloud にだけある画像として扱う。iCloud から取ってよい時は、downloadSucceeds が true なら取れ、false なら取れない
+    case inCloudOnly(downloadSucceeds: Bool)
+    /// 読み出せない画像として扱う
+    case unavailable
+}
+
+/// 見本のスクリーンショットの number 枚目の扱いを返す。3 列の一覧の 1 行目の右端 (3 番) と 2 行目の左端 (4 番) を iCloud にだけある画像にし、
+/// 取れる時と取れない時を並べて見比べる。3 行目の左端 (7 番) は読み出せない画像にし、一覧から外れて 8 番が詰めて並ぶことを確かめる
+nonisolated func debugSampleScreenshotAvailability(number: Int) -> DebugSampleScreenshotAvailability {
+    switch number {
+    case 3:
+        .inCloudOnly(downloadSucceeds: true)
+    case 4:
+        .inCloudOnly(downloadSucceeds: false)
+    case 7:
+        .unavailable
+    default:
+        .onDevice
+    }
+}
+
+/// 開発者メニューの、iCloud にだけある見本と読み出せない見本を混ぜた一覧で使う、縮小画像の読み出し。
+/// 引数と返す値は loadScreenshotThumbnailImage と同じで、見本の番号 (debugSampleScreenshotAvailability) で iCloud にだけある画像と読み出せない画像を作る。
+/// iCloud から取る時は、進み具合を 4 回に分けて 0.5 秒ずつ伝える (取っている間の表示を simulator で撮れる長さにするため)
+func debugSampleScreenshotThumbnailImage(
+    asset: PHAsset,
+    isNetworkAccessAllowed: Bool,
+    progressHandler: @escaping @Sendable (_ fractionCompleted: Double) -> Void
+) async -> Result<UIImage, ScreenshotImageUnavailableReason> {
+    // 見本の控えは 1 番から順に並ぶため、控えの中の位置 + 1 が番号になる。控えに無い写真は端末にある画像として扱う
+    switch debugSavedSampleScreenshotIdentifiers().firstIndex(of: asset.localIdentifier).map({ debugSampleScreenshotAvailability(number: $0 + 1) }) {
+    case .inCloudOnly(let downloadSucceeds):
+        guard isNetworkAccessAllowed else {
+            return .failure(.inCloudOnly)
+        }
+        for step in 1...4 {
+            try? await Task.sleep(for: .milliseconds(500))
+            progressHandler(Double(step) / 4)
+        }
+        guard downloadSucceeds else {
+            return .failure(.failed(errorDescription: "PHPhotosErrorDomain 3164: 見本のダウンロードの失敗"))
+        }
+    case .unavailable:
+        return .failure(.unknown)
+    case .onDevice, nil:
+        break
+    }
+    return await loadScreenshotThumbnailImage(
+        asset: asset,
+        isNetworkAccessAllowed: isNetworkAccessAllowed,
+        progressHandler: progressHandler
+    )
+}
+
 /// 開発者メニューで足した見本のスクリーンショットのうち、写真アプリがスクリーンショットの種別を付けたものの数
 func debugSampleScreenshotsMarkedAsScreenshotCount() -> Int {
     debugSampleScreenshots().filter { $0.mediaSubtypes.contains(.photoScreenshot) }.count

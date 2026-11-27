@@ -53,14 +53,18 @@ func nextLanguageDownloadConfiguration(
     return configuration
 }
 
-/// スクリーンショット (screenshot) の画像を読み出し、写っている文字を行ごとに読んで返す。
+/// スクリーンショット (screenshot) の画像を読み出し、写っている文字を行ごとに読んで返す。端末に無い時は iCloud から取る
+/// (利用者が読み取る 1 枚として選んだ画像のため。documents/DIRECTION.md「決めたこと」2026-11-27)。
 /// スクリーンショットを読み出せない時は ChatReadingError.imageUnavailable を、ほかは recognizeTextLines(image:) と同じエラーを投げる
 func recognizeTextLines(screenshot: PHAsset) async throws -> [RecognizedTextLine] {
     guard
         case .success(let loadedImage) = await loadScreenshotImage(
             asset: screenshot,
             targetSize: PHImageManagerMaximumSize,
-            contentMode: .default
+            contentMode: .default,
+            isNetworkAccessAllowed: true,
+            // 読み取りの画面は、取っている間も「読み取っています」の表示だけを出し、進み具合を出さないため
+            progressHandler: nil
         ),
         let image = loadedImage.cgImage
     else {
