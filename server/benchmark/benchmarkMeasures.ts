@@ -20,6 +20,23 @@ export function isWrittenInScript(text: string, writingScript: WritingScript): b
   }
 }
 
+/**
+ * text が、角括弧で囲んだ埋めていない枠 (`[Adresse]`・`[Uhrzeit]` など。全角の `［］` も含む) を含むかを返す。
+ * モデルが知らないことを聞かれた時に、答えの代わりに書く枠を数えるために使う
+ */
+export function containsBracketPlaceholder(text: string): boolean {
+  return /[[［][^\]］]*[\]］]/u.test(text);
+}
+
+/**
+ * text が、conversation (会話の文) のどこにも無い数字の並びを含むかを返す。
+ * モデルが作った番地・郵便番号・電話番号・時刻を数える目安に使う (会話に出た数字を繰り返しただけの文は数えない)。
+ * 数字の無い作り物 (通りの名前だけ、人の名前など) は見分けないので、そこは返った文を読んで確かめる
+ */
+export function containsNumberNotInConversation(text: string, conversation: string): boolean {
+  return (text.match(/\p{Nd}+/gu) ?? []).some((number) => !(conversation.match(/\p{Nd}+/gu) ?? []).includes(number));
+}
+
 /** 候補のモデル 1 つを、会話の見本 1 つで 1 回呼んだ結果 */
 export type ReplyModelCall = {
   /** 呼んだモデルの名前 (提供元の API でのモデルの ID) */
@@ -103,19 +120,23 @@ export async function measureReplyModelCall(
 }
 
 /**
- * 実行の引数から、見本 1 つあたりの呼ぶ回数 (`runCount`)、測ると選ばれた候補 (`selectedModels`)、そのうち実際に呼ぶ候補 (`measuredModels`) を返す。
- * runs は `--runs` の値、modelNames は `--models` の値 (カンマ区切り。undefined は候補の全部)。
+ * 実行の引数から、見本 1 つあたりの呼ぶ回数 (`runCount`)、測ると選ばれた候補 (`selectedModels`)、そのうち実際に呼ぶ候補 (`measuredModels`)、
+ * 渡す会話の見本 (`selectedSamples`) を返す。
+ * runs は `--runs` の値、modelNames は `--models` の値 (カンマ区切り。undefined は候補の全部)、
+ * sampleIDs は `--samples` の値 (見本の `id` のカンマ区切り。undefined は samples の全部)。
  * hasAPIKey が false を返した候補 (提供元の API キーが無い) は呼ばない。
- * runs が 1 以上の整数でない時、modelNames に候補に無い名前がある時 (名前の打ち間違いで何も測らずに終わらないため)、呼ぶ回数 (呼ぶ候補の数 × sampleCount × runCount) が maximumCallCount を超える時は、Error を投げる (提供元を呼ぶ前に止めるため)
+ * runs が 1 以上の整数でない時、modelNames に候補に無い名前がある時・sampleIDs に samples に無い名前がある時 (名前の打ち間違いで何も測らずに終わらないため)、
+ * 呼ぶ回数 (呼ぶ候補の数 × 渡す見本の数 × runCount) が maximumCallCount を超える時は、Error を投げる (提供元を呼ぶ前に止めるため)
  */
-export function planReplyModelCalls<Model extends { modelName: string }>(plan: {
+export function planReplyModelCalls<Model extends { modelName: string }, Sample extends { id: string }>(plan: {
   candidates: Model[];
   runs: string;
   modelNames: string | undefined;
-  sampleCount: number;
+  samples: Sample[];
+  sampleIDs: string | undefined;
   maximumCallCount: number;
   hasAPIKey: (model: Model) => boolean;
-}): { runCount: number; selectedModels: Model[]; measuredModels: Model[] } {
+}): { runCount: number; selectedModels: Model[]; measuredModels: Model[]; selectedSamples: Sample[] } {
   const runCount = Number(plan.runs);
   if (!Number.isInteger(runCount) || runCount < 1) {
     throw new Error(`--runs は 1 以上の整数にする: ${plan.runs}`);
@@ -129,11 +150,16 @@ export function planReplyModelCalls<Model extends { modelName: string }>(plan: {
   const selectedModels = plan.candidates.filter(
     (model) => plan.modelNames === undefined || plan.modelNames.split(',').includes(model.modelName),
   );
-  const measuredModels = selectedModels.filter(plan.hasAPIKey);
-  if (measuredModels.length * plan.sampleCount * runCount > plan.maximumCallCount) {
-    throw new Error(`呼ぶ回数が上限 (${plan.maximumCallCount} 回) を超える。--runs か --models で減らす`);
+  const unknownSampleIDs = (plan.sampleIDs?.split(',') ?? []).filter((sampleID) => !plan.samples.some((sample) => sample.id === sampleID));
+  if (unknownSampleIDs.length > 0) {
+    throw new Error(`--samples に見本に無い名前がある: ${unknownSampleIDs.join(', ')}`);
   }
-  return { runCount, selectedModels, measuredModels };
+  const selectedSamples = plan.samples.filter((sample) => plan.sampleIDs === undefined || plan.sampleIDs.split(',').includes(sample.id));
+  const measuredModels = selectedModels.filter(plan.hasAPIKey);
+  if (measuredModels.length * selectedSamples.length * runCount > plan.maximumCallCount) {
+    throw new Error(`呼ぶ回数が上限 (${plan.maximumCallCount} 回) を超える。--runs・--models・--samples で減らす`);
+  }
+  return { runCount, selectedModels, measuredModels, selectedSamples };
 }
 
 /** トークンの数と 100 万トークンあたりの単価 (USD) から、1 回の呼び出しの費用 (USD) を返す */
@@ -168,6 +194,10 @@ export type ReplyModelSummary = {
   textCount: number;
   /** 返った返信の文のうち、相手の言語の文字で書かれていた数 */
   textInThemWritingScriptCount: number;
+  /** 返った返信の文のうち、角括弧で囲んだ埋めていない枠を含んでいた数 */
+  textWithBracketPlaceholderCount: number;
+  /** 返った返信の文のうち、渡した会話に無い数字を含んでいた数 (作り物の番地・電話番号・時刻の目安) */
+  textWithNumberNotInConversationCount: number;
   /** 返信の文 3 つの形で返った呼び出しの、返るまでの時間の中央値 (ミリ秒)。1 回も返らなかった時は null */
   medianDurationMilliseconds: number | null;
   /** 返信の文 3 つの形で返った呼び出しの、返るまでの時間の最も遅かった値 (ミリ秒)。1 回も返らなかった時は null */
@@ -187,12 +217,12 @@ function meanOf(values: number[]): number | null {
 
 /**
  * calls のうち model.modelName の呼び出しをまとめた数字を返す。
- * themWritingScriptOfSampleID は、会話の見本の `id` から相手の言語の文字の種類を引く対応
+ * sampleOfID は、会話の見本の `id` から、相手の言語の文字の種類と会話の文を引く対応
  */
 export function summarizeReplyModelCalls(
   model: { modelName: string; inputUSDPerMillionTokens: number; outputUSDPerMillionTokens: number },
   calls: ReplyModelCall[],
-  themWritingScriptOfSampleID: Record<string, WritingScript>,
+  sampleOfID: Record<string, { themWritingScript: WritingScript; conversation: string }>,
 ): ReplyModelSummary {
   const modelCalls = calls.filter((call) => call.modelName === model.modelName);
   const threeTextsCalls = modelCalls.flatMap((call) => (call.texts === null ? [] : [{ ...call, texts: call.texts }]));
@@ -208,7 +238,13 @@ export function summarizeReplyModelCalls(
     threeTextsCallCount: threeTextsCalls.length,
     textCount: threeTextsCalls.reduce((count, call) => count + call.texts.length, 0),
     textInThemWritingScriptCount: threeTextsCalls.reduce(
-      (count, call) => count + call.texts.filter((text) => isWrittenInScript(text, themWritingScriptOfSampleID[call.sampleID])).length,
+      (count, call) => count + call.texts.filter((text) => isWrittenInScript(text, sampleOfID[call.sampleID].themWritingScript)).length,
+      0,
+    ),
+    textWithBracketPlaceholderCount: threeTextsCalls.reduce((count, call) => count + call.texts.filter(containsBracketPlaceholder).length, 0),
+    textWithNumberNotInConversationCount: threeTextsCalls.reduce(
+      (count, call) =>
+        count + call.texts.filter((text) => containsNumberNotInConversation(text, sampleOfID[call.sampleID].conversation)).length,
       0,
     ),
     medianDurationMilliseconds: durations.length === 0 ? null : medianOf(durations),
@@ -235,11 +271,13 @@ function formatNumber(value: number | null, fractionDigits: number): string {
 /** summaries を、モデルごとに 1 行の Markdown の表にして返す */
 export function renderSummaryTable(summaries: ReplyModelSummary[]): string {
   return [
-    '| モデル | 返信の文 3 つの形で返った回数 / 呼んだ回数 | 相手の言語の文字で書かれた文 / 返った文 | 返るまでの時間の中央値 (秒) | 最も遅かった値 (秒) | 入力のトークンの平均 | 出力のトークンの平均 (思考を含む) | 1 回あたりの費用 (USD) |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| モデル | 返信の文 3 つの形で返った回数 / 呼んだ回数 | 相手の言語の文字で書かれた文 / 返った文 | 埋めていない枠 (`[...]`) を含む文 | 会話に無い数字を含む文 | 返るまでの時間の中央値 (秒) | 最も遅かった値 (秒) | 入力のトークンの平均 | 出力のトークンの平均 (思考を含む) | 1 回あたりの費用 (USD) |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
     ...summaries.map(
       (summary) =>
-        `| \`${summary.modelName}\` | ${summary.threeTextsCallCount} / ${summary.callCount} | ${summary.textInThemWritingScriptCount} / ${summary.textCount} | ${formatNumber(
+        `| \`${summary.modelName}\` | ${summary.threeTextsCallCount} / ${summary.callCount} | ${summary.textInThemWritingScriptCount} / ${summary.textCount} | ${
+          summary.textWithBracketPlaceholderCount
+        } | ${summary.textWithNumberNotInConversationCount} | ${formatNumber(
           summary.medianDurationMilliseconds === null ? null : summary.medianDurationMilliseconds / 1000,
           2,
         )} | ${formatNumber(summary.slowestDurationMilliseconds === null ? null : summary.slowestDurationMilliseconds / 1000, 2)} | ${formatNumber(

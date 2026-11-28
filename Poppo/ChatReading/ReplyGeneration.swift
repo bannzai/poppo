@@ -22,13 +22,21 @@ nonisolated func replyPrompt(messages: [ExtractedMessage]) -> String {
     messages.map { ($0.isFromUser ? "Me: " : "Them: ") + $0.text }.joined(separator: "\n\n")
 }
 
-/// 返信の文を作るモデルへの指示の文。どのモデルでも同じ文を使う
+/// 返信の文を作るモデルへの指示の文。どのモデルでも同じ文を使う。
+/// 「The replies are suggestions」から後ろの 3 つの文は、モデルが知らないこと (利用者の住所など) を聞かれた会話で、
+/// 作り物の答えや `[Adresse]` のような埋めていない枠を返信の文に書かせないためのもの
+/// (文を選んだ経緯と測った結果: documents/evaluation/2026-11-28-reply-instructions-unknown-facts.md)
 let replyInstructions = """
     You help a person reply in a chat. The chat is listed from oldest to newest. \
     Lines starting with "Me:" were written by the person you help. \
     Lines starting with "Them:" were written by other people. \
     Write replies that the person could send next in response to the latest "Them:" lines. \
-    Write every reply in the same language as the "Them:" lines.
+    Write every reply in the same language as the "Them:" lines. \
+    The replies are suggestions on the person's keyboard: tapping one sends it exactly as written. \
+    Yes-or-no questions, including whether the person is free or willing, are decided by the person choosing a reply, \
+    so offer both answers. \
+    For anything else that only the person knows, do not write it or a blank for it; \
+    the person will type it themselves, so suggest replies that work without it.
     """
 
 /// 返信の文を作るモデルへの指示の文。chatPartnerRelationship は、利用者が選んだ相手との関係 (nil は未選択)。

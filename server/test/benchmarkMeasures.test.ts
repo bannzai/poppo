@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   billedOutputTokensOfUsage,
+  containsBracketPlaceholder,
+  containsNumberNotInConversation,
   costUSDOfTokens,
   failureOfError,
   isWrittenInScript,
@@ -34,6 +36,38 @@ for (const [writingScript, text, expected] of [
 ] as const) {
   test(`「${text}」は ${writingScript} の文字で書かれて${expected ? 'いる' : 'いない'}`, () => {
     assert.equal(isWrittenInScript(text, writingScript), expected);
+  });
+}
+
+// 枠を含む側と、角括弧を使っていない・閉じていない側の両方を置く
+for (const [text, expected] of [
+  ['Meine Adresse lautet [Adresse].', true],
+  ['Ich bin ab [Uhrzeit] zu Hause.', true],
+  ['[Ihre Adresse]', true],
+  ['住所は［住所］です。', true],
+  ['Meine Adresse ist Musterstraße 12.', false],
+  ['Meine Adresse lautet (siehe Paket).', false],
+  ['Meine Adresse lautet [', false],
+  ['', false],
+] as const) {
+  test(`「${text}」は埋めていない枠を含${expected ? 'む' : 'まない'}`, () => {
+    assert.equal(containsBracketPlaceholder(text), expected);
+  });
+}
+
+// 会話に無い数字を含む側と、数字が無い・会話にある数字だけの側の両方を置く
+for (const [text, conversation, expected] of [
+  ['Meine Adresse ist Musterstraße 12, 12345 Berlin.', 'Them: Können Sie uns Ihre Adresse nennen?', true],
+  ['Ich bin ab 14 Uhr zu Hause.', 'Them: Wir kommen um 9 Uhr.', true],
+  // 会話の数字 (14) の一部 (1) は、会話に無い数字として数える
+  ['Je serai là à 1h.', 'Them: On commence le samedi 14 vers 9h.', true],
+  ['電話番号は０９０です。', 'Them: 電話番号を教えてください。', true],
+  ['Je serai là à 9h le 14.', 'Them: On commence le samedi 14 vers 9h.', false],
+  ['Ich bin morgen den ganzen Tag zu Hause.', 'Them: Wir kommen um 9 Uhr.', false],
+  ['', 'Them: Wir kommen um 9 Uhr.', false],
+] as const) {
+  test(`「${text}」は、会話「${conversation}」に無い数字を含${expected ? 'む' : 'まない'}`, () => {
+    assert.equal(containsNumberNotInConversation(text, conversation), expected);
   });
 }
 
@@ -118,13 +152,17 @@ function clockReturning(times: number[]) {
 /** 計画のテストで使う候補。b は API キーが無い提供元のモデルとして扱う */
 const planCandidates = [{ modelName: 'a' }, { modelName: 'b' }, { modelName: 'c' }];
 
+/** 計画のテストで使う会話の見本 (8 つ) */
+const planSamples = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'].map((id) => ({ id }));
+
 /** planCandidates を、b だけ API キーが無いものとして計画する (上書きする引数だけを渡す) */
-function plan(overrides: { runs?: string; modelNames?: string; sampleCount?: number; maximumCallCount?: number }) {
+function plan(overrides: { runs?: string; modelNames?: string; sampleIDs?: string; maximumCallCount?: number }) {
   return planReplyModelCalls({
     candidates: planCandidates,
     runs: '3',
     modelNames: undefined,
-    sampleCount: 8,
+    samples: planSamples,
+    sampleIDs: undefined,
     maximumCallCount: 300,
     hasAPIKey: (model) => model.modelName !== 'b',
     ...overrides,
@@ -136,6 +174,7 @@ test('モデルを指定しない計画は、候補の全部を選び、API キ�
     runCount: 3,
     selectedModels: [{ modelName: 'a' }, { modelName: 'b' }, { modelName: 'c' }],
     measuredModels: [{ modelName: 'a' }, { modelName: 'c' }],
+    selectedSamples: planSamples,
   });
 });
 
@@ -144,7 +183,29 @@ test('モデルを指定した計画は、指定した名前の候補だけを�
     runCount: 3,
     selectedModels: [{ modelName: 'b' }, { modelName: 'c' }],
     measuredModels: [{ modelName: 'c' }],
+    selectedSamples: planSamples,
   });
+});
+
+test('見本を指定した計画は、指定した名前の見本だけを、見本の並びの順で選ぶ', () => {
+  assert.deepEqual(plan({ sampleIDs: 's8,s2' }).selectedSamples, [{ id: 's2' }, { id: 's8' }]);
+});
+
+for (const sampleIDs of ['s1,unknown', 's', '']) {
+  test(`--samples が「${sampleIDs}」(見本に無い名前を含む) の計画は失敗する`, () => {
+    assert.throws(() => plan({ sampleIDs }), /--samples に見本に無い名前がある/);
+  });
+}
+
+test('見本に無い名前だけを、失敗の文に並べる', () => {
+  assert.throws(() => plan({ sampleIDs: 'x,s1,y' }), /--samples に見本に無い名前がある: x, y$/);
+});
+
+test('呼ぶ回数は、指定した見本の数で数える (見本の全部では上限を超える計画が、見本を絞ると通る)', () => {
+  // 呼ぶ候補 2 つ × 見本 8 つ × 3 回 = 48 回は上限 12 回を超え、見本 2 つなら 12 回でちょうど通り、見本 3 つなら 18 回で超える
+  assert.throws(() => plan({ maximumCallCount: 12 }), /呼ぶ回数が上限 \(12 回\) を超える/);
+  assert.equal(plan({ maximumCallCount: 12, sampleIDs: 's1,s2' }).selectedSamples.length, 2);
+  assert.throws(() => plan({ maximumCallCount: 12, sampleIDs: 's1,s2,s3' }), /呼ぶ回数が上限 \(12 回\) を超える/);
 });
 
 for (const modelNames of ['c,unknown', 'aa', '']) {
@@ -273,12 +334,15 @@ const calls: ReplyModelCall[] = [
   },
 ];
 
+/** まとめのテストで使う、会話の見本の id から相手の言語の文字の種類と会話の文を引く対応 */
+const sampleOfID = {
+  english: { themWritingScript: 'latin', conversation: 'Them: Can you come at 8?' },
+  korean: { themWritingScript: 'hangul', conversation: 'Them: 목요일까지 보내주실 수 있을까요?' },
+} as const;
+
 test('モデルごとのまとめは、そのモデルの呼び出しだけを数え、失敗した回を時間・トークン・費用に入れない', () => {
   assert.deepEqual(
-    summarizeReplyModelCalls({ modelName: 'model-a', inputUSDPerMillionTokens: 1_000_000, outputUSDPerMillionTokens: 2_000_000 }, calls, {
-      english: 'latin',
-      korean: 'hangul',
-    }),
+    summarizeReplyModelCalls({ modelName: 'model-a', inputUSDPerMillionTokens: 1_000_000, outputUSDPerMillionTokens: 2_000_000 }, calls, sampleOfID),
     {
       modelName: 'model-a',
       callCount: 3,
@@ -286,6 +350,8 @@ test('モデルごとのまとめは、そのモデルの呼び出しだけを�
       textCount: 6,
       // english の 3 つのうちラテン文字は 2 つ、korean の 3 つのうちハングルは 2 つ
       textInThemWritingScriptCount: 4,
+      textWithBracketPlaceholderCount: 0,
+      textWithNumberNotInConversationCount: 0,
       medianDurationMilliseconds: 2000,
       slowestDurationMilliseconds: 3000,
       meanInputTokens: 200,
@@ -298,13 +364,15 @@ test('モデルごとのまとめは、そのモデルの呼び出しだけを�
 
 test('1 回も返信の文が返らなかったモデルのまとめは、時間・トークン・費用を null にする (0 にしない)', () => {
   assert.deepEqual(
-    summarizeReplyModelCalls({ modelName: 'model-a', inputUSDPerMillionTokens: 1, outputUSDPerMillionTokens: 1 }, [calls[2]], { korean: 'hangul' }),
+    summarizeReplyModelCalls({ modelName: 'model-a', inputUSDPerMillionTokens: 1, outputUSDPerMillionTokens: 1 }, [calls[2]], sampleOfID),
     {
       modelName: 'model-a',
       callCount: 1,
       threeTextsCallCount: 0,
       textCount: 0,
       textInThemWritingScriptCount: 0,
+      textWithBracketPlaceholderCount: 0,
+      textWithNumberNotInConversationCount: 0,
       medianDurationMilliseconds: null,
       slowestDurationMilliseconds: null,
       meanInputTokens: null,
@@ -312,6 +380,22 @@ test('1 回も返信の文が返らなかったモデルのまとめは、時間
       meanCostUSD: null,
     },
   );
+});
+
+test('モデルごとのまとめは、埋めていない枠を含む文と、その見本の会話に無い数字を含む文を、文ごとに数える', () => {
+  const summary = summarizeReplyModelCalls(
+    { modelName: 'model-a', inputUSDPerMillionTokens: 1, outputUSDPerMillionTokens: 1 },
+    [
+      // 枠だけ / 会話に無い数字 (12 と 12345) だけ / 枠と会話に無い数字 (9) の両方
+      { ...calls[0], texts: ['My address is [address].', 'I live at 12 Main Street, 12345 Berlin.', 'Come at 9 to [address].'] },
+      // 8 は english の会話にあり、korean の会話には無い: 見本ごとの会話と比べていることを確かめる
+      { ...calls[1], texts: ['See you at 8.', 'OK', 'OK'] },
+      { ...calls[0], runNumber: 2, texts: ['See you at 8.', 'OK', 'OK'] },
+    ],
+    sampleOfID,
+  );
+  assert.equal(summary.textWithBracketPlaceholderCount, 2);
+  assert.equal(summary.textWithNumberNotInConversationCount, 3);
 });
 
 test('まとめの表は、モデルごとに 1 行で、時間を秒に直し、測れなかった数字を「-」にする', () => {
@@ -323,6 +407,8 @@ test('まとめの表は、モデルごとに 1 行で、時間を秒に直し�
         threeTextsCallCount: 2,
         textCount: 6,
         textInThemWritingScriptCount: 4,
+        textWithBracketPlaceholderCount: 1,
+        textWithNumberNotInConversationCount: 2,
         medianDurationMilliseconds: 2000,
         slowestDurationMilliseconds: 3456,
         meanInputTokens: 200.4,
@@ -335,6 +421,8 @@ test('まとめの表は、モデルごとに 1 行で、時間を秒に直し�
         threeTextsCallCount: 0,
         textCount: 0,
         textInThemWritingScriptCount: 0,
+        textWithBracketPlaceholderCount: 0,
+        textWithNumberNotInConversationCount: 0,
         medianDurationMilliseconds: null,
         slowestDurationMilliseconds: null,
         meanInputTokens: null,
@@ -344,7 +432,10 @@ test('まとめの表は、モデルごとに 1 行で、時間を秒に直し�
     ])
       .split('\n')
       .slice(2),
-    ['| `model-a` | 2 / 3 | 4 / 6 | 2.00 | 3.46 | 200 | 30 | 0.000123 |', '| `model-b` | 0 / 1 | 0 / 0 | - | - | - | - | - |'],
+    [
+      '| `model-a` | 2 / 3 | 4 / 6 | 1 | 2 | 2.00 | 3.46 | 200 | 30 | 0.000123 |',
+      '| `model-b` | 0 / 1 | 0 / 0 | 0 | 0 | - | - | - | - | - |',
+    ],
   );
 });
 

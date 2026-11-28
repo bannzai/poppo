@@ -13,6 +13,7 @@ import {
   summarizeReplyModelCalls,
   type ReplyModelCall,
 } from './benchmarkMeasures.js';
+import { appReplyInstructionsAtGitRef } from './appReplyInstructions.js';
 import { candidateReplyModels, type CandidateReplyModel } from './candidateReplyModels.js';
 import { conversationSamples } from './conversationSamples.js';
 
@@ -39,7 +40,7 @@ const providers = {
 };
 
 /**
- * 1 回の実行で呼んでよい回数の上限。候補 10 個 × 見本 8 つ × 3 回 = 240 回に余裕を足した数で、
+ * 1 回の実行で呼んでよい回数の上限。候補 10 個 × 見本 9 つ × 3 回 = 270 回に余裕を足した数で、
  * 引数の指定を誤っても試す間の費用 (3 社それぞれ月 10 ドル。documents/DIRECTION.md「決めたこと」の 2026-11-21 の行) を大きく使わないようにする
  */
 const maximumCallCount = 300;
@@ -51,23 +52,31 @@ const callTimeoutMilliseconds = 60_000;
 
 const { values: options } = parseArgs({
   options: {
-    // 見本 1 つあたりの呼ぶ回数。3 は、中央値と最も遅い値を見本 8 つ × 3 回 = 24 回から出すための数
+    // 見本 1 つあたりの呼ぶ回数。3 は、中央値と最も遅い値を見本 9 つ × 3 回 = 27 回から出すための数
     runs: { type: 'string', default: '3' },
     // 測るモデルの名前 (カンマ区切り)。指定しない時は候補の全部
     models: { type: 'string' },
     // 全部の呼び出しの結果を JSON で書き出すファイル。指定しない時は書き出さない
     output: { type: 'string' },
+    // 渡す会話の見本の id (カンマ区切り)。指定しない時は見本の全部
+    samples: { type: 'string' },
+    // git のこの ref (ブランチ・タグ・コミット) の時点の、アプリの指示の文で呼ぶ。指定しない時は今の指示の文
+    'instructions-ref': { type: 'string' },
   },
 });
 
-const { runCount, selectedModels, measuredModels } = planReplyModelCalls({
+const { runCount, selectedModels, measuredModels, selectedSamples } = planReplyModelCalls({
   candidates: candidateReplyModels,
   runs: options.runs,
   modelNames: options.models,
-  sampleCount: conversationSamples.length,
+  samples: conversationSamples,
+  sampleIDs: options.samples,
   maximumCallCount,
   hasAPIKey: (model) => Boolean(process.env[providers[model.provider].apiKeyEnvironmentName]),
 });
+
+// 提供元を呼ぶ前に読む (ref の打ち間違いで、利用料をかけてから失敗しないため)。undefined は、今の指示の文 (generateReplyTextsWithModel の既定) で呼ぶ
+const instructions = options['instructions-ref'] === undefined ? undefined : appReplyInstructionsAtGitRef(options['instructions-ref']);
 
 const ai = genkit({
   plugins: [...new Set(measuredModels.map((model) => model.provider))].map((provider) => providers[provider].createPlugin()),
@@ -78,7 +87,7 @@ const calls = (
   await Promise.all(
     measuredModels.map(async (model) => {
       const modelCalls: ReplyModelCall[] = [];
-      for (const sample of conversationSamples) {
+      for (const sample of selectedSamples) {
         for (let runNumber = 1; runNumber <= runCount; runNumber += 1) {
           modelCalls.push(
             await measureReplyModelCall({ modelName: model.modelName, sampleID: sample.id, runNumber }, () =>
@@ -87,6 +96,7 @@ const calls = (
                 providers[model.provider].model(model),
                 sample.conversation,
                 AbortSignal.timeout(callTimeoutMilliseconds),
+                instructions,
               ),
             ),
           );
@@ -99,14 +109,15 @@ const calls = (
 
 console.log(
   [
-    `測った日時: ${new Date().toISOString()} (見本 ${conversationSamples.length} つ × ${runCount} 回)`,
+    `測った日時: ${new Date().toISOString()} (見本 ${selectedSamples.length} つ × ${runCount} 回)`,
+    `指示の文: ${options['instructions-ref'] === undefined ? '今の文' : `git の ${options['instructions-ref']} の時点の文`}`,
     '',
     renderSummaryTable(
       measuredModels.map((model) =>
         summarizeReplyModelCalls(
           model,
           calls,
-          Object.fromEntries(conversationSamples.map((sample) => [sample.id, sample.themWritingScript])),
+          Object.fromEntries(selectedSamples.map((sample) => [sample.id, sample])),
         ),
       ),
     ),
@@ -116,7 +127,7 @@ console.log(
       .map((model) => `測っていない: \`${model.modelName}\` (環境変数 ${providers[model.provider].apiKeyEnvironmentName} が無い)`),
     '',
     renderReplyTexts(
-      conversationSamples.map((sample) => sample.id),
+      selectedSamples.map((sample) => sample.id),
       measuredModels.map((model) => model.modelName),
       calls,
     ),

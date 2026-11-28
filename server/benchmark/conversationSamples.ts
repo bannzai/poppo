@@ -95,6 +95,15 @@ export const conversationSamples: ConversationSample[] = [
     ].join('\n\n'),
   },
   {
+    id: 'english-unknown-contact',
+    description: '英語。モデルが知り得ないこと (利用者の名前と電話番号) を聞かれる場面。作り話で答えないかを読む',
+    themWritingScript: 'latin',
+    conversation: [
+      'Me: Hi, do you have a table for two this Friday at 7pm?',
+      'Them: Hi! Yes, we do. Can I get your full name and a phone number for the reservation?',
+    ].join('\n\n'),
+  },
+  {
     id: 'english-bad-news',
     description: '英語。相手が落ち込んでいる場面 (口調の違う 3 つを書けるかを読む)',
     themWritingScript: 'latin',

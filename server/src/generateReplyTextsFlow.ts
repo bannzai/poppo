@@ -11,7 +11,12 @@ export const replyInstructions =
   'Lines starting with "Me:" were written by the person you help. ' +
   'Lines starting with "Them:" were written by other people. ' +
   'Write replies that the person could send next in response to the latest "Them:" lines. ' +
-  'Write every reply in the same language as the "Them:" lines.';
+  'Write every reply in the same language as the "Them:" lines. ' +
+  "The replies are suggestions on the person's keyboard: tapping one sends it exactly as written. " +
+  'Yes-or-no questions, including whether the person is free or willing, are decided by the person choosing a reply, ' +
+  'so offer both answers. ' +
+  'For anything else that only the person knows, do not write it or a blank for it; ' +
+  'the person will type it themselves, so suggest replies that work without it.';
 
 /**
  * 返信の文の組 (`texts`) がどういうものかをモデルに伝える説明の文。
@@ -89,12 +94,20 @@ function endsInsideUnclosedJSON(text: string): boolean {
 /**
  * model に会話の文を渡し、会話に続けて利用者が送れる返信の文 3 つ (`texts`) と、その呼び出しで数えられたトークンの数 (`usage`) を返す。
  * 提供元の API を 1 回呼ぶ (利用料がかかる)。モデルの出力が返信の文 3 つの形でない時は失敗する (一部だけを返さない)。
- * abortSignal を渡すと、その signal が止めた時に呼び出しを打ち切って失敗する (渡さない時は打ち切らない)
+ * abortSignal を渡すと、その signal が止めた時に呼び出しを打ち切って失敗する (渡さない時は打ち切らない)。
+ * instructions はモデルへの指示の文で、渡さない時は `replyInstructions`
+ * (指示の文を変える前と後を比べる測定だけが、ほかの文を渡す。server/README.md「指示の文を変える前と後を比べる」)
  */
-export async function generateReplyTextsWithModel(ai: Genkit, model: ModelArgument, conversation: string, abortSignal?: AbortSignal) {
+export async function generateReplyTextsWithModel(
+  ai: Genkit,
+  model: ModelArgument,
+  conversation: string,
+  abortSignal?: AbortSignal,
+  instructions: string = replyInstructions,
+) {
   const { output, text, usage } = await ai.generate({
     model,
-    system: replyInstructions,
+    system: instructions,
     prompt: conversation,
     output: { schema: GeneratedReplyTextsSchema },
     abortSignal,
