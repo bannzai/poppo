@@ -1,3 +1,5 @@
+import type { ConversationSample } from './conversationSamples.js';
+
 /** 言語を書く文字の種類。返信の文が相手の言語で書かれたかを、文字の種類で数える時に使う */
 export type WritingScript = 'latin' | 'hangul' | 'han' | 'kana';
 
@@ -223,7 +225,7 @@ function meanOf(values: number[]): number | null {
 export function summarizeReplyModelCalls(
   model: { modelName: string; inputUSDPerMillionTokens: number; outputUSDPerMillionTokens: number },
   calls: ReplyModelCall[],
-  sampleOfID: Record<string, { themWritingScript: WritingScript; conversation: string }>,
+  sampleOfID: Record<string, Pick<ConversationSample, 'themWritingScript' | 'conversation'>>,
 ): ReplyModelSummary {
   const modelCalls = calls.filter((call) => call.modelName === model.modelName);
   const threeTextsCalls = modelCalls.flatMap((call) => (call.texts === null ? [] : [{ ...call, texts: call.texts }]));
