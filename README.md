@@ -41,6 +41,7 @@
 - 方向性 (仮説・判定基準・必要な機能・決めたこと・用語): [documents/DIRECTION.md](documents/DIRECTION.md)
 - 評価の記録: [documents/evaluation/2026-11-17-report.md](documents/evaluation/2026-11-17-report.md)
 - 返信案を作るモデルの候補の測定と提案: [documents/evaluation/2026-11-22-reply-model-benchmark.md](documents/evaluation/2026-11-22-reply-model-benchmark.md)
+- 知らないことを聞かれた会話で、作り物の答えを返信案に出さない指示の文の測定: [documents/evaluation/2026-11-28-reply-instructions-unknown-facts.md](documents/evaluation/2026-11-28-reply-instructions-unknown-facts.md)
 - 開発の手順と検証方法: [AGENTS.md](AGENTS.md)
 - 端末の外のモデルで返信の文を作るサーバーの処理 (デプロイしていない。手元での起動とテスト): [server/README.md](server/README.md)。置き場所・費用・呼び方の案: [documents/adr/0003-serve-off-device-reply-models-through-genkit-server.md](documents/adr/0003-serve-off-device-reply-models-through-genkit-server.md)
 - TestFlight の内部テストへの配布: [documents/ios-testflight-distribution.md](documents/ios-testflight-distribution.md)

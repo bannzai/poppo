@@ -92,7 +92,12 @@ import Testing
             Lines starting with "Me:" were written by the person you help. \
             Lines starting with "Them:" were written by other people. \
             Write replies that the person could send next in response to the latest "Them:" lines. \
-            Write every reply in the same language as the "Them:" lines.
+            Write every reply in the same language as the "Them:" lines. \
+            The replies are suggestions on the person's keyboard: tapping one sends it exactly as written. \
+            Yes-or-no questions, including whether the person is free or willing, are decided by the person choosing a reply, \
+            so offer both answers. \
+            For anything else that only the person knows, do not write it or a blank for it; \
+            the person will type it themselves, so suggest replies that work without it.
             """
     )
 }

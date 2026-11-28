@@ -87,6 +87,20 @@ test('モデルへ、指示の文を system として、会話の文をそのま
   );
 });
 
+test('指示の文を渡して呼ぶと、モデルへ、その文を system として渡す (渡さない時の指示の文は渡らない)', async () => {
+  mockModelOfProvider.gemini.respondWith({ text: JSON.stringify({ texts: ['a', 'b', 'c'] }) });
+
+  await generateReplyTextsWithModel(ai, mockModelOfProvider.gemini, conversation, undefined, 'Reply in one word.');
+
+  assert.deepEqual(
+    mockModelOfProvider.gemini.lastRequest?.messages.map((message) => ({ role: message.role, content: message.content })),
+    [
+      { role: 'system', content: [{ text: 'Reply in one word.' }] },
+      { role: 'user', content: [{ text: conversation }] },
+    ],
+  );
+});
+
 test('モデルへ、出力の形 (追加のプロパティを許さない、3 つの文字列の texts) を schema として渡す', async () => {
   mockModelOfProvider.openAI.respondWith({ text: JSON.stringify({ texts: ['a', 'b', 'c'] }) });
 
