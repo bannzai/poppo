@@ -4,7 +4,8 @@ import { modelOfProvider } from '../src/providerModels.js';
 
 for (const [provider, name, config] of [
   ['claude', 'anthropic/claude-haiku-4-5', {}],
-  ['openAI', 'openai/gpt-5.4-mini', { strict: true }],
+  // 設定が無い (strict の指定を付けない)。付けると plugin が提供元を呼ぶ前に失敗する
+  ['openAI', 'openai/gpt-6-luna', undefined],
   ['gemini', 'googleai/gemini-3.5-flash-lite', {}],
 ] as const) {
   test(`${provider} には ${name} を、設定 ${JSON.stringify(config)} で使う`, () => {
