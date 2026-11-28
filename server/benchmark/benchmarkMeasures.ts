@@ -34,7 +34,8 @@ export function containsBracketPlaceholder(text: string): boolean {
  * 数字の無い作り物 (通りの名前だけ、人の名前など) は見分けないので、そこは返った文を読んで確かめる
  */
 export function containsNumberNotInConversation(text: string, conversation: string): boolean {
-  return (text.match(/\p{Nd}+/gu) ?? []).some((number) => !(conversation.match(/\p{Nd}+/gu) ?? []).includes(number));
+  const numbersInConversation: string[] = conversation.match(/\p{Nd}+/gu) ?? [];
+  return (text.match(/\p{Nd}+/gu) ?? []).some((number) => !numbersInConversation.includes(number));
 }
 
 /** 候補のモデル 1 つを、会話の見本 1 つで 1 回呼んだ結果 */
