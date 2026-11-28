@@ -110,7 +110,7 @@ API キーの環境変数を 1 つも持たない状態で `npm start` を実行
 | 各社の API キーをサーバーの secret に置くこと | `ANTHROPIC_API_KEY`・`OPENAI_API_KEY`・`GEMINI_API_KEY` の 3 つを Cloud Secret Manager に置く。どの提供元を利用者に配るか (3 社とも / 一部) |
 | `GoogleService-Info.plist` の扱い | リポジトリに置かず、ビルドの時に Secrets から書き出す (勧める案。Secrets に名前が 1 つ増える) か、Firebase の文書に従ってコミットする |
 | 利用者の見分け方と回数の上限 | 匿名のサインインでよいか (入れ直しやサインインのし直しで回数が戻ることを許すか、匿名の uid に頼らない制限を足すか)。無料の利用者の 1 日あたり (または通算) の回数 |
-| 提供元ごとのモデル | 仮に選んだ小さい側のモデルのままにするか、質を比べて決め直すか。OpenAI を、アプリの開発者メニューの経路と同じ `gpt-6-luna` に揃えるか |
+| 提供元ごとのモデル | Claude と Gemini を、仮に選んだ小さい側のモデルのままにするか、質を比べて決め直すか (Gemini は測定の提案が今の `gemini-3.5-flash-lite` のまま、Claude は測れていない: `documents/evaluation/2026-11-22-reply-model-benchmark.md`)。OpenAI は 2026-11-28 に `gpt-6-luna` に決まった |
 | 同意の画面と文書の直し | 端末の外へ発言を送る前の同意の画面、`docs/PrivacyPolicy-ja.md`、App Privacy の回答、輸出コンプライアンスの申告。利用者に配るビルドで端末の外へ送る変更と同じ変更で行う (`documents/DIRECTION.md`「決めたこと」の 2026-11-20 の行) |
 
 決まった後に別の issue で行うこと: `onCallGenkit` の入口とデプロイ、アプリ側の呼び出しの切り替え ( https://github.com/bannzai/poppo/issues/39 の実装は main に入っている。開発者メニューの OpenAI・Gemini の経路をこの flow に替えるか、残すかもその時に決める)、同意の画面と文書の直し、`documents/adr/0002-process-on-device-without-backend.md` の改め。
